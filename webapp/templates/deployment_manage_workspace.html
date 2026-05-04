@@ -1,0 +1,99 @@
+{% extends "booking_workspace_base.html" %}
+{% set workspace_nav = "deployment_manage" %}
+{% block workspace_title %}ENV Deployment Queue{% endblock %}
+{% block workspace_styles %}
+.table-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.table-actions .btn {
+    white-space: nowrap;
+}
+
+.queue-empty {
+    padding: 2rem 1rem;
+    text-align: center;
+    color: #64748b;
+}
+{% endblock %}
+{% block workspace_content %}
+<div class="container-fluid px-0">
+    <div class="workspace-card">
+        <div class="workspace-card-header">
+            <i class="fas fa-diagram-project"></i>
+            <h5>ENV Deployment Queue</h5>
+        </div>
+        <div class="workspace-card-body">
+            {% if not env_dashboard_enabled %}
+            <div class="alert alert-warning mb-0">
+                This dashboard is available only to the ENV team.
+            </div>
+            {% else %}
+            <div id="pageMessage" class="form-message muted" style="display: none;">
+                <i class="fas fa-info-circle"></i>
+                <span id="pageMessageText">Review OPEN requests and progress them through deployment.</span>
+            </div>
+
+            <div class="form-section">
+                <div class="section-title">
+                    <i class="fas fa-filter"></i>
+                    Filters
+                </div>
+                <div class="row">
+                    <div class="col-md-4">
+                        <label for="statusFilter" class="form-label">Status</label>
+                        <select id="statusFilter" class="form-select">
+                            <option value="">All statuses</option>
+                            {% for status in workspace_status_options.deployment_queue_statuses | default([], true) %}
+                            <option value="{{ status.value }}">{{ status.label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="searchFilter" class="form-label">Search</label>
+                        <input id="searchFilter" class="form-control" placeholder="Env, request id, user, target...">
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <button type="button" id="refreshQueueBtn" class="btn btn-outline-secondary-custom w-100">
+                            <i class="fas fa-rotate"></i> Refresh Queue
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th>Request</th>
+                            <th>Environment</th>
+                            <th>Planned Start</th>
+                            <th>Requested By</th>
+                            <th>Target</th>
+                            <th>Version</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="queueTableBody"></tbody>
+                </table>
+            </div>
+            <div id="queueEmpty" class="queue-empty" style="display: none;">No deployment requests match the current filters.</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block workspace_scripts %}
+{% if env_dashboard_enabled %}
+<script>
+window.pageData = {
+    deploymentRequests: {{ deployment_requests|default([], true)|tojson }},
+    statusLabels: {{ workspace_status_options.deployment_queue_status_labels | default({}, true) | tojson }}
+};
+</script>
+<script src="{{ url_for('static', filename='js/pages/deployment-manage.js') }}"></script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,701 @@
+{% extends "base.html" %}
+{% block title %}Environment Dashboard{% endblock %}
+{% block navbar %}{% endblock %}
+{% block extra_head %}
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <style>
+        :root {
+            --shell-navy: #16244f;
+            --shell-navy-deep: #0f1838;
+            --sidebar-start: #33496a;
+            --sidebar-end: #5b7291;
+            --canvas: #f4f7fb;
+            --panel: #ffffff;
+            --panel-line: #9aa9bc;
+            --card-blue: #9ac4f2;
+            --card-blue-dark: #79aee8;
+            --text-main: #152033;
+            --text-soft: #5f6d82;
+            --text-strong: #0f172a;
+            --active-strip: #1a2140;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: var(--canvas);
+            color: var(--text-main);
+            font-family: "Trebuchet MS", Arial, sans-serif;
+            min-height: 100vh;
+        }
+
+        .app-layout {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            width: 230px;
+            background: linear-gradient(180deg, var(--sidebar-start), var(--sidebar-end));
+            border-right: 1px solid rgba(21, 32, 51, 0.18);
+            padding: 22px 16px;
+            position: fixed;
+            left: 0;
+            top: 0;
+            bottom: 0;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 36px;
+            font-size: 20px;
+            font-weight: 700;
+            color: #f8fbff;
+        }
+
+        .brand-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            background: linear-gradient(180deg, var(--shell-navy), #243773);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 8px 18px rgba(15, 24, 56, 0.22);
+        }
+
+        .menu-item {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            color: #f8fbff;
+            padding: 13px 14px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            text-decoration: none;
+            font-size: 15px;
+        }
+
+        .menu-item i {
+            width: 22px;
+            font-size: 18px;
+        }
+
+        .menu-item.active,
+        .menu-item:hover {
+            background: var(--active-strip);
+            color: #ffffff;
+            text-decoration: none;
+        }
+
+        .quick-actions {
+            margin-top: 24px;
+            padding: 16px;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+
+        .quick-actions-title {
+            font-size: 13px;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            color: #e7eef8;
+            letter-spacing: 0.08em;
+            font-weight: 700;
+        }
+
+        .action-button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            margin-bottom: 10px;
+            padding: 12px 14px;
+            text-decoration: none;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.18);
+            color: #ffffff;
+            font-weight: 600;
+            transition: background 0.2s ease;
+        }
+
+        .action-button:hover {
+            background: rgba(255, 255, 255, 0.28);
+        }
+
+        .action-button.secondary {
+            background: rgba(14, 25, 58, 0.3);
+        }
+
+        .theme-toggle {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 18px;
+            padding: 12px 14px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.16);
+            color: #ffffff;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .theme-toggle i {
+            width: 18px;
+            text-align: center;
+        }
+
+        .sidebar-footer {
+            position: absolute;
+            left: 16px;
+            right: 16px;
+            bottom: 22px;
+            color: #e7eef8;
+            font-size: 12px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            padding-top: 14px;
+        }
+
+        .main-content {
+            margin-left: 230px;
+            width: calc(100% - 230px);
+            min-height: 100vh;
+            background: linear-gradient(180deg, #fbfdff 0%, #eef3f9 100%);
+            position: relative;
+        }
+
+        .topbar {
+            min-height: 68px;
+            border-bottom: 1px solid rgba(15, 24, 56, 0.16);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 24px;
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            background: linear-gradient(90deg, var(--shell-navy-deep), var(--shell-navy));
+            box-shadow: 0 8px 18px rgba(15, 24, 56, 0.16);
+        }
+
+        .topbar h1 {
+            font-size: 26px;
+            font-weight: 700;
+            margin: 0;
+            color: #ffffff;
+            letter-spacing: 0.01em;
+        }
+
+        .user-actions {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            color: #ffffff;
+            font-size: 13px;
+            flex-wrap: wrap;
+        }
+
+        .user-actions a {
+            color: #ffffff;
+            text-decoration: none;
+        }
+
+        .user-actions a:hover {
+            color: #60a5fa;
+        }
+
+        .content-wrapper {
+            padding: 22px 24px 28px;
+        }
+
+        .toolbar {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            margin-bottom: 16px;
+            position: sticky;
+            top: 68px;
+            z-index: 15;
+            background: rgba(244, 247, 251, 0.94);
+            padding: 10px 0 8px;
+        }
+
+        .toolbar .btn-dark-custom {
+            background: var(--panel);
+            border: 1px solid var(--panel-line);
+            color: var(--text-main);
+            border-radius: 7px;
+            padding: 6px 12px;
+            font-size: 12px;
+            line-height: 1.2;
+            white-space: nowrap;
+            box-shadow: 0 3px 8px rgba(34, 51, 84, 0.08);
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .summary-card {
+            background: linear-gradient(180deg, #ffffff 0%, #eef4fb 100%);
+            border: 1px solid var(--panel-line);
+            border-radius: 14px;
+            min-height: 108px;
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            box-shadow: 0 8px 18px rgba(34, 51, 84, 0.08);
+        }
+
+        .summary-icon {
+            width: 54px;
+            height: 54px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        .summary-icon.total { background: rgba(37, 99, 235, 0.24); color: #3b82f6; }
+        .summary-icon.healthy { background: rgba(34, 197, 94, 0.22); color: #22c55e; }
+        .summary-icon.warning { background: rgba(234, 179, 8, 0.22); color: #eab308; }
+        .summary-icon.critical { background: rgba(239, 68, 68, 0.22); color: #ef4444; }
+        .summary-icon.maintenance { background: rgba(59, 130, 246, 0.22); color: #3b82f6; }
+
+        .summary-title {
+            font-size: 13px;
+            color: var(--text-strong);
+            margin-bottom: 4px;
+            font-weight: 700;
+        }
+
+        .summary-number {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--text-strong);
+            line-height: 1;
+        }
+
+        .summary-subtitle {
+            color: #475569;
+            font-size: 12px;
+            margin-top: 6px;
+        }
+
+        .group-card {
+            background: var(--panel);
+            border: 1px solid var(--panel-line);
+            border-radius: 16px;
+            margin-bottom: 18px;
+            padding: 18px 18px 20px;
+            box-shadow: 0 10px 24px rgba(34, 51, 84, 0.07);
+        }
+
+        .group-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+
+        .group-header h3 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-strong);
+        }
+
+        .group-count {
+            color: #475569;
+            font-size: 13px;
+        }
+
+        .server-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+            gap: 12px;
+        }
+
+        .env-card {
+            background: linear-gradient(180deg, var(--card-blue) 0%, var(--card-blue-dark) 100%);
+            border: 1px solid rgba(76, 112, 158, 0.32);
+            border-radius: 16px;
+            min-height: 126px;
+            padding: 10px 8px;
+            text-align: center;
+            color: #0f1c33;
+            transition: 0.2s ease;
+            cursor: pointer;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 8px 16px rgba(53, 93, 140, 0.12);
+        }
+
+        .env-card:hover {
+            transform: translateY(-3px);
+            border-color: rgba(41, 73, 120, 0.55);
+            box-shadow: 0 10px 22px rgba(53, 93, 140, 0.22);
+        }
+
+        .env-card.active-booking {
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 0 0 2px rgba(34, 197, 94, 0.38), 0 10px 22px rgba(53, 93, 140, 0.22);
+        }
+
+        .env-card-title {
+            font-weight: 700;
+            font-size: 20px;
+            margin-bottom: 8px;
+            letter-spacing: 0.01em;
+            color: var(--text-strong);
+            line-height: 1.15;
+        }
+
+        .traffic-light {
+            width: 32px;
+            height: 66px;
+            margin: 0 auto 6px;
+            background: linear-gradient(145deg, #1f2937, #111827);
+            border-radius: 10px;
+            padding: 6px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            box-shadow: inset 0 0 7px rgba(0,0,0,0.8);
+        }
+
+        .light {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #374151;
+            margin: 0 auto;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+
+        .light.red.active {
+            background: #ef4444;
+            box-shadow: 0 0 12px #ef4444;
+        }
+
+        .light.yellow.active {
+            background: #eab308;
+            box-shadow: 0 0 12px #eab308;
+        }
+
+        .light.green.active {
+            background: #22c55e;
+            box-shadow: 0 0 12px #22c55e;
+        }
+
+        .light.blue.active {
+            background: #3b82f6;
+            box-shadow: 0 0 12px #3b82f6;
+        }
+
+        .env-card-status {
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            text-shadow: 0 1px 0 rgba(255, 255, 255, 0.28);
+            background: rgba(255, 255, 255, 0.42);
+            border: 1px solid rgba(15, 23, 42, 0.12);
+            border-radius: 999px;
+            padding: 3px 8px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 78px;
+        }
+
+        .env-card-status.healthy { color: #166534; }
+        .env-card-status.warning { color: #92400e; }
+        .env-card-status.critical { color: #991b1b; }
+        .env-card-status.maintenance { color: #1d4ed8; }
+        .env-card-status.unknown { color: #334155; }
+
+        .bottom-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 18px;
+            margin-top: 14px;
+        }
+
+        .info-card {
+            background: var(--panel);
+            border: 1px solid var(--panel-line);
+            border-radius: 14px;
+            padding: 16px 20px;
+            min-height: 92px;
+            color: var(--text-strong);
+            box-shadow: 0 8px 18px rgba(34, 51, 84, 0.06);
+        }
+
+        .info-card strong {
+            color: var(--text-strong);
+        }
+
+        .info-card .text-muted,
+        .legend-item small {
+            color: #475569 !important;
+        }
+
+        .legend-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 28px;
+            align-items: center;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+            color: var(--text-strong);
+        }
+
+        .mini-light {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .mini-light.green { background: #22c55e; }
+        .mini-light.yellow { background: #eab308; }
+        .mini-light.red { background: #ef4444; }
+        .mini-light.blue { background: #3b82f6; }
+
+        .no-results {
+            background: var(--panel);
+            border: 1px solid var(--panel-line);
+            border-radius: 14px;
+            padding: 40px;
+            text-align: center;
+            color: var(--text-soft);
+            box-shadow: 0 8px 18px rgba(34, 51, 84, 0.06);
+        }
+
+        @media (max-width: 1200px) {
+            .summary-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                display: none;
+            }
+
+            .main-content {
+                margin-left: 0;
+                width: 100%;
+            }
+
+            .summary-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .bottom-info {
+                grid-template-columns: 1fr;
+            }
+
+            .topbar {
+                height: auto;
+                padding: 18px;
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 14px;
+            }
+
+            .toolbar {
+                top: 96px;
+                justify-content: flex-start;
+                flex-wrap: wrap;
+            }
+        }
+    </style>
+{% endblock %}
+{% block main_class %}container-fluid px-0 py-0{% endblock %}
+{% block content %}
+<div class="app-layout">
+
+    <aside class="sidebar">
+        <div class="brand">
+            <div class="brand-icon"><i class="fas fa-server"></i></div>
+            <div>Environment<br>Dashboard</div>
+        </div>
+
+        <a href="{{ url_for('main.environment_health') }}" class="menu-item active"><i class="fas fa-home"></i> Home</a>
+        <a href="{{ url_for('booking.booking_grid') }}" class="menu-item"><i class="fas fa-th"></i> Environment Booking</a>
+        <a href="{{ url_for('booking.booking_screen') }}" class="menu-item"><i class="fas fa-calendar-alt"></i> Booking Calendar</a>
+        <a href="{{ url_for('booking.deployment_request') }}" class="menu-item"><i class="fas fa-rocket"></i> Deployment Request</a>
+        <a href="{{ url_for('booking.manage_bookings') }}" class="menu-item"><i class="fas fa-list"></i> My Requests</a>
+        <a href="#" class="menu-item"><i class="fas fa-check-circle"></i> Approvals</a>
+        <a href="#" class="menu-item"><i class="fas fa-chart-line"></i> Reports</a>
+        <a href="{{ url_for('main.admin_screen') }}" class="menu-item"><i class="fas fa-users"></i> Users</a>
+        <a href="#" class="menu-item"><i class="fas fa-cog"></i> Settings</a>
+        <a href="#" class="menu-item"><i class="fas fa-file-alt"></i> Audit Logs</a>
+        <a href="#" class="menu-item"><i class="fas fa-life-ring"></i> Help & Support</a>
+
+        <div class="quick-actions">
+            <div class="quick-actions-title">Quick Actions</div>
+            <a href="{{ url_for('booking.booking_grid') }}" class="action-button"><i class="fas fa-th"></i> Environment Booking</a>
+            <a href="{{ url_for('booking.booking_screen') }}" class="action-button secondary"><i class="fas fa-calendar"></i> View Calendar</a>
+        </div>
+
+        <div class="theme-toggle">
+            <i class="fas fa-moon"></i>
+            Dark Mode
+        </div>
+
+        <div class="sidebar-footer">
+            © 2024 Environment Dashboard<br>
+            All rights reserved.
+        </div>
+    </aside>
+
+    <section class="main-content">
+
+        <header class="topbar">
+            <h1>Environment Dashboard</h1>
+
+            <div class="user-actions">
+                <span><i class="far fa-user-circle"></i> {{ id }}</span>
+
+                <a href="#">
+                    <i class="fas fa-lock"></i> Change Password
+                </a>
+
+                <a href="{{ url_for('main.logout') }}">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
+            </div>
+        </header>
+
+        <section class="content-wrapper">
+
+            <div class="toolbar">
+                <button class="btn-dark-custom">
+                    <i class="far fa-clock"></i> <span id="refreshSecondsText">{{ refresh_seconds }}</span>s
+                </button>
+
+                <button id="refreshButton" class="btn-dark-custom">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
+            </div>
+
+            <div class="summary-grid">
+                <div class="summary-card">
+                    <div class="summary-icon total"><i class="fas fa-server"></i></div>
+                    <div>
+                        <div class="summary-title">Total Environments</div>
+                        <div class="summary-number" id="totalCount">{{ summary.total }}</div>
+                        <div class="summary-subtitle">All Environments</div>
+                    </div>
+                </div>
+
+                <div class="summary-card">
+                    <div class="summary-icon healthy"><i class="fas fa-check"></i></div>
+                    <div>
+                        <div class="summary-title">Healthy</div>
+                        <div class="summary-number" id="healthyCount">{{ summary.healthy }}</div>
+                        <div class="summary-subtitle" id="healthyPercent">0%</div>
+                    </div>
+                </div>
+
+                <div class="summary-card">
+                    <div class="summary-icon warning"><i class="fas fa-exclamation-triangle"></i></div>
+                    <div>
+                        <div class="summary-title">Warning</div>
+                        <div class="summary-number" id="warningCount">{{ summary.warning }}</div>
+                        <div class="summary-subtitle" id="warningPercent">0%</div>
+                    </div>
+                </div>
+
+                <div class="summary-card">
+                    <div class="summary-icon critical"><i class="fas fa-times"></i></div>
+                    <div>
+                        <div class="summary-title">Critical</div>
+                        <div class="summary-number" id="criticalCount">{{ summary.critical }}</div>
+                        <div class="summary-subtitle" id="criticalPercent">0%</div>
+                    </div>
+                </div>
+
+                <div class="summary-card">
+                    <div class="summary-icon maintenance"><i class="fas fa-wrench"></i></div>
+                    <div>
+                        <div class="summary-title">Maintenance</div>
+                        <div class="summary-number" id="maintenanceCount">{{ summary.maintenance if summary.maintenance is defined else 0 }}</div>
+                        <div class="summary-subtitle" id="maintenancePercent">0%</div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="dashboardGroups"></div>
+
+            <div class="bottom-info">
+                <div class="info-card">
+                    <strong>Traffic Light Legend</strong>
+                    <div class="legend-row mt-3">
+                        <div class="legend-item">
+                            <span class="mini-light green"></span>
+                            <div><strong>Healthy</strong><br><small class="text-muted">Normal traffic</small></div>
+                        </div>
+                        <div class="legend-item">
+                            <span class="mini-light yellow"></span>
+                            <div><strong>Warning</strong><br><small class="text-muted">High traffic</small></div>
+                        </div>
+                        <div class="legend-item">
+                            <span class="mini-light red"></span>
+                            <div><strong>Critical</strong><br><small class="text-muted">Very high traffic</small></div>
+                        </div>
+                        <div class="legend-item">
+                            <span class="mini-light blue"></span>
+                            <div><strong>Maintenance</strong><br><small class="text-muted">Planned downtime</small></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="info-card">
+                    <div>
+                        <i class="fas fa-info-circle text-primary"></i>
+                        <span class="ml-2">Status is derived from logical server and component checks.</span>
+                    </div>
+                    <div class="text-muted mt-2">
+                        Environment color comes from the aggregated VM and component state.
+                    </div>
+                    <div class="text-muted mt-2">
+                        Last updated: <span id="lastUpdated">{{ summary.last_updated }}</span>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+    </section>
+</div>
+
+<script id="environmentHealthConfig" type="application/json">
+    {{ {
+        "apiUrl": url_for("monitoring.api_environment_health"),
+        "refreshSeconds": refresh_seconds,
+        "statuses": statuses,
+        "activeEnvs": active_envs,
+        "summary": summary
+    } | tojson }}
+</script>
+{% endblock %}
+{% block scripts %}
+    <script src="{{ url_for('static', filename='js/pages/environment-health.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,502 @@
+{% extends "base.html" %}
+{% block title %}{% block workspace_title %}Booking Workspace{% endblock %}{% endblock %}
+{% block main_class %}p-0{% endblock %}
+{% block extra_head %}
+{% block workspace_extra_head %}{% endblock %}
+<style>
+:root {
+    --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --card-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    --border-radius: 12px;
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --sidebar-width: 280px;
+    --color-scheduled: #2563eb;
+    --color-active: #059669;
+    --color-completed: #64748b;
+    --color-cancelled: #dc2626;
+    --color-open: #2563eb;
+    --color-ready: #7c3aed;
+    --color-auto-running: #d97706;
+    --color-manual-running: #ca8a04;
+    --color-failed: #dc2626;
+    --color-rejected: #db2777;
+    --color-deployment: #f59e0b;
+}
+
+.sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: var(--sidebar-width);
+    height: 100vh;
+    background: #f8fafc;
+    border-right: 1px solid #e2e8f0;
+    padding: 0.5rem 0;
+    z-index: 1000;
+    overflow-y: auto;
+}
+
+.sidebar-header {
+    padding: 0.75rem 0.875rem;
+    border-bottom: 1px solid #e2e8f0;
+    background: #ffffff;
+}
+
+.sidebar-header h6 {
+    margin: 0;
+    font-weight: 600;
+    color: #4a5568;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.sidebar-nav {
+    padding: 0.5rem 0;
+}
+
+.sidebar-link {
+    display: flex;
+    align-items: center;
+    padding: 0.625rem 0.875rem;
+    color: #4a5568;
+    text-decoration: none;
+    transition: var(--transition);
+    border: none;
+    background: none;
+    width: 100%;
+    text-align: left;
+}
+
+.sidebar-link:hover {
+    background: #e2e8f0;
+    color: #2d3748;
+    text-decoration: none;
+}
+
+.sidebar-link.active {
+    background: var(--primary-gradient);
+    color: #ffffff;
+}
+
+.sidebar-link i {
+    margin-right: 0.75rem;
+    width: 16px;
+    text-align: center;
+}
+
+.sidebar-toggle {
+    display: none;
+    position: fixed;
+    top: 16px;
+    left: 10px;
+    z-index: 1001;
+    background: var(--primary-gradient);
+    color: #ffffff;
+    border: none;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--card-shadow);
+    transition: var(--transition);
+}
+
+.sidebar-toggle:hover {
+    transform: scale(1.1);
+}
+
+.main-content {
+    margin-left: var(--sidebar-width);
+    padding: 0.5rem 0.75rem 0.75rem;
+    min-height: 100vh;
+}
+
+.workspace-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: var(--border-radius);
+    box-shadow: var(--card-shadow);
+    margin-bottom: 0.75rem;
+    padding: 0.75rem 1rem;
+}
+
+.workspace-title {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+}
+
+.workspace-title-label {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #2d3748;
+}
+
+.workspace-title-meta {
+    font-size: 0.85rem;
+    color: #718096;
+}
+
+.workspace-userbar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.workspace-userchip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 0.85rem;
+    border-radius: 999px;
+    background: #edf2f7;
+    color: #2d3748;
+    font-weight: 600;
+}
+
+.workspace-logout {
+    text-decoration: none;
+}
+
+.workspace-card {
+    background: #ffffff;
+    border: none;
+    border-radius: var(--border-radius);
+    box-shadow: var(--card-shadow);
+    overflow: hidden;
+    transition: var(--transition);
+}
+
+.workspace-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+}
+
+.workspace-card-header {
+    background: var(--primary-gradient);
+    color: #ffffff;
+    padding: 0.875rem 1rem;
+    border: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.workspace-card-header i {
+    font-size: 1.25rem;
+}
+
+.workspace-card-header h5 {
+    margin: 0;
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+.workspace-card-body {
+    padding: 0.875rem 1rem 1rem;
+}
+
+.form-section {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.section-title {
+    font-weight: 600;
+    color: #2d3748;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.section-title i {
+    color: #667eea;
+}
+
+.form-control,
+.form-select {
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 0.625rem 0.875rem;
+    font-size: 0.9rem;
+    transition: var(--transition);
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    transform: translateY(-1px);
+}
+
+.form-control:hover,
+.form-select:hover {
+    border-color: #cbd5e0;
+}
+
+.form-group label,
+.form-label {
+    font-weight: 600;
+    color: #4a5568;
+    margin-bottom: 0.5rem;
+}
+
+.form-group label i {
+    color: #667eea;
+    font-size: 0.8rem;
+}
+
+.btn-custom {
+    border-radius: 8px;
+    padding: 0.625rem 1.25rem;
+    font-weight: 600;
+    transition: var(--transition);
+    border: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-custom:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.btn-primary-custom {
+    background: var(--primary-gradient);
+    color: #ffffff;
+}
+
+.btn-outline-secondary-custom {
+    border: 2px solid #e2e8f0;
+    color: #4a5568;
+    background: #ffffff;
+}
+
+.btn-outline-secondary-custom:hover {
+    background: #f8fafc;
+    border-color: #cbd5e0;
+    color: #2d3748;
+}
+
+.form-message {
+    padding: 0.625rem 0.875rem;
+    border-radius: 6px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.form-message.success {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.form-message.danger {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.form-message.muted {
+    background: #f8f9fa;
+    color: #6c757d;
+    border: 1px solid #dee2e6;
+}
+
+.legend-swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 999px;
+}
+
+.legend-swatch.scheduled { background: var(--color-scheduled); }
+.legend-swatch.active { background: var(--color-active); }
+.legend-swatch.completed { background: var(--color-completed); }
+.legend-swatch.cancelled { background: var(--color-cancelled); }
+.legend-swatch.open { background: var(--color-open); }
+.legend-swatch.ready_for_deployment { background: var(--color-ready); }
+.legend-swatch.auto_deployment_running { background: var(--color-auto-running); }
+.legend-swatch.manual_deployment_in_progress { background: var(--color-manual-running); }
+.legend-swatch.failed { background: var(--color-failed); }
+.legend-swatch.rejected { background: var(--color-rejected); }
+.legend-swatch.deployment { background: var(--color-deployment); }
+
+.status-pill {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 0.25rem 0.65rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.status-scheduled { background: rgba(37, 99, 235, 0.12); color: #1d4ed8; }
+.status-active { background: rgba(5, 150, 105, 0.12); color: #047857; }
+.status-completed { background: rgba(100, 116, 139, 0.14); color: #475569; }
+.status-cancelled { background: rgba(220, 38, 38, 0.12); color: #b91c1c; }
+.status-open { background: rgba(37, 99, 235, 0.12); color: #1d4ed8; }
+.status-ready_for_deployment,
+.status-ready-for-deployment { background: rgba(139, 92, 246, 0.14); color: #6d28d9; }
+.status-auto_deployment_running,
+.status-auto-deployment-running { background: rgba(245, 158, 11, 0.16); color: #b45309; }
+.status-manual_deployment_in_progress,
+.status-manual-deployment-in-progress { background: rgba(234, 179, 8, 0.18); color: #854d0e; }
+.status-failed { background: rgba(220, 38, 38, 0.12); color: #b91c1c; }
+.status-rejected { background: rgba(236, 72, 153, 0.14); color: #9d174d; }
+
+.booking-scheduled { background: var(--color-scheduled) !important; color: #ffffff !important; }
+.booking-active { background: var(--color-active) !important; color: #ffffff !important; }
+.booking-completed { background: var(--color-completed) !important; color: #ffffff !important; }
+.booking-cancelled { background: var(--color-cancelled) !important; color: #ffffff !important; }
+.booking-open { background: var(--color-open) !important; color: #ffffff !important; }
+.booking-ready_for_deployment,
+.booking-ready-for-deployment { background: var(--color-ready) !important; color: #ffffff !important; }
+.booking-auto_deployment_running,
+.booking-auto-deployment-running { background: var(--color-auto-running) !important; color: #ffffff !important; }
+.booking-manual_deployment_in_progress,
+.booking-manual-deployment-in-progress { background: var(--color-manual-running) !important; color: #ffffff !important; }
+.booking-failed { background: var(--color-failed) !important; color: #ffffff !important; }
+.booking-rejected { background: var(--color-rejected) !important; color: #ffffff !important; }
+
+{% block workspace_styles %}{% endblock %}
+
+@media (max-width: 768px) {
+    .sidebar {
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+    }
+
+    .sidebar.show {
+        transform: translateX(0);
+    }
+
+    .main-content {
+        margin-left: 0;
+        padding: 3.5rem 0.5rem 0.75rem;
+    }
+
+    .workspace-topbar {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .workspace-userbar {
+        justify-content: flex-start;
+    }
+
+    .sidebar-toggle {
+        display: flex;
+    }
+
+    .btn-custom {
+        width: 100%;
+        margin-bottom: 0.5rem;
+    }
+
+    {% block workspace_mobile_styles %}{% endblock %}
+}
+</style>
+{% endblock %}
+{% block content %}
+<button class="sidebar-toggle" type="button" onclick="toggleWorkspaceSidebar()">
+    <i class="fas fa-bars"></i>
+</button>
+
+<div class="sidebar" id="workspaceSidebar">
+    <div class="sidebar-header">
+        <h6><i class="fas fa-layer-group"></i> Navigation</h6>
+    </div>
+    <nav class="sidebar-nav">
+        <a href="{{ url_for('booking.booking_grid') }}" class="sidebar-link{% if workspace_nav == 'grid' %} active{% endif %}">
+            <i class="fas fa-calendar-plus"></i> Quick Booking
+        </a>
+        <a href="{{ url_for('booking.deployment_request') }}" class="sidebar-link{% if workspace_nav == 'deployment' %} active{% endif %}">
+            <i class="fas fa-rocket"></i> Deployment Request
+        </a>
+        <a href="{{ url_for('booking.tool_deployment_request') }}" class="sidebar-link{% if workspace_nav == 'tool_deployment' %} active{% endif %}">
+            <i class="fas fa-toolbox"></i> Tool Deployment
+        </a>
+        {% if user is defined and (user.role == "admin" or "env" in user.team_names) %}
+        <a href="{{ url_for('booking.manage_deployment_requests') }}" class="sidebar-link{% if workspace_nav == 'deployment_manage' %} active{% endif %}">
+            <i class="fas fa-diagram-project"></i> ENV Deployment Queue
+        </a>
+        {% endif %}
+        <a href="{{ url_for('booking.booking_screen') }}" class="sidebar-link{% if workspace_nav == 'calendar' %} active{% endif %}">
+            <i class="fas fa-calendar"></i> View Calendar
+        </a>
+        <a href="{{ url_for('booking.manage_bookings') }}" class="sidebar-link{% if workspace_nav == 'manage' %} active{% endif %}">
+            <i class="fas fa-list"></i> My Requests
+        </a>
+        <a href="{{ url_for('main.dashboard') }}" class="sidebar-link">
+            <i class="fas fa-tachometer-alt"></i> Dashboard
+        </a>
+        <a href="{{ url_for('main.environment_health') }}" class="sidebar-link">
+            <i class="fas fa-heartbeat"></i> Health Status
+        </a>
+    </nav>
+</div>
+
+<div class="main-content">
+    <div class="workspace-topbar">
+        <div class="workspace-title">
+            <span class="workspace-title-label">{% block workspace_heading %}Booking Workspace{% endblock %}</span>
+            <span class="workspace-title-meta">Manage bookings and deployment requests from one place.</span>
+        </div>
+        <div class="workspace-userbar">
+            <span class="workspace-userchip">
+                <i class="fas fa-user-circle"></i>
+                {{ user.user_id if user is defined and user.user_id else "guest" }}
+            </span>
+            <a href="{{ url_for('main.logout') }}" class="btn btn-outline-secondary-custom btn-custom workspace-logout">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </a>
+        </div>
+    </div>
+    {% block workspace_content %}{% endblock %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/min/moment.min.js"></script>
+<script src="{{ url_for('static', filename='js/workspace-common.js') }}"></script>
+<script>
+function toggleWorkspaceSidebar() {
+    const sidebar = document.getElementById("workspaceSidebar");
+    if (sidebar) {
+        sidebar.classList.toggle("show");
+    }
+}
+
+document.addEventListener("click", function (event) {
+    const sidebar = document.getElementById("workspaceSidebar");
+    const toggle = document.querySelector(".sidebar-toggle");
+
+    if (
+        window.innerWidth <= 768 &&
+        sidebar &&
+        toggle &&
+        !sidebar.contains(event.target) &&
+        !toggle.contains(event.target)
+    ) {
+        sidebar.classList.remove("show");
+    }
+});
+</script>
+{% block workspace_scripts %}{% endblock %}
+{% endblock %}

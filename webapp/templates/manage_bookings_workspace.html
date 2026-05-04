@@ -1,0 +1,351 @@
+{% extends "booking_workspace_base.html" %}
+{% set workspace_nav = "manage" %}
+{% block workspace_title %}Manage Requests{% endblock %}
+{% block workspace_styles %}
+.page-card {
+    background: #ffffff;
+    border-radius: 14px;
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
+    overflow: hidden;
+}
+
+.page-header {
+    background: var(--primary-gradient);
+    color: #ffffff;
+    padding: 1.25rem 1.5rem;
+}
+
+.page-header h2 {
+    margin: 0;
+    font-size: 1.65rem;
+    font-weight: 700;
+}
+
+.page-header p {
+    margin: 0.35rem 0 0;
+    opacity: 0.92;
+}
+
+.page-body {
+    padding: 1.25rem 1.5rem 1.5rem;
+}
+
+.summary-grid,
+.toolbar-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.9rem;
+}
+
+.summary-grid {
+    margin-bottom: 1rem;
+}
+
+.summary-card,
+.toolbar-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 1rem;
+}
+
+.summary-label {
+    color: #64748b;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.summary-value {
+    margin-top: 0.35rem;
+    color: #0f172a;
+    font-size: 1.45rem;
+    font-weight: 700;
+}
+
+.table-card {
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.table thead th {
+    background: #eff6ff;
+    color: #334155;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-bottom: 1px solid #dbeafe;
+}
+
+.table td,
+.table th {
+    vertical-align: middle;
+}
+
+.type-pill {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 0.25rem 0.65rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+.type-reservation { background: rgba(59, 130, 246, 0.12); color: #1d4ed8; }
+.type-deployment { background: rgba(245, 158, 11, 0.16); color: #b45309; }
+
+.row-note {
+    color: #64748b;
+    font-size: 0.82rem;
+}
+
+.action-group {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.modal-section {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.modal-section-title {
+    font-weight: 700;
+    color: #334155;
+    margin-bottom: 0.9rem;
+}
+
+.empty-state {
+    text-align: center;
+    color: #64748b;
+    padding: 2rem 1rem;
+}
+
+@media (max-width: 991px) {
+    .summary-grid,
+    .toolbar-grid {
+        grid-template-columns: 1fr;
+    }
+}
+{% endblock %}
+{% block workspace_content %}
+<div class="page-card">
+    <div class="page-header">
+        <h2><i class="fas fa-list-check me-2"></i>Manage Booking Requests</h2>
+        <p>See your environment reservations and deployment requests, then modify or cancel the ones that are still scheduled.</p>
+    </div>
+
+    <div class="page-body">
+        <div id="pageMessage" style="display: none;"></div>
+        {% if reservation_policy.mutual_env_reservation_enabled %}
+        <div class="alert alert-light border mb-3">
+            <i class="fas fa-shield-alt me-2"></i>
+            Environment bookings and env-scoped deployment requests now reserve the same time window.
+        </div>
+        {% endif %}
+
+        <div class="summary-grid">
+            <div class="summary-card">
+                <div class="summary-label">Visible Requests</div>
+                <div class="summary-value" id="summaryVisible">0</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">Scheduled</div>
+                <div class="summary-value" id="summaryScheduled">0</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">Deployments</div>
+                <div class="summary-value" id="summaryDeployments">0</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">Current Scope</div>
+                <div class="summary-value" id="summaryScope">{{ "All" if user.role == "admin" else "Mine" }}</div>
+            </div>
+        </div>
+
+        <div class="toolbar-card">
+            <div class="toolbar-grid">
+                <div>
+                    <label for="filterEnvType" class="form-label">Environment Type</label>
+                    <select id="filterEnvType" class="form-select">
+                        <option value="">All Types</option>
+                        {% for env_type in environment_types %}
+                        <option value="{{ env_type }}">{{ env_type }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="filterBookingType" class="form-label">Booking Type</label>
+                    <select id="filterBookingType" class="form-select">
+                        <option value="">All Types</option>
+                        <option value="RESERVATION">Reservation</option>
+                        <option value="DEPLOYMENT">Deployment</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="filterStatus" class="form-label">Status</label>
+                    <select id="filterStatus" class="form-select">
+                        <option value="">All Statuses</option>
+                        {% for status in workspace_status_options.booking_statuses | default([], true) %}
+                        <option value="{{ status.value }}">{{ status.label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="filterSearch" class="form-label">Search</label>
+                    <input id="filterSearch" class="form-control" type="text" placeholder="Env, booking id, requester">
+                </div>
+            </div>
+            <div class="d-flex justify-content-end mt-3">
+                <button id="clearFiltersButton" type="button" class="btn btn-outline-secondary btn-sm">
+                    <i class="fas fa-rotate-left me-1"></i>Clear Filters
+                </button>
+            </div>
+        </div>
+
+        <div class="table-card">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Booking ID</th>
+                            <th>Env</th>
+                            <th>Window</th>
+                            <th>Type</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bookingTableBody">
+                        <tr>
+                            <td colspan="6" class="empty-state">Loading booking requests...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="editBookingModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editModalTitle">Edit Booking</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="modalMessage" style="display: none;"></div>
+                <form id="editBookingForm">
+                    <div class="modal-section">
+                        <div class="modal-section-title">Booking Details</div>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="editStartTime" class="form-label">Start Date & Time</label>
+                                <input type="datetime-local" id="editStartTime" class="form-control" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="editEndTime" class="form-label">End Date & Time</label>
+                                <input type="datetime-local" id="editEndTime" class="form-control" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="editEnvType" class="form-label">Environment Type</label>
+                                <select id="editEnvType" class="form-select">
+                                    <option value="">Select type...</option>
+                                    {% for env_type in environment_types %}
+                                    <option value="{{ env_type }}">{{ env_type }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="editEnvId" class="form-label">Environment</label>
+                                <select id="editEnvId" class="form-select" required>
+                                    <option value="">Select environment...</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="editBookingTypeDisplay" class="form-label">Booking Type</label>
+                                <input type="text" id="editBookingTypeDisplay" class="form-control" readonly>
+                            </div>
+                            <div class="col-12">
+                                <label for="editDescription" class="form-label">Description</label>
+                                <textarea id="editDescription" class="form-control" rows="3" placeholder="Optional description"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="modal-section" id="deploymentSection" style="display: none;">
+                        <div class="modal-section-title">Deployment Request</div>
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label for="editComponentType" class="form-label">Component Type</label>
+                                <select id="editComponentType" class="form-select">
+                                    <option value="">Select component type...</option>
+                                    {% for component in manage_deployment_options.edit_components | default([], true) %}
+                                    <option value="{{ component.value }}">{{ component.label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="editVersion" class="form-label">Version</label>
+                                <select id="editVersion" class="form-select">
+                                    <option value="">Select version...</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="editTestingMode" class="form-label">Testing Mode</label>
+                                <select id="editTestingMode" class="form-select">
+                                    <option value="">Select mode...</option>
+                                    {% for mode in manage_deployment_options.testing_modes | default([], true) %}
+                                    <option value="{{ mode.value }}">{{ mode.label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="editComponentNames" class="form-label">Component Names</label>
+                                <select id="editComponentNames" class="form-select" multiple size="5"></select>
+                            </div>
+                            <div class="col-md-6" id="editServiceTypesGroup" style="display: none;">
+                                <label for="editServiceTypes" class="form-label">Service Types</label>
+                                <select id="editServiceTypes" class="form-select" multiple size="5">
+                                    {% for service in manage_deployment_options.service_types | default([], true) %}
+                                    <option value="{{ service.value }}">{{ service.label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="deleteBookingButton" class="btn btn-outline-danger me-auto">
+                    <i class="fas fa-ban me-1"></i>Cancel
+                </button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" id="saveBookingButton" class="btn btn-primary-custom btn-custom">
+                    <i class="fas fa-floppy-disk me-1"></i>Save Changes
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block workspace_scripts %}
+<script>
+window.pageData = {
+    currentUser: {{ user.user_id | tojson }},
+    userRole: {{ user.role | tojson }},
+    environments: {{ environments | tojson }},
+    componentConfig: {{ manage_deployment_options.edit_component_packages | default({}, true) | tojson }},
+    serverTimezone: {{ (server_timezone or "UTC") | tojson }},
+    reservationPolicy: {{ reservation_policy | default({}, true) | tojson }}
+};
+</script>
+<script src="{{ url_for('static', filename='js/pages/manage-bookings.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,55 @@
+body {
+    background: linear-gradient(135deg, #edf6ff 0%, #f8fbff 45%, #fff8ef 100%);
+    min-height: 100vh;
+}
+
+.navbar-brand {
+    letter-spacing: 0.02em;
+}
+
+.card {
+    border-radius: 1.25rem;
+}
+
+.screen-card {
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.screen-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 1rem 2rem rgba(0, 0, 0, 0.08) !important;
+}
+
+.health-badge {
+    min-width: 72px;
+    text-transform: capitalize;
+}
+
+.health-healthy {
+    background: #198754;
+}
+
+.health-warning {
+    background: #ffc107;
+    color: #2b2b2b;
+}
+
+.health-critical {
+    background: #dc3545;
+}
+
+.health-unknown {
+    background: #6c757d;
+}
+
+.health-card-healthy {
+    border-left: 5px solid #198754 !important;
+}
+
+.health-card-warning {
+    border-left: 5px solid #ffc107 !important;
+}
+
+.health-card-critical {
+    border-left: 5px solid #dc3545 !important;
+}

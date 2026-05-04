@@ -1,0 +1,355 @@
+{% extends "booking_workspace_base.html" %}
+{% set workspace_nav = "calendar" %}
+{% block workspace_title %}Booking Calendar{% endblock %}
+{% block workspace_extra_head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css">
+{% endblock %}
+{% block workspace_styles %}
+.page-card,
+.calendar-card,
+.detail-card {
+    background: #ffffff;
+    border: 0;
+    border-radius: 14px;
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
+}
+
+.page-card {
+    overflow: hidden;
+}
+
+.page-header {
+    background: var(--primary-gradient);
+    color: #ffffff;
+    padding: 1.25rem 1.5rem;
+}
+
+.page-header h2 {
+    margin: 0;
+    font-size: 1.75rem;
+    font-weight: 700;
+}
+
+.page-header p {
+    margin: 0.35rem 0 0;
+    opacity: 0.92;
+}
+
+.count-badge {
+    background: rgba(255, 255, 255, 0.18);
+    color: #ffffff;
+    border-radius: 999px;
+    padding: 0.35rem 0.75rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.alert-host {
+    padding: 1rem 1.5rem 0;
+}
+
+.quick-stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.9rem;
+    padding: 1rem 1.5rem 0;
+}
+
+.stat-card,
+.filter-card,
+.legend-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 1rem;
+}
+
+.stat-label {
+    color: #64748b;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.stat-value {
+    margin-top: 0.35rem;
+    color: #0f172a;
+    font-size: 1.4rem;
+    font-weight: 700;
+}
+
+.toolbar-row,
+.content-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    padding: 1rem 1.5rem 0;
+}
+
+.content-grid {
+    padding: 1rem 1.5rem 1.5rem;
+}
+
+.filter-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+
+.legend-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1rem;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #334155;
+    font-size: 0.9rem;
+}
+
+.calendar-card {
+    padding: 1.25rem;
+}
+
+#calendar {
+    min-height: 760px;
+}
+
+.calendar-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+}
+
+.calendar-actions-copy {
+    color: #64748b;
+    font-size: 0.95rem;
+}
+
+.detail-card {
+    padding: 1.25rem;
+}
+
+.detail-card h5 {
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 1rem;
+}
+
+.detail-empty {
+    color: #64748b;
+    font-size: 0.95rem;
+    line-height: 1.6;
+}
+
+.detail-list {
+    display: grid;
+    gap: 0.85rem;
+}
+
+.detail-item {
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.detail-item:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+}
+
+.detail-label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #64748b;
+    margin-bottom: 0.2rem;
+}
+
+.detail-value {
+    color: #1e293b;
+    word-break: break-word;
+}
+
+.fc .fc-toolbar-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.fc .fc-toolbar.fc-header-toolbar {
+    margin-bottom: 1.25rem;
+}
+
+.fc .fc-button {
+    background: #1e293b;
+    border-color: #1e293b;
+}
+
+.fc .fc-button:hover,
+.fc .fc-button:focus {
+    background: #0f172a;
+    border-color: #0f172a;
+    box-shadow: none;
+}
+
+.fc .fc-button-primary:not(:disabled).fc-button-active {
+    background: #2563eb;
+    border-color: #2563eb;
+}
+
+.fc-daygrid-event {
+    margin-top: 2px;
+}
+
+.fc-event {
+    cursor: pointer;
+    border: 0;
+    border-radius: 8px;
+    padding: 3px 7px;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+.fc-event-title {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.booking-deployment { box-shadow: inset 0 0 0 2px rgba(245, 158, 11, 0.95); }
+{% endblock %}
+{% block workspace_mobile_styles %}
+.main-content {
+    padding-top: 3.5rem;
+}
+
+.quick-stats,
+.filter-grid {
+    grid-template-columns: 1fr;
+}
+
+#calendar {
+    min-height: 620px;
+}
+{% endblock %}
+{% block workspace_content %}
+<div class="page-card">
+    <div class="page-header d-flex flex-wrap justify-content-between align-items-start gap-3">
+        <div>
+            <h2><i class="fas fa-calendar-alt me-2"></i>Booking Calendar</h2>
+            <p>Read-only calendar view for all environment reservations and deployment bookings.</p>
+        </div>
+        <div class="count-badge">
+            <i class="fas fa-user me-1"></i>{{ user.user_id }} | {{ user.role }}
+        </div>
+    </div>
+
+    <div id="messageContainer" class="alert-host"></div>
+
+    <div class="quick-stats">
+        <div class="stat-card">
+            <div class="stat-label">Total Bookings</div>
+            <div class="stat-value" id="statTotal">0</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Active Now</div>
+            <div class="stat-value" id="statActive">0</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Deployments</div>
+            <div class="stat-value" id="statDeployment">0</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Visible Items</div>
+            <div class="stat-value" id="statVisible">0</div>
+        </div>
+    </div>
+
+    <div class="toolbar-row">
+        <div class="filter-card">
+            <div class="filter-grid">
+                <div>
+                    <label for="filterEnvType" class="form-label">Environment Type</label>
+                    <select id="filterEnvType" class="form-select">
+                        <option value="">All Types</option>
+                        {% for env_type in environment_types %}
+                        <option value="{{ env_type }}">{{ env_type }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="filterBookingType" class="form-label">Booking Type</label>
+                    <select id="filterBookingType" class="form-select">
+                        <option value="">All Types</option>
+                        <option value="RESERVATION">Reservation</option>
+                        <option value="DEPLOYMENT">Deployment</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="filterStatus" class="form-label">Status</label>
+                    <select id="filterStatus" class="form-select">
+                        <option value="">All Statuses</option>
+                        {% for status in workspace_status_options.booking_statuses | default([], true) %}
+                        <option value="{{ status.value }}">{{ status.label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="filterRequestedBy" class="form-label">Requested By</label>
+                    <input id="filterRequestedBy" class="form-control" type="text" placeholder="Search user">
+                </div>
+            </div>
+        </div>
+
+        <div class="legend-card">
+            <div class="legend-list">
+                {% for status in workspace_status_options.calendar_legend_statuses | default([], true) %}
+                <div class="legend-item"><span class="legend-swatch {{ status.value }}"></span>{{ status.legend_label }}</div>
+                {% endfor %}
+                <div class="legend-item"><span class="legend-swatch deployment"></span>Deployment</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="content-grid">
+        <div class="calendar-card">
+            <div class="calendar-actions">
+                <div class="calendar-actions-copy">
+                    Use month view for overview and switch to week/day only when you need deeper detail.
+                </div>
+                <button id="clearFiltersButton" type="button" class="btn btn-outline-secondary btn-sm">
+                    <i class="fas fa-rotate-left me-1"></i>Clear Filters
+                </button>
+            </div>
+            <div id="calendar"></div>
+        </div>
+
+        <aside class="detail-card">
+            <h5><i class="fas fa-circle-info me-2"></i>Booking Details</h5>
+            <div id="bookingDetails" class="detail-empty">
+                Select a booking from the calendar to view its details here.
+            </div>
+        </aside>
+    </div>
+</div>
+{% endblock %}
+{% block workspace_scripts %}
+<script>
+window.pageData = {
+    environments: {{ environments | tojson }},
+    serverTimezone: {{ (server_timezone or 'UTC') | tojson }},
+    statusLabels: {{ workspace_status_options.status_labels | default({}, true) | tojson }}
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js"></script>
+<script src="{{ url_for('static', filename='js/pages/booking-calendar.js') }}"></script>
+{% endblock %}

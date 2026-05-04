@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<div class="mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+        <div>
+            <h1 class="display-6 fw-bold">Dashboard</h1>
+            <p class="text-muted mb-0">These are the screens available to your current role/team.</p>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <a class="btn btn-outline-secondary" href="{{ url_for('main.environment_health') }}">Health</a>
+            <a class="btn btn-outline-secondary" href="{{ url_for('booking.booking_screen') }}">Booking</a>
+            <a class="btn btn-dark" href="{{ url_for('main.logout') }}">Logout</a>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    {% for screen in screens %}
+        <div class="col-md-6 col-xl-4">
+            <div class="card h-100 border-0 shadow-sm screen-card">
+                <div class="card-body p-4">
+                    <h2 class="h5">{{ screen.title }}</h2>
+                    <p class="text-muted">{{ screen.description }}</p>
+                    <a class="btn btn-outline-primary" href="{{ url_for(screen.endpoint) }}">Open screen</a>
+                </div>
+            </div>
+        </div>
+    {% else %}
+        <div class="col-12">
+            <div class="alert alert-warning">No screens are currently assigned to your account.</div>
+        </div>
+    {% endfor %}
+</div>
+{% endblock %}
