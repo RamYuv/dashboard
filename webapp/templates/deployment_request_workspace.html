@@ -172,7 +172,7 @@
                 <div class="form-section" id="resolvedScopeNote" {% if deployment_mode != "tools" %}style="display: none;"{% endif %}>
                     <div class="alert alert-light border mb-0">
                         <i class="fas fa-info-circle me-2"></i>
-                        Shared tool deployments resolve by environment type like <strong>DEV</strong>. Use <strong>Specific Environment</strong> when a tool must deploy to a host such as the <strong>DEV01 Core</strong> box.
+                        Tool deployments resolve to the <strong>configured server role</strong> for the selected environment, so each tool package goes to its predefined destination host.
                     </div>
                 </div>
 

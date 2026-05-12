@@ -11,6 +11,16 @@ from webapp.helpers import get_booking_lifecycle_status
 monitoring_bp = Blueprint("monitoring", __name__)
 
 
+def _included_server_roles():
+    raw_value = current_app.config.get("MONITOR_INCLUDED_SERVER_ROLES", "")
+    included = []
+    for item in str(raw_value).split(","):
+        role_key = (item or "").strip()
+        if role_key and role_key not in included:
+            included.append(role_key)
+    return included
+
+
 def _get_active_booking_env_ids():
     now = datetime.utcnow()
     active_env_ids = []
@@ -43,19 +53,26 @@ def _infer_env_type(env_id):
 
 def _build_server_role_map(env_ids):
     env_server_roles = {}
+    included_server_roles = set(_included_server_roles())
 
     for env_id in env_ids:
         role_ids = [
             row[0]
             for row in EnvironmentHostMapping.query.with_entities(EnvironmentHostMapping.server_role_id)
-            .filter(EnvironmentHostMapping.env_id == env_id)
+            .filter(
+                EnvironmentHostMapping.env_id == env_id,
+                EnvironmentHostMapping.is_shared.is_(False),
+            )
             .distinct()
             .all()
         ]
         role_keys = []
         for role_id in role_ids:
             server_role = ServerRole.query.get(role_id)
-            if server_role is not None:
+            if (
+                server_role is not None and
+                server_role.role_key in included_server_roles
+            ):
                 role_keys.append(server_role.role_key)
         env_server_roles[env_id] = role_keys
 

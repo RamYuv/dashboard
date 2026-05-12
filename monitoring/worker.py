@@ -14,6 +14,7 @@ worker process.
 
 from monitoring.services.health_service import build_dummy_environment_snapshot
 from webapp.models import EnvironmentHostMapping
+from sqlalchemy.orm import joinedload
 
 
 class EnvMonitorWorker:
@@ -27,18 +28,50 @@ class EnvMonitorWorker:
         self.status_fetcher = status_fetcher
         self.status_aggregator = status_aggregator
 
+    def _included_server_roles(self):
+        raw_value = self.app.config.get("MONITOR_INCLUDED_SERVER_ROLES", "")
+        included = []
+        for item in str(raw_value).split(","):
+            role_key = (item or "").strip()
+            if role_key and role_key not in included:
+                included.append(role_key)
+        return included
+
+    def _include_shared_mappings(self):
+        return bool(self.app.config.get("MONITOR_INCLUDE_SHARED_MAPPINGS", False))
+
+    def _should_monitor_mapping(self, mapping, included_server_roles):
+        if mapping is None:
+            return False
+        if not self._include_shared_mappings() and getattr(mapping, "is_shared", False):
+            return False
+        if not getattr(mapping, "env_id", None):
+            return False
+        server_role = mapping.server_role.role_key if mapping.server_role else None
+        return bool(server_role and server_role in included_server_roles)
+
     def _load_environment_mappings(self):
         """Load environment-to-server-role mappings and fetch raw VM status."""
+        included_server_roles = self._included_server_roles()
         mappings = (
             EnvironmentHostMapping.query
+            .options(
+                joinedload(EnvironmentHostMapping.server_role),
+                joinedload(EnvironmentHostMapping.environment),
+                joinedload(EnvironmentHostMapping.host),
+            )
             .order_by(EnvironmentHostMapping.env_id, EnvironmentHostMapping.environment_host_mapping_id)
             .all()
         )
 
         vm_statuses = {}
         env_index = {}
+        host_status_cache = {}
 
         for mapping in mappings:
+            if not self._should_monitor_mapping(mapping, included_server_roles):
+                continue
+
             env_id = mapping.env_id
             server_role = mapping.server_role.role_key if mapping.server_role else "unknown"
             vm_id = "{0}:{1}".format(env_id, server_role)
@@ -53,7 +86,14 @@ class EnvMonitorWorker:
             host = mapping.host.hostname if mapping.host else None
             username = mapping.deployment_user or ""
             password = mapping.deployment_password or ""
-            vm_statuses[vm_id] = self.status_fetcher.fetch_vm_status(host, username, password)
+            fetch_key = (host, username, password)
+            if fetch_key not in host_status_cache:
+                host_status_cache[fetch_key] = self.status_fetcher.fetch_vm_status(
+                    host,
+                    username,
+                    password,
+                )
+            vm_statuses[vm_id] = host_status_cache[fetch_key]
 
         return list(env_index.values()), vm_statuses
 

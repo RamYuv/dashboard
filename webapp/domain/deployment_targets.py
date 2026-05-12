@@ -12,32 +12,48 @@ from ..models import EnvironmentHostMapping, ServerRole
 
 
 CONFIG_PATH = Path(__file__).resolve().parents[2] / "configs" / "deployment_targets.json"
-TARGETS_WITH_ALL_OPTION = {"TCS_APP", "TCS_DB"}
+SUPPORTED_ENV_SCOPES = {"ENV", "ENV_TYPE"}
 
-LEGACY_TARGET_KEY_MAP = {
-    "TCS": "TCS_APP",
-    "DB": "TCS_DB",
-    "PAYUI": "PAYGET",
-    "PAYGET": "PAYGET",
-    "TCS_PAYUI": "PAYGET",
-    "TOOLS": "TOOLS",
-}
-
-TARGET_COMPONENT_TYPE_MAP = {
-    "TCS_APP": "TCS_APP",
-    "TCS_DB": "DB",
-    "PAYGET": "PAYGET",
-    "TCS_PAYUI": "PAYGET",
-    "TOOLS": "TOOLS",
-}
-
-REQUIRED_TARGET_FIELDS = {"display_name", "component_name", "component_type", "packages"}
+REQUIRED_TARGET_FIELDS = {"display_name", "packages"}
 REQUIRED_PACKAGE_FIELDS = {"package_name", "server_role_key"}
 LOGGER = logging.getLogger(__name__)
+_TARGET_CACHE = {
+    "mtime": None,
+    "targets": {},
+}
+
+
+def _normalize_supported_scopes(raw_scopes, default_scopes=None):
+    """Normalize target/package deployment scopes."""
+    default_scopes = list(default_scopes or ["ENV"])
+    if raw_scopes is None:
+        return default_scopes
+
+    if isinstance(raw_scopes, str):
+        raw_scopes = [raw_scopes]
+
+    normalized = []
+    for scope in raw_scopes:
+        value = (scope or "").strip().upper()
+        if value in SUPPORTED_ENV_SCOPES and value not in normalized:
+            normalized.append(value)
+    return normalized or default_scopes
+
+
+def _normalize_server_role_key(package):
+    """Return the package's single deployment server role key."""
+    return (package.get("server_role_key") or "").strip()
 
 
 def load_deployment_targets():
     """Load and normalize deployment target definitions from JSON config."""
+    try:
+        config_mtime = CONFIG_PATH.stat().st_mtime
+    except (OSError, ValueError):
+        return {}
+    if _TARGET_CACHE["mtime"] == config_mtime:
+        return _TARGET_CACHE["targets"]
+
     try:
         with CONFIG_PATH.open("r", encoding="utf-8") as handle:
             data = json.load(handle)
@@ -45,7 +61,10 @@ def load_deployment_targets():
         return {}
     if not isinstance(data, dict):
         return {}
-    return _normalize_target_config(data)
+    normalized = _normalize_target_config(data)
+    _TARGET_CACHE["mtime"] = config_mtime
+    _TARGET_CACHE["targets"] = normalized
+    return normalized
 
 
 def _normalize_target_config(raw_targets):
@@ -73,17 +92,19 @@ def _normalize_target_config(raw_targets):
             )
             continue
 
+        target_supported_scopes = _normalize_supported_scopes(
+            target.get("supported_scopes"),
+            default_scopes=["ENV"],
+        )
+
         normalized_packages = {}
-        seen_server_role_keys = set()
         for package_key, package in packages.items():
             if not isinstance(package, dict):
                 validation_errors.append(
                     "Package '{}.{}' must be a JSON object.".format(target_key, package_key)
                 )
                 continue
-            server_role_key = (
-                package.get("server_role_key") or ""
-            ).strip()
+            server_role_key = _normalize_server_role_key(package)
             package_keys = set(package.keys())
             if server_role_key:
                 package_keys.add("server_role_key")
@@ -97,14 +118,6 @@ def _normalize_target_config(raw_targets):
                     )
                 )
                 continue
-            if not server_role_key:
-                validation_errors.append(
-                    "Package '{}.{}' must define a non-empty server_role_key.".format(
-                        target_key,
-                        package_key,
-                    )
-                )
-                continue
             if package_key in normalized_packages:
                 validation_errors.append(
                     "Target '{}' contains duplicate package key '{}'.".format(
@@ -113,19 +126,15 @@ def _normalize_target_config(raw_targets):
                     )
                 )
                 continue
-            if server_role_key in seen_server_role_keys and target_key != "TOOLS":
-                validation_errors.append(
-                    "Target '{}' reuses server_role_key '{}' across multiple packages.".format(
-                        target_key,
-                        server_role_key,
-                    )
-                )
-                continue
-            seen_server_role_keys.add(server_role_key)
+            package_supported_scopes = _normalize_supported_scopes(
+                package.get("supported_scopes"),
+                default_scopes=target_supported_scopes,
+            )
             normalized_packages[package_key] = {
                 "package_name": package.get("package_name") or package_key,
                 "server_role_key": server_role_key,
                 "deploy_order": package.get("deploy_order", 0),
+                "supported_scopes": package_supported_scopes,
             }
 
         if not normalized_packages:
@@ -136,9 +145,9 @@ def _normalize_target_config(raw_targets):
 
         normalized[target_key] = {
             "display_name": target.get("display_name") or target_key,
-            "component_name": target.get("component_name") or target_key.lower(),
-            "component_type": target.get("component_type") or TARGET_COMPONENT_TYPE_MAP.get(target_key, target_key),
+            "allow_multiple_packages": bool(target.get("allow_multiple_packages")),
             "packages": normalized_packages,
+            "supported_scopes": target_supported_scopes,
         }
     for error in validation_errors:
         LOGGER.warning("Invalid deployment target config: %s", error)
@@ -154,43 +163,21 @@ def get_deployment_target_options():
             {
                 "target_key": target_key,
                 "display_name": target.get("display_name") or target_key,
-                "component_name": target.get("component_name") or "",
-                "allow_all_packages": target_key in TARGETS_WITH_ALL_OPTION,
+                "allow_multiple_packages": bool(target.get("allow_multiple_packages")),
+                "supported_scopes": target.get("supported_scopes") or ["ENV"],
                 "packages": [
                     {
                         "package_key": package_key,
                         "package_name": package.get("package_name") or package_key,
                         "server_role_key": package.get("server_role_key"),
                         "deploy_order": package.get("deploy_order", 0),
+                        "supported_scopes": package.get("supported_scopes") or ["ENV"],
                     }
                     for package_key, package in packages.items()
                 ],
             }
         )
     return options
-
-
-def infer_target_key(deployment_data):
-    """Resolve the canonical target key from modern or legacy payload fields."""
-    target_key = (deployment_data.get("target_key") or "").strip()
-    if target_key:
-        return target_key
-
-    legacy_component_type = (deployment_data.get("component_type") or "").strip().upper()
-    return LEGACY_TARGET_KEY_MAP.get(legacy_component_type)
-
-
-def derive_component_type(target_key, fallback=None):
-    """Map a target key to the canonical component type stored in build records."""
-    target_definition = get_target_definition(target_key) or {}
-    return (
-        target_definition.get("component_type") or
-        TARGET_COMPONENT_TYPE_MAP.get(target_key) or
-        fallback or
-        target_key
-    )
-
-
 def get_target_definition(target_key):
     """Return the normalized config block for one target key."""
     return load_deployment_targets().get(target_key or "")
@@ -198,7 +185,36 @@ def get_target_definition(target_key):
 
 def target_supports_all_option(target_key):
     """Return whether the target allows selecting all packages at once."""
-    return target_key in TARGETS_WITH_ALL_OPTION
+    return target_supports_multiple_packages(target_key)
+
+
+def target_supports_multiple_packages(target_key):
+    """Return whether the target allows selecting multiple packages."""
+    target = get_target_definition(target_key) or {}
+    return bool(target.get("allow_multiple_packages"))
+
+
+def target_supports_scope(target_key, env_scope_type):
+    """Return whether a target supports the requested deployment scope."""
+    target = get_target_definition(target_key) or {}
+    supported_scopes = target.get("supported_scopes") or ["ENV"]
+    return (env_scope_type or "").strip().upper() in supported_scopes
+
+
+def package_supports_scope(target_key, package_key, env_scope_type):
+    """Return whether one package supports the requested deployment scope."""
+    target = get_target_definition(target_key) or {}
+    package = (target.get("packages") or {}).get(package_key) or {}
+    supported_scopes = package.get("supported_scopes") or target.get("supported_scopes") or ["ENV"]
+    return (env_scope_type or "").strip().upper() in supported_scopes
+
+
+def packages_support_scope(target_key, package_keys, env_scope_type):
+    """Return whether all selected packages support the requested deployment scope."""
+    return all(
+        package_supports_scope(target_key, package_key, env_scope_type)
+        for package_key in (package_keys or [])
+    )
 
 
 def _build_package_lookup(packages):
@@ -225,10 +241,7 @@ def get_selected_package_keys(target_key, deployment_data):
     if not packages:
         return []
 
-    selected = deployment_data.get("selected_packages")
-    if not selected:
-        selected = deployment_data.get("selected_package")
-
+    selected = deployment_data.get("package_keys")
     if not selected:
         return []
 
@@ -290,7 +303,7 @@ def _resolve_package_mappings(env_id, requested_env_type, env_scope_type, server
 
 def resolve_request_targets(env_id, deployment_data):
     """Expand a deployment request into concrete package/server-role deployment targets."""
-    target_key = infer_target_key(deployment_data)
+    target_key = (deployment_data.get("target_key") or "").strip().upper()
     target = get_target_definition(target_key)
     if not target:
         return []
@@ -307,21 +320,44 @@ def resolve_request_targets(env_id, deployment_data):
         if not package:
             continue
 
-        server_role_key = package.get("server_role_key")
-        mappings = _resolve_package_mappings(
-            env_id,
-            requested_env_type,
-            env_scope_type,
-            server_role_key,
-        )
-
-        for mapping in mappings or [None]:
-            host = mapping.host if mapping is not None else None
+        if env_scope_type not in (package.get("supported_scopes") or target.get("supported_scopes") or ["ENV"]):
             resolved_targets.append(
                 {
                     "package_key": package_key,
                     "package_name": package.get("package_name") or package_key,
-                    "server_role_key": server_role_key,
+                    "server_role_key": package.get("server_role_key"),
+                    "environment_host_mapping_id": None,
+                    "env_scope_type": env_scope_type,
+                    "requested_env_type": requested_env_type,
+                    "host_id": None,
+                    "host_name": None,
+                    "deploy_order": package.get("deploy_order", 0),
+                    "supported_scopes": package.get("supported_scopes") or ["ENV"],
+                    "resolution_error": "Package does not support {} scope.".format(env_scope_type),
+                }
+            )
+            continue
+
+        resolved_role_key = package.get("server_role_key")
+        mappings = _resolve_package_mappings(
+            env_id,
+            requested_env_type,
+            env_scope_type,
+            resolved_role_key,
+        )
+
+        for mapping in mappings or [None]:
+            host = mapping.host if mapping is not None else None
+            mapping_server_role_key = (
+                mapping.server_role.role_key
+                if mapping is not None and mapping.server_role is not None
+                else resolved_role_key
+            )
+            resolved_targets.append(
+                {
+                    "package_key": package_key,
+                    "package_name": package.get("package_name") or package_key,
+                    "server_role_key": mapping_server_role_key,
                     "environment_host_mapping_id": (
                         mapping.environment_host_mapping_id if mapping is not None else None
                     ),
@@ -330,6 +366,8 @@ def resolve_request_targets(env_id, deployment_data):
                     "host_id": host.host_id if host is not None else None,
                     "host_name": host.hostname if host is not None else None,
                     "deploy_order": package.get("deploy_order", 0),
+                    "supported_scopes": package.get("supported_scopes") or ["ENV"],
+                    "resolution_error": None if mapping is not None else "No matching environment host mapping found.",
                 }
             )
 

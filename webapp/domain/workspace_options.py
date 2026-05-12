@@ -16,22 +16,6 @@ DEPLOYMENT_SERVICE_TYPES = [
     {"value": "conv", "label": "CONV"},
 ]
 
-EDIT_DEPLOYMENT_COMPONENTS = [
-    {"value": "TCS", "label": "TCS"},
-    {"value": "DB", "label": "DB"},
-    {"value": "PAM", "label": "PAM"},
-    {"value": "TOOLS", "label": "TOOLS"},
-    {"value": "MQ", "label": "MQ"},
-]
-
-EDIT_COMPONENT_PACKAGE_OPTIONS = {
-    "TCS": ["cor-tcs", "gateway-tcs", "lg"],
-    "DB": ["pam-db", "core-db"],
-    "PAM": ["pam-app", "pam-api"],
-    "TOOLS": ["scheduler", "monitoring"],
-    "MQ": ["mq-broker", "mq-client"],
-}
-
 WORKSPACE_STATUS_DEFINITIONS = [
     {"value": "scheduled", "label": "Scheduled", "legend_label": "Scheduled"},
     {"value": "active", "label": "Active", "legend_label": "Active"},
@@ -57,14 +41,32 @@ DEPLOYMENT_QUEUE_STATUS_OPTIONS = [
 ]
 
 
+def _build_edit_target_options(targets):
+    return [
+        {"value": target["target_key"], "label": target["display_name"]}
+        for target in targets
+    ]
+
+
+def _build_edit_package_options(targets):
+    return {
+        target["target_key"]: [
+            package["package_key"]
+            for package in target.get("packages", [])
+        ]
+        for target in targets
+    }
+
+
 def get_workspace_deployment_form_options():
     """Return shared deployment-form choices for workspace templates."""
+    targets = get_deployment_target_options() or []
     return {
-        "targets": get_deployment_target_options() or [],
+        "targets": targets,
         "testing_modes": DEPLOYMENT_TESTING_MODES,
         "service_types": DEPLOYMENT_SERVICE_TYPES,
-        "edit_components": EDIT_DEPLOYMENT_COMPONENTS,
-        "edit_component_packages": EDIT_COMPONENT_PACKAGE_OPTIONS,
+        "edit_components": _build_edit_target_options(targets),
+        "edit_component_packages": _build_edit_package_options(targets),
     }
 
 

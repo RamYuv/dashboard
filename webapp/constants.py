@@ -121,67 +121,53 @@ DEFAULT_HOSTS = [
         "description": "Shared host for Core deployments",
     },
     {
-        "hostname": "Gateway",
+        "hostname": "Gatway",
         "ip_address": "10.0.0.11",
         "domain": "APP",
-        "description": "Shared host for Gateway deployments",
+        "description": "Shared host for Gatway deployments",
     },
     {
-        "hostname": "PayGet",
+        "hostname": "PAYAPP",
         "ip_address": "10.0.0.12",
-        "domain": "PAYGET",
-        "description": "Shared host for PayGet deployments",
+        "domain": "PAYAPP",
+        "description": "Shared host for PayApp deployments",
     },
     {
         "hostname": "CoreDB",
         "ip_address": "10.0.0.13",
         "domain": "DB",
-        "description": "Reserved host entry for CoreDB",
+        "description": "Shared host for CoreDB deployments",
     },
     {
-        "hostname": "DB",
+        "hostname": "CosDB",
         "ip_address": "10.0.0.14",
         "domain": "DB",
-        "description": "Shared host for DB deployments",
+        "description": "Shared host for CosDB deployments",
     },
     {
-        "hostname": "Dev",
+        "hostname": "TOOL_SERVER",
         "ip_address": "10.0.0.15",
         "domain": "TOOLS",
-        "description": "Reserved host entry for Dev",
-    },
-    {
-        "hostname": "Dev-Tool01",
-        "ip_address": "10.0.0.16",
-        "domain": "TOOLS",
-        "description": "Shared host for Tools package tool1",
-    },
-    {
-        "hostname": "Dev-Tool02",
-        "ip_address": "10.0.0.17",
-        "domain": "TOOLS",
-        "description": "Shared host for Tools package tool2",
+        "description": "Shared host for tool server workloads",
     },
 ]
 
 DEFAULT_SERVER_ROLES = [
     {"role_key": "Core", "role_type": "TCS_APP"},
-    {"role_key": "Gateway", "role_type": "TCS_APP"},
-    {"role_key": "PayGet", "role_type": "PAYGET"},
+    {"role_key": "Gatway", "role_type": "TCS_APP"},
+    {"role_key": "PAYAPP", "role_type": "PAYAPP"},
     {"role_key": "CoreDB", "role_type": "DB"},
-    {"role_key": "DB", "role_type": "DB"},
-    {"role_key": "Dev", "role_type": "TOOLS"},
-    {"role_key": "Dev-Tool01", "role_type": "TOOLS"},
-    {"role_key": "Dev-Tool02", "role_type": "TOOLS"},
+    {"role_key": "CosDB", "role_type": "DB"},
+    {"role_key": "TOOL_SERVER", "role_type": "TOOLS"},
 ]
 
 _DEFAULT_HOST_ROLE_MATRIX = [
     ("Core", "Core"),
-    ("Gateway", "Gateway"),
-    ("PayGet", "PayGet"),
-    ("DB", "DB"),
-    ("Dev-Tool01", "Dev-Tool01"),
-    ("Dev-Tool02", "Dev-Tool02"),
+    ("Gatway", "Gatway"),
+    ("PAYAPP", "PAYAPP"),
+    ("CoreDB", "CoreDB"),
+    ("CosDB", "CosDB"),
+    ("TOOL_SERVER", "TOOL_SERVER"),
 ]
 
 DEFAULT_ENVIRONMENT_HOST_MAPPINGS = [
@@ -196,46 +182,19 @@ DEFAULT_ENVIRONMENT_HOST_MAPPINGS = [
     }
     for env_id, env_type in DEFAULT_ENVIRONMENTS
     for role_key, hostname in _DEFAULT_HOST_ROLE_MATRIX
-    if env_type == "DEV" or role_key not in {"Dev-Tool01", "Dev-Tool02"}
 ]
-
-DEFAULT_ENVIRONMENT_HOST_MAPPINGS.extend([
-    {
-        "env_id": None,
-        "env_type": "DEV",
-        "is_shared": True,
-        "server_role_key": "Dev-Tool01",
-        "hostname": "Dev-Tool01",
-        "deployment_user": "user1",
-        "deployment_password": "pass1",
-    },
-    {
-        "env_id": None,
-        "env_type": "DEV",
-        "is_shared": True,
-        "server_role_key": "Dev-Tool02",
-        "hostname": "Dev-Tool02",
-        "deployment_user": "user1",
-        "deployment_password": "pass1",
-    },
-])
 
 # Component Version Definitions
 COMPONENT_VERSIONS = {
-    "TCS": ["1.0.0", "1.1.0", "2.0.0"],
     "TCS_APP": ["1.0.0", "1.1.0", "2.0.0"],
-    "PAYGET": ["1.0.0", "1.1.0", "2.0.0"],
+    "PAYAPP": ["1.0.0", "1.1.0", "2.0.0"],
     "DB": ["schema-2026.01", "schema-2026.02"],
-    "TCS_DB": ["schema-2026.01", "schema-2026.02"],
-    "PAYUI": ["1.0.0", "1.1.0", "2.0.0"],
-    "TCS_PAYUI": ["1.0.0", "1.1.0", "2.0.0"],
-    "PAM": ["pam-4.5", "pam-4.6"],
     "TOOLS": ["latest", "stable", "lts"],
-    "MQ": ["mq-9.3", "mq-9.4"],
 }
 
 PACKAGE_VERSIONS = {
     "tool1": ["1.0.0", "1.1.0", "1.2.0"],
     "tool2": ["2.0.0", "2.1.0", "2.2.0"],
     "tool3": ["3.0.0", "3.1.0", "3.2.0"],
+    "tool5": ["5.0.0", "5.1.0", "5.2.0"],
 }

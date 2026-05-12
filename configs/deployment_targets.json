@@ -1,68 +1,71 @@
 {
   "TCS_APP": {
     "display_name": "TCS Application",
-    "component_type": "TCS_APP",
-    "component_name": "tcs_service",
+    "allow_multiple_packages": true,
+    "supported_scopes": ["ENV"],
     "packages": {
       "core": {
-        "package_name": "tcs_service_cor",
+        "package_name": "tcs_service_core",
         "server_role_key": "Core",
         "deploy_order": 20
       },
-      "gateway": {
-        "package_name": "tcs_service_gateway",
-        "server_role_key": "Gateway",
+      "gatway": {
+        "package_name": "tcs_service_gatway",
+        "server_role_key": "Gatway",
         "deploy_order": 30
       }
     }
   },
-  "PAYGET": {
-    "display_name": "PayGet",
-    "component_type": "PAYGET",
-    "component_name": "payget",
+  "PAYAPP": {
+    "display_name": "PayApp",
+    "supported_scopes": ["ENV"],
     "packages": {
-      "payget": {
-        "package_name": "payget",
-        "server_role_key": "PayGet",
+      "payapp": {
+        "package_name": "payapp",
+        "server_role_key": "PAYAPP",
         "deploy_order": 40
       }
     }
   },
-  "TCS_DB": {
-    "display_name": "TCS Database",
-    "component_type": "DB",
-    "component_name": "tcs_db",
+  "DB": {
+    "display_name": "Database",
+    "allow_multiple_packages": true,
+    "supported_scopes": ["ENV"],
     "packages": {
-      "cordb": {
-        "package_name": "cordb",
-        "server_role_key": "Core",
+      "coredb": {
+        "package_name": "coredb",
+        "server_role_key": "CoreDB",
         "deploy_order": 10
       },
-      "dbdev": {
-        "package_name": "dbdev",
-        "server_role_key": "DB",
+      "cosdb": {
+        "package_name": "cosdb",
+        "server_role_key": "CosDB",
         "deploy_order": 10
       }
     }
   },
   "TOOLS": {
     "display_name": "Tools",
-    "component_type": "TOOLS",
-    "component_name": "tools",
+    "supported_scopes": ["ENV"],
     "packages": {
       "tool1": {
         "package_name": "tool1",
-        "server_role_key": "Dev-Tool01",
+        "server_role_key": "TOOL_SERVER",
         "deploy_order": 50
       },
       "tool2": {
         "package_name": "tool2",
-        "server_role_key": "Dev-Tool02",
+        "server_role_key": "Core",
         "deploy_order": 50
       },
       "tool3": {
         "package_name": "tool3",
-        "server_role_key": "Core",
+        "server_role_key": "TOOL_SERVER",
+        "deploy_order": 50
+      },
+      "tool5": {
+        "package_name": "tool5",
+        "server_role_key": "TOOL_SERVER",
         "deploy_order": 50
       }
     }

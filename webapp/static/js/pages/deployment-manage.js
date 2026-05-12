@@ -79,7 +79,7 @@
 
         empty.style.display = "none";
         body.innerHTML = rows.map(function (item) {
-            const packages = (item.selected_packages || []).join(", ") || "-";
+            const packages = (item.package_keys || []).join(", ") || "-";
             const environmentLabel = item.environment_display || item.env_id || "-";
             const resolvedHosts = item.resolved_hosts_summary || "";
             const actions = (item.available_actions || [])

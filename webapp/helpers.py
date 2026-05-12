@@ -15,8 +15,6 @@ from .constants import (
     VALID_ROLES,
     VALID_TEAMS,
 )
-from .deployment_targets import derive_component_type, get_target_definition
-
 
 def json_error(message, status_code):
     """Create a JSON error response."""
@@ -253,9 +251,9 @@ def get_environment_types():
     return [row[0] for row in rows]
 
 
-def get_component_versions(component_type, package_key=None):
-    """Get available versions for a component type."""
-    requested_target_key = (component_type or "").strip().upper()
+def get_target_versions(target_key, package_key=None):
+    """Get available versions for a deployment target."""
+    requested_target_key = (target_key or "").strip().upper()
     package_key = (package_key or "").strip().lower()
     if not requested_target_key:
         return []
@@ -264,9 +262,9 @@ def get_component_versions(component_type, package_key=None):
         versions = [
             row.version
             for row in ComponentBuild.query.filter(
-                (ComponentBuild.component_type == "TOOLS") &
+                (ComponentBuild.target_key == "TOOLS") &
                 (
-                    (ComponentBuild.component_name == package_key) |
+                    (ComponentBuild.build_name == package_key) |
                     (ComponentBuild.artifact_name == package_key)
                 )
             ).order_by(ComponentBuild.version).all()
@@ -275,18 +273,7 @@ def get_component_versions(component_type, package_key=None):
             return versions
         return PACKAGE_VERSIONS.get(package_key, COMPONENT_VERSIONS.get("TOOLS", []))
 
-    target_definition = get_target_definition(requested_target_key) or {}
-    canonical_type = derive_component_type(requested_target_key, requested_target_key).upper()
-    component_name = (target_definition.get("component_name") or "").strip()
-
-    query = ComponentBuild.query
-    if component_name:
-        query = query.filter(
-            (ComponentBuild.component_type == canonical_type) |
-            (ComponentBuild.component_name == component_name)
-        )
-    else:
-        query = query.filter(ComponentBuild.component_type == canonical_type)
+    query = ComponentBuild.query.filter(ComponentBuild.target_key == requested_target_key)
 
     versions = [
         row.version
@@ -297,5 +284,5 @@ def get_component_versions(component_type, package_key=None):
 
     return (
         COMPONENT_VERSIONS.get(requested_target_key) or
-        COMPONENT_VERSIONS.get(canonical_type, [])
+        []
     )

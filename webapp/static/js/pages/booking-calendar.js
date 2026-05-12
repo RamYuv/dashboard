@@ -134,10 +134,10 @@
         ];
 
         if (deployment) {
-            detailRows.push(buildDetailRow("Component Type", deployment.component_type || "-"));
+            detailRows.push(buildDetailRow("Target", deployment.target_key || "-"));
             detailRows.push(buildDetailRow("Requested Version", deployment.requested_version || "-"));
             detailRows.push(buildDetailRow("Testing Mode", deployment.testing_mode || "-"));
-            detailRows.push(buildDetailRow("Component Names", (deployment.component_names || []).join(", ") || "-"));
+            detailRows.push(buildDetailRow("Packages", (deployment.package_keys || []).join(", ") || "-"));
             detailRows.push(buildDetailRow("Service Types", (deployment.service_types || []).join(", ") || "-"));
         }
 

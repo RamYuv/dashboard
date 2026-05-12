@@ -126,10 +126,10 @@ def build_dummy_environment_snapshot():
             "timestamp": timestamp,
             "vm_count": 2,
             "component_summary": {"running": 8, "notrunning": 0, "unknown": 0},
-            "message": "All logical servers are healthy.",
+            "message": "Core and Gatway are healthy.",
             "vm_details": {
-                "DEV-01:cor-tcs": {"vm_color": "Green", "component_data": {"app1": {"run_status": "Running", "pid": "12345"}, "disc1": {"run_status": "Running", "pid": "44232"}, "disc2": {"run_status": "Running", "pid": "63453"}, "stat1": {"run_status": "Running", "pid": "03984"}}},
-                "DEV-01:gateway-tcs": {"vm_color": "Green", "component_data": {"app4": {"run_status": "Running", "pid": "65453"}, "Notif1": {"run_status": "Running", "pid": "12346"}, "Notif2": {"run_status": "Running", "pid": "12347"}, "mq-listener": {"run_status": "Running", "pid": "12348"}}},
+                "DEV-01:Core": {"vm_color": "Green", "component_data": {"app1": {"run_status": "Running", "pid": "12345"}, "disc1": {"run_status": "Running", "pid": "44232"}, "disc2": {"run_status": "Running", "pid": "63453"}, "stat1": {"run_status": "Running", "pid": "03984"}}},
+                "DEV-01:Gatway": {"vm_color": "Green", "component_data": {"app4": {"run_status": "Running", "pid": "65453"}, "Notif1": {"run_status": "Running", "pid": "12346"}, "Notif2": {"run_status": "Running", "pid": "12347"}, "mq-listener": {"run_status": "Running", "pid": "12348"}}},
             },
         },
         "DEV-02": {
@@ -140,8 +140,8 @@ def build_dummy_environment_snapshot():
             "component_summary": {"running": 6, "notrunning": 0, "unknown": 0},
             "message": "Services are up, but one logical server has no running apps.",
             "vm_details": {
-                "DEV-02:cor-tcs": {"vm_color": "Green", "component_data": {"app1": {"run_status": "Running", "pid": "22345"}, "disc1": {"run_status": "Running", "pid": "24232"}, "disc2": {"run_status": "Running", "pid": "26453"}}},
-                "DEV-02:gateway-tcs": {"vm_color": "Yellow", "component_data": {"status-check": {"run_status": "Running", "pid": "29876"}, "scheduler": {"run_status": "Running", "pid": "29877"}, "audit": {"run_status": "Running", "pid": "29878"}}},
+                "DEV-02:Core": {"vm_color": "Green", "component_data": {"app1": {"run_status": "Running", "pid": "22345"}, "disc1": {"run_status": "Running", "pid": "24232"}, "disc2": {"run_status": "Running", "pid": "26453"}}},
+                "DEV-02:Gatway": {"vm_color": "Yellow", "component_data": {"status-check": {"run_status": "Running", "pid": "29876"}, "scheduler": {"run_status": "Running", "pid": "29877"}, "audit": {"run_status": "Running", "pid": "29878"}}},
             },
         },
         "QA-01": {
@@ -152,19 +152,20 @@ def build_dummy_environment_snapshot():
             "component_summary": {"running": 4, "notrunning": 2, "unknown": 0},
             "message": "Two components are not running in QA.",
             "vm_details": {
-                "QA-01:cor-tcs": {"vm_color": "Red", "component_data": {"app1": {"run_status": "Running", "pid": "32345"}, "disc1": {"run_status": "NotRunning", "pid": None}, "disc2": {"run_status": "NotRunning", "pid": None}}},
-                "QA-01:gateway-tcs": {"vm_color": "Green", "component_data": {"gateway": {"run_status": "Running", "pid": "35555"}, "notif": {"run_status": "Running", "pid": "35556"}, "audit": {"run_status": "Running", "pid": "35557"}}},
+                "QA-01:Core": {"vm_color": "Red", "component_data": {"app1": {"run_status": "Running", "pid": "32345"}, "disc1": {"run_status": "NotRunning", "pid": None}, "disc2": {"run_status": "NotRunning", "pid": None}}},
+                "QA-01:Gatway": {"vm_color": "Green", "component_data": {"gateway": {"run_status": "Running", "pid": "35555"}, "notif": {"run_status": "Running", "pid": "35556"}, "audit": {"run_status": "Running", "pid": "35557"}}},
             },
         },
         "UAT-01": {
             "env_color": "Black",
             "env_type": "UAT",
             "timestamp": timestamp,
-            "vm_count": 1,
-            "component_summary": {"running": 0, "notrunning": 0, "unknown": 2},
+            "vm_count": 2,
+            "component_summary": {"running": 3, "notrunning": 0, "unknown": 2},
             "message": "Host unreachable or status command unavailable.",
             "vm_details": {
-                "UAT-01:cor-tcs": {"vm_color": "Black", "component_data": {"app1": {"run_status": "Unknown", "pid": None}, "disc1": {"run_status": "Unknown", "pid": None}}},
+                "UAT-01:Core": {"vm_color": "Black", "component_data": {"app1": {"run_status": "Unknown", "pid": None}, "disc1": {"run_status": "Unknown", "pid": None}}},
+                "UAT-01:Gatway": {"vm_color": "Green", "component_data": {"gateway": {"run_status": "Running", "pid": "41111"}, "notif": {"run_status": "Running", "pid": "41112"}, "audit": {"run_status": "Running", "pid": "41113"}}},
             },
         },
         "PROD-01": {
@@ -175,8 +176,8 @@ def build_dummy_environment_snapshot():
             "component_summary": {"running": 10, "notrunning": 0, "unknown": 0},
             "message": "Production services are healthy.",
             "vm_details": {
-                "PROD-01:cor-tcs": {"vm_color": "Green", "component_data": {"app1": {"run_status": "Running", "pid": "42345"}, "disc1": {"run_status": "Running", "pid": "44232"}, "disc2": {"run_status": "Running", "pid": "46453"}, "stat1": {"run_status": "Running", "pid": "43984"}, "mq": {"run_status": "Running", "pid": "43985"}}},
-                "PROD-01:gateway-tcs": {"vm_color": "Green", "component_data": {"gateway": {"run_status": "Running", "pid": "45555"}, "notif": {"run_status": "Running", "pid": "45556"}, "audit": {"run_status": "Running", "pid": "45557"}, "batch": {"run_status": "Running", "pid": "45558"}, "cache": {"run_status": "Running", "pid": "45559"}}},
+                "PROD-01:Core": {"vm_color": "Green", "component_data": {"app1": {"run_status": "Running", "pid": "42345"}, "disc1": {"run_status": "Running", "pid": "44232"}, "disc2": {"run_status": "Running", "pid": "46453"}, "stat1": {"run_status": "Running", "pid": "43984"}, "mq": {"run_status": "Running", "pid": "43985"}}},
+                "PROD-01:Gatway": {"vm_color": "Green", "component_data": {"gateway": {"run_status": "Running", "pid": "45555"}, "notif": {"run_status": "Running", "pid": "45556"}, "audit": {"run_status": "Running", "pid": "45557"}, "batch": {"run_status": "Running", "pid": "45558"}, "cache": {"run_status": "Running", "pid": "45559"}}},
             },
         },
     }

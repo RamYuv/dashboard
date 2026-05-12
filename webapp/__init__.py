@@ -1,5 +1,9 @@
 from flask import Flask
-from flask.logging import default_handler
+
+try:
+    from flask.logging import default_handler
+except ImportError:
+    default_handler = None
 
 from logging_setup import configure_application_logging
 from .config import Config
@@ -13,7 +17,7 @@ def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
     configure_application_logging(app.config)
-    if default_handler in app.logger.handlers:
+    if default_handler is not None and default_handler in app.logger.handlers:
         app.logger.removeHandler(default_handler)
     app.logger.propagate = True
 

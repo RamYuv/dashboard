@@ -25,8 +25,15 @@ class Config:
     SERVER_TIMEZONE = os.environ.get('SERVER_TIMEZONE', 'UTC')
 
     # Monitoring scheduler/cache
-    MONITOR_REFRESH_SECONDS = int(os.environ.get('MONITOR_REFRESH_SECONDS', 30))
+    MONITOR_REFRESH_SECONDS = int(os.environ.get('MONITOR_REFRESH_SECONDS', 60))
     MONITOR_SCHEDULER_ENABLED = _read_bool(os.environ.get('MONITOR_SCHEDULER_ENABLED', 'false'))
+    MONITOR_INCLUDED_SERVER_ROLES = os.environ.get(
+        'MONITOR_INCLUDED_SERVER_ROLES',
+        'Core,Gatway'
+    )
+    MONITOR_INCLUDE_SHARED_MAPPINGS = _read_bool(
+        os.environ.get('MONITOR_INCLUDE_SHARED_MAPPINGS', 'false')
+    )
     MONITOR_CACHE_FILE = os.environ.get(
         'MONITOR_CACHE_FILE',
         os.path.join(BASE_DIR, 'monitoring_cache.json')
@@ -52,6 +59,7 @@ class Config:
         os.path.join(LOG_DIR, 'deployments')
     )
 
+    RESET_DB_ON_INIT = _read_bool(os.environ.get('RESET_DB_ON_INIT', 'false'))
     MUTUAL_ENV_RESERVATION_ENABLED = _read_bool(
         os.environ.get('MUTUAL_ENV_RESERVATION_ENABLED', 'false')
     )

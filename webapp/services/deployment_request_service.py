@@ -9,11 +9,12 @@ from flask import current_app
 from ..auto_deployment_service import AutoDeploymentError, AutoDeploymentService
 from ..auth_service import can_access_env_team_screen
 from ..domain.deployment_targets import (
-    derive_component_type,
     get_selected_package_keys,
     get_target_definition,
-    infer_target_key,
+    packages_support_scope,
     resolve_request_targets,
+    target_supports_multiple_packages,
+    target_supports_scope,
 )
 from .email_service import EmailDeliveryError, SendmailEmailService
 from ..helpers import to_utc_naive
@@ -69,10 +70,12 @@ class DeploymentRequestService:
         scope_label = env_id or requested_env_type or "the selected scope"
         missing_descriptions = []
         for target in missing_targets:
+            resolution_error = target.get("resolution_error")
             missing_descriptions.append(
-                "{} ({})".format(
+                "{} ({}){}".format(
                     target.get("package_name") or target.get("package_key") or "unknown package",
                     target.get("server_role_key") or "unknown server role",
+                    ": {}".format(resolution_error) if resolution_error else "",
                 )
             )
         return (
@@ -97,7 +100,7 @@ class DeploymentRequestService:
         return normalized
 
     @staticmethod
-    def _resolve_component_name(target_key, target_definition, deployment_data, selected_package_keys):
+    def _resolve_build_name(target_key, target_definition, deployment_data, selected_package_keys):
         packages = target_definition.get("packages") or {}
         if target_key == "TOOLS" and selected_package_keys:
             selected_package = packages.get(selected_package_keys[0]) or {}
@@ -108,14 +111,12 @@ class DeploymentRequestService:
             )
         return (
             deployment_data.get("artifact_name") or
-            target_definition.get("component_name") or
             target_key
         )
 
     @staticmethod
     def _find_or_create_build(target_key, target_definition, deployment_data, selected_package_keys):
-        canonical_component_type = derive_component_type(target_key, target_key)
-        component_name = DeploymentRequestService._resolve_component_name(
+        build_name = DeploymentRequestService._resolve_build_name(
             target_key,
             target_definition,
             deployment_data,
@@ -123,18 +124,18 @@ class DeploymentRequestService:
         )
         requested_version = deployment_data.get("requested_version")
         build = ComponentBuild.query.filter_by(
-            component_type=canonical_component_type,
-            component_name=component_name,
+            target_key=target_key,
+            build_name=build_name,
             version=requested_version,
         ).first()
         if build is not None:
             return build
 
         build = ComponentBuild(
-            component_type=canonical_component_type,
-            component_name=component_name,
+            target_key=target_key,
+            build_name=build_name,
             version=requested_version,
-            artifact_name=component_name,
+            artifact_name=build_name,
         )
         db.session.add(build)
         db.session.flush()
@@ -217,7 +218,7 @@ class DeploymentRequestService:
             return "Planned start time is required."
 
         deployment = data.get("deployment_request") or {}
-        target_key = infer_target_key(deployment)
+        target_key = (deployment.get("target_key") or "").strip().upper()
         if not target_key:
             return "Deployment target is required."
 
@@ -225,9 +226,28 @@ class DeploymentRequestService:
         env_id = (data.get("env_id") or "").strip()
         requested_env_type = (data.get("requested_env_type") or "").strip().upper()
 
-        if target_key == "TOOLS" and env_scope_type == "ENV_TYPE":
+        package_keys = get_selected_package_keys(target_key, deployment)
+        if not package_keys:
+            return "Target package is required."
+        if not target_supports_multiple_packages(target_key) and len(package_keys) > 1:
+            return "Deployment target '{}' allows only one package selection.".format(
+                target_key
+            )
+
+        if not target_supports_scope(target_key, env_scope_type):
+            return "Deployment target '{}' does not support {} scope.".format(
+                target_key,
+                env_scope_type,
+            )
+
+        if not packages_support_scope(target_key, package_keys, env_scope_type):
+            return "One or more selected packages do not support {} scope.".format(
+                env_scope_type
+            )
+
+        if env_scope_type == "ENV_TYPE":
             if not requested_env_type:
-                return "Environment type is required for shared tool deployments."
+                return "Environment type is required for shared deployments."
         else:
             if not env_id:
                 return "env_id is required."
@@ -237,12 +257,6 @@ class DeploymentRequestService:
             if not requested_env_type:
                 requested_env_type = (env.env_type or "").strip().upper()
 
-        if target_key != "TOOLS" and env_scope_type != "ENV":
-            return "Only tool deployments can use shared environment-type scope."
-
-        selected_packages = get_selected_package_keys(target_key, deployment)
-        if not selected_packages:
-            return "Target package is required."
         if not deployment.get("requested_version"):
             return "Build/version is required."
         if target_key == "TCS_APP" and not deployment.get("testing_mode"):
@@ -320,7 +334,7 @@ class DeploymentRequestService:
                 requester.email_id if requester and requester.email_id else "Not available"
             ),
             "Target: {}".format(deployment_request.target_key),
-            "Component: {}".format(deployment_request.resolved_component_name() or "Not provided"),
+            "Build: {}".format(deployment_request.build_name or "Not provided"),
             "Version: {}".format(deployment_request.requested_version or "Not provided"),
             "Planned start: {}".format(planned_start),
             "Jira ID: {}".format(deployment_request.jira_id or "Not provided"),
@@ -357,7 +371,7 @@ class DeploymentRequestService:
             return None, validation_error, 400
 
         deployment_data = data.get("deployment_request") or {}
-        target_key = infer_target_key(deployment_data)
+        target_key = (deployment_data.get("target_key") or "").strip().upper()
         env_scope_type, env_id, requested_env_type = DeploymentRequestService._resolve_request_scope(
             data,
             deployment_data,
@@ -402,7 +416,7 @@ class DeploymentRequestService:
                 requested_env_type,
                 resolved_targets,
             ) or "No deployment host mapping was found for the selected scope and package(s).", 400
-        component_name = DeploymentRequestService._resolve_component_name(
+        build_name = DeploymentRequestService._resolve_build_name(
             target_key,
             target_definition,
             deployment_data,
@@ -416,17 +430,15 @@ class DeploymentRequestService:
             planned_start_time=planned_start_time,
             build_id=build.build_id if build is not None else None,
             target_key=target_key,
-            component_type=derive_component_type(target_key, None),
-            component_name=component_name,
             requested_version=deployment_data.get("requested_version"),
-            selected_packages="[]",
+            package_keys_raw="[]",
             testing_mode=deployment_data.get("testing_mode") if target_key == "TCS_APP" else "",
             jira_id=deployment_data.get("jira_id"),
             description=data.get("description"),
             remarks=deployment_data.get("remarks") or data.get("description"),
             status=DEPLOYMENT_REQUEST_STATUSES["OPEN"],
         )
-        deployment_request.set_selected_packages(selected_package_keys)
+        deployment_request.package_keys = selected_package_keys
         deployment_request.set_service_types(
             DeploymentRequestService._normalize_service_types(target_key, deployment_data)
         )

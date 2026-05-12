@@ -25,7 +25,7 @@ from ..helpers import (
     get_list_bookings,
     get_environments,
     get_environment_types,
-    get_component_versions,
+    get_target_versions,
 )
 
 main_bp = Blueprint('main', __name__)
@@ -122,7 +122,14 @@ def logout():
 @login_required
 def dashboard():
     user = current_user()
-    allowed_screens = get_allowed_screens(user)
+    allowed_screens = []
+    for screen in get_allowed_screens(user):
+        endpoint = screen.get("endpoint") or ""
+        if "." not in endpoint:
+            endpoint = "booking.{}".format(endpoint) if endpoint == "booking_screen" else "main.{}".format(endpoint)
+        screen_data = dict(screen)
+        screen_data["url_endpoint"] = endpoint
+        allowed_screens.append(screen_data)
     return render_template("dashboard.html", screens=allowed_screens)
 
 @main_bp.route("/environment-health")
@@ -214,9 +221,9 @@ def api_delete_booking(booking_id):
 @main_bp.route("/api/component-versions")
 @login_required
 def api_component_versions():
-    component_type = request.args.get("component_type")
+    target_key = request.args.get("target_key")
     package_key = request.args.get("package_key")
-    return jsonify({"versions": get_component_versions(component_type, package_key=package_key)})
+    return jsonify({"versions": get_target_versions(target_key, package_key=package_key)})
 
 @main_bp.route("/api/environments")
 @login_required
@@ -377,19 +384,7 @@ def dashboard_preview():
     Test route to preview dashboard with dummy data.
     Useful for UI/UX testing without needing live environment data.
     """
-    test_data = {
-        'id': 'preview.admin',
-        'role': 'admin',
-        'summary': {
-            'total': 33,
-            'healthy': 26,
-            'warning': 4,
-            'critical': 2,
-            'maintenance': 1,
-            'last_updated': datetime.now(timezone.utc).isoformat()
-        },
-        'refresh_seconds': 30,
-        'grouped_statuses': {
+    grouped_statuses = {
             'DEV': [
                 {
                     'env_id': 'DEV01', 'env_type': 'DEV', 'host': 'host1.local', 'owner_team': 'alpha',
@@ -508,7 +503,21 @@ def dashboard_preview():
                     'server_roles': ['cor-tcs', 'gateway-tcs']
                 }
             ]
+        }
+    test_data = {
+        'id': 'preview.admin',
+        'role': 'admin',
+        'summary': {
+            'total': 33,
+            'healthy': 26,
+            'warning': 4,
+            'critical': 2,
+            'maintenance': 1,
+            'last_updated': datetime.now(timezone.utc).isoformat()
         },
+        'refresh_seconds': 30,
+        'grouped_statuses': grouped_statuses,
+        'statuses': [item for items in grouped_statuses.values() for item in items],
         'active_envs': ['DEV01', 'PROD01']
     }
     return render_template('env_health_dashboard.html', **test_data)

@@ -284,9 +284,9 @@
                         <div class="modal-section-title">Deployment Request</div>
                         <div class="row g-3">
                             <div class="col-md-4">
-                                <label for="editComponentType" class="form-label">Component Type</label>
+                                <label for="editComponentType" class="form-label">Deployment Target</label>
                                 <select id="editComponentType" class="form-select">
-                                    <option value="">Select component type...</option>
+                                    <option value="">Select deployment target...</option>
                                     {% for component in manage_deployment_options.edit_components | default([], true) %}
                                     <option value="{{ component.value }}">{{ component.label }}</option>
                                     {% endfor %}
@@ -308,7 +308,7 @@
                                 </select>
                             </div>
                             <div class="col-md-6">
-                                <label for="editComponentNames" class="form-label">Component Names</label>
+                                <label for="editComponentNames" class="form-label">Packages</label>
                                 <select id="editComponentNames" class="form-select" multiple size="5"></select>
                             </div>
                             <div class="col-md-6" id="editServiceTypesGroup" style="display: none;">
@@ -343,6 +343,7 @@ window.pageData = {
     userRole: {{ user.role | tojson }},
     environments: {{ environments | tojson }},
     componentConfig: {{ manage_deployment_options.edit_component_packages | default({}, true) | tojson }},
+    deploymentTargets: {{ manage_deployment_options.targets | default([], true) | tojson }},
     serverTimezone: {{ (server_timezone or "UTC") | tojson }},
     reservationPolicy: {{ reservation_policy | default({}, true) | tojson }}
 };

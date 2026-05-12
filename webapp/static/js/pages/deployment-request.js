@@ -44,7 +44,7 @@
             return;
         }
         if (deploymentMode === "tools") {
-            showFormMessage("Specific-environment tool deployments are checked against existing bookings.", "muted");
+            showFormMessage("Tool deployments target the configured server role for the selected environment and are checked against existing bookings.", "muted");
             return;
         }
         showFormMessage(
@@ -103,6 +103,17 @@
         }) || null;
     }
 
+    function getSelectedPackageConfig() {
+        const target = getTargetByKey(document.getElementById("formTargetKey").value);
+        const selectedPackageKey = document.getElementById("formComponentNames").value;
+        if (!target || !selectedPackageKey) {
+            return null;
+        }
+        return (target.packages || []).find(function (pkg) {
+            return pkg.package_key === selectedPackageKey;
+        }) || null;
+    }
+
     function populateEnvOptions(envType) {
         common.populateEnvironmentOptions({
             selectId: "formEnvId",
@@ -125,6 +136,39 @@
         envTypeGroup.className = scopeType === "ENV" ? "col-md-6" : "col-md-12";
         envIdSelect.required = scopeType === "ENV";
         envTypeSelect.required = true;
+    }
+
+    function syncToolScopeAvailability() {
+        if (deploymentMode !== "tools") {
+            return;
+        }
+
+        const scopeSelect = document.getElementById("formScopeType");
+        const envTypeOption = Array.from(scopeSelect.options).find(function (option) {
+            return option.value === "ENV_TYPE";
+        });
+        const envOption = Array.from(scopeSelect.options).find(function (option) {
+            return option.value === "ENV";
+        });
+        const selectedPackage = getSelectedPackageConfig();
+        const supportedScopes = selectedPackage && selectedPackage.supported_scopes
+            ? selectedPackage.supported_scopes
+            : ["ENV", "ENV_TYPE"];
+
+        if (envTypeOption) {
+            envTypeOption.disabled = supportedScopes.indexOf("ENV_TYPE") === -1;
+        }
+        if (envOption) {
+            envOption.disabled = supportedScopes.indexOf("ENV") === -1;
+        }
+
+        if (scopeSelect.value === "ENV_TYPE" && supportedScopes.indexOf("ENV_TYPE") === -1) {
+            scopeSelect.value = "ENV";
+        } else if (scopeSelect.value === "ENV" && supportedScopes.indexOf("ENV") === -1) {
+            scopeSelect.value = "ENV_TYPE";
+        }
+
+        syncToolScopeFields();
     }
 
     function resetServiceSelections() {
@@ -166,12 +210,15 @@
             return;
         }
 
-        if (target.allow_all_packages) {
+        if (target.allow_multiple_packages && (target.packages || []).length > 1) {
             componentNames.insertAdjacentHTML("beforeend", '<option value="all">all</option>');
         }
 
         (target.packages || []).forEach(function (pkg) {
-            const label = pkg.package_key + " (" + (pkg.server_role_key || "-") + ")";
+            const scopes = (pkg.supported_scopes || []).join("/");
+            const label = pkg.package_key +
+                " (" + (pkg.server_role_key || "-") + ")" +
+                (scopes ? " [" + scopes + "]" : "");
             componentNames.insertAdjacentHTML(
                 "beforeend",
                 '<option value="' + common.escapeHtml(pkg.package_key) + '">' +
@@ -180,9 +227,11 @@
             );
         });
 
-        if ((target.packages || []).length === 1 && !target.allow_all_packages) {
+        if ((target.packages || []).length === 1 && !target.allow_multiple_packages) {
             componentNames.value = target.packages[0].package_key;
         }
+
+        syncToolScopeAvailability();
 
         if (componentNames.value) {
             loadVersionOptions();
@@ -208,7 +257,7 @@
         }
 
         versionSelect.innerHTML = '<option value="">Loading versions...</option>';
-        const params = new URLSearchParams({ component_type: targetKey });
+        const params = new URLSearchParams({ target_key: targetKey });
         if (targetKey === "TOOLS" && selectedPackage) {
             params.set("package_key", selectedPackage);
         }
@@ -253,8 +302,7 @@
                     : "ENV",
                 requested_version: document.getElementById("formVersion").value.trim(),
                 testing_mode: targetKey === "TCS_APP" ? document.getElementById("formTestingMode").value : "",
-                selected_package: selectedPackage,
-                selected_packages: selectedPackage ? [selectedPackage] : [],
+                package_keys: selectedPackage ? [selectedPackage] : [],
                 service_types: targetKey === "TCS_APP"
                     ? Array.from(document.getElementById("formServiceTypes").selectedOptions).map(function (opt) {
                         return opt.value;
@@ -282,7 +330,7 @@
         if (!deployment.target_key) {
             return "Deployment target is required.";
         }
-        if (!deployment.selected_package) {
+        if (!deployment.package_keys || !deployment.package_keys.length) {
             return "Target package is required.";
         }
         if (!deployment.requested_version) {
@@ -405,7 +453,10 @@
             document.getElementById("formScopeType").addEventListener("change", syncToolScopeFields);
         }
         document.getElementById("formTargetKey").addEventListener("change", loadDeploymentOptions);
-        document.getElementById("formComponentNames").addEventListener("change", loadVersionOptions);
+        document.getElementById("formComponentNames").addEventListener("change", function () {
+            syncToolScopeAvailability();
+            loadVersionOptions();
+        });
         document.getElementById("deploymentRequestForm").addEventListener("submit", handleDeploymentSubmit);
 
         populateTargetOptions();

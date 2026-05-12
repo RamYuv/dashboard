@@ -5,6 +5,8 @@ import random
 
 logger = logging.getLogger(__name__)
 
+STANDARD_STATUS_SUPPORTED_HOSTS = {"Core", "Gatway"}
+
 
 class VmStatusFetcher:
     """Fetch per-host service status and normalize it into VM health metadata."""
@@ -12,12 +14,24 @@ class VmStatusFetcher:
     def __init__(self):
         pass
 
+    def supports_standard_status_command(self, host):
+        """Return whether the default status command is supported for this host."""
+        normalized_host = (host or "").strip()
+        return normalized_host in STANDARD_STATUS_SUPPORTED_HOSTS
+
     def service_status(self, host, username, password):
         """Return mock command output for one host.
 
         This remains a stub for now; production implementations can replace
         it with SSH or other remote execution logic.
         """
+        if not self.supports_standard_status_command(host):
+            logger.info(
+                "Skipping standard service status command for host %s because a dedicated monitor command is not implemented yet.",
+                host,
+            )
+            return "__MONITORING_NOT_IMPLEMENTED__"
+
         mock_outputs = [
             "Getting status of instances .....................done\nNo instances running",
             "Getting status of instances .................. done\nStatus of required instances for session: [24, 40]\napp1\t\t: Running(pid: 12345)\ndisc1\t\t: Running(pid: 44232)\ndisc2\t\t: Running(pid: 63453)\nstat1\t\t: Running(pid: 03984)\napp4\t\t: Running(pid: 65453)",
@@ -33,6 +47,9 @@ class VmStatusFetcher:
             vm_status["vm_color"] = "Black"
             return vm_status
         normalized = output_string.strip().lower()
+        if "__monitoring_not_implemented__" in normalized:
+            vm_status["vm_color"] = "Black"
+            return vm_status
         if "command not found" in normalized:
             vm_status["vm_color"] = "Black"
             return vm_status

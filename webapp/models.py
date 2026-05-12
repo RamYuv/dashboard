@@ -252,11 +252,11 @@ class ComponentBuild(db.Model):
 
     build_id = db.Column(db.Integer, primary_key=True)
 
-    component_type = db.Column(db.String(50), nullable=False)
-    # TCS_APP / TCS_PAYUI / TCS_DB / TOOLS
+    target_key = db.Column(db.String(50), nullable=False)
+    # TCS_APP / DB / PAYAPP / TOOLS
 
-    component_name = db.Column(db.String(100), nullable=False)
-    # tcs_service / payui / tcs_db / tools
+    build_name = db.Column(db.String(100), nullable=False)
+    # target/package specific build identifier
 
     version = db.Column(db.String(50), nullable=False)
 
@@ -267,19 +267,19 @@ class ComponentBuild(db.Model):
 
     __table_args__ = (
         db.UniqueConstraint(
-            "component_type",
-            "component_name",
+            "target_key",
+            "build_name",
             "version",
             name="uq_component_build"
         ),
-        db.Index("idx_component_build_lookup", "component_type", "component_name", "version"),
+        db.Index("idx_component_build_lookup", "target_key", "build_name", "version"),
     )
 
     def to_dict(self):
         return {
             "build_id": self.build_id,
-            "component_type": self.component_type,
-            "component_name": self.component_name,
+            "target_key": self.target_key,
+            "build_name": self.build_name,
             "version": self.version,
             "artifact_name": self.artifact_name,
             "artifact_path": self.artifact_path,
@@ -446,16 +446,10 @@ class DeploymentRequest(db.Model):
 
     target_key = db.Column(db.String(50), nullable=False)
 
-    component_type = db.Column(db.String(50), nullable=True)
-    # Legacy denormalized field retained for migration compatibility.
-
-    component_name = db.Column(db.String(100), nullable=True)
-    # Legacy denormalized field retained for migration compatibility.
-
     requested_version = db.Column(db.String(50), nullable=False)
 
-    selected_packages = db.Column(db.Text, nullable=False)
-    # JSON list: ["all"] or ["gateway"] or ["cordb", "paydb"]
+    package_keys_raw = db.Column("package_keys", db.Text, nullable=False)
+    # JSON list: ["core"] or ["coredb", "cosdb"]
 
     testing_mode = db.Column(db.String(50), nullable=False, default="")
     service_types = db.Column(db.Text, nullable=False, default="[]")
@@ -508,14 +502,16 @@ class DeploymentRequest(db.Model):
     __table_args__ = (
         db.Index("idx_dreq_status_created", "status", "created_at"),
         db.Index("idx_dreq_env_status", "env_id", "status"),
-        db.Index("idx_dreq_component", "component_type", "component_name", "requested_version"),
+        db.Index("idx_dreq_target_version", "target_key", "requested_version"),
     )
 
-    def get_selected_packages(self):
-        return parse_json_list(self.selected_packages)
+    @property
+    def package_keys(self):
+        return parse_json_list(self.package_keys_raw)
 
-    def set_selected_packages(self, packages):
-        self.selected_packages = json_dumps(packages)
+    @package_keys.setter
+    def package_keys(self, packages):
+        self.package_keys_raw = json_dumps(packages)
 
     def get_service_types(self):
         return parse_json_list(self.service_types)
@@ -523,23 +519,52 @@ class DeploymentRequest(db.Model):
     def set_service_types(self, service_types):
         self.service_types = json_dumps(service_types)
 
-    def resolved_component_type(self):
-        from .deployment_targets import derive_component_type
-
-        return (
-            self.build.component_type if self.build else None
-        ) or derive_component_type(self.target_key, self.component_type)
-
-    def resolved_component_name(self):
+    @property
+    def target_definition(self):
         from .deployment_targets import get_target_definition
 
-        target_definition = get_target_definition(self.target_key) or {}
+        return get_target_definition(self.target_key) or {}
+
+    @property
+    def target_display_name(self):
+        return self.target_definition.get("display_name") or self.target_key
+
+    @property
+    def environment_scope(self):
+        return (self.env_scope_type or "ENV").strip().upper()
+
+    @property
+    def environment_scope_value(self):
+        if self.environment_scope == "ENV":
+            return self.env_id
+        return self.requested_env_type
+
+    @property
+    def package_definitions(self):
+        packages = self.target_definition.get("packages") or {}
+        return [
+            packages[package_key]
+            for package_key in self.package_keys
+            if package_key in packages
+        ]
+
+    @property
+    def package_display_names(self):
+        names = []
+        packages = self.target_definition.get("packages") or {}
+        for package_key in self.package_keys:
+            package = packages.get(package_key) or {}
+            names.append(package.get("package_name") or package_key)
+        return names
+
+    @property
+    def build_name(self):
         return (
-            self.build.component_name if self.build else None
-        ) or self.component_name or target_definition.get("component_name")
+            self.build.build_name if self.build else None
+        ) or self.target_key
 
     def environment_display_label(self):
-        if self.env_scope_type == "ENV" and self.env_id:
+        if self.environment_scope == "ENV" and self.env_id:
             return self.env_id
         if self.requested_env_type:
             return "{} (shared)".format(self.requested_env_type)
@@ -564,18 +589,20 @@ class DeploymentRequest(db.Model):
             "env_id": self.env_id,
             "environment_display": self.environment_display_label(),
             "requested_env_type": self.requested_env_type,
-            "env_scope_type": self.env_scope_type,
+            "env_scope_type": self.environment_scope,
+            "environment_scope": self.environment_scope,
+            "environment_scope_value": self.environment_scope_value,
             "requested_by": self.requested_by,
             "requested_by_name": self.requester.name if self.requester else self.requested_by,
             "planned_start_time": format_datetime(self.planned_start_time),
             "build_id": self.build_id,
             "target_key": self.target_key,
-            "component_type": self.resolved_component_type(),
-            "component_name": self.resolved_component_name(),
+            "target_display_name": self.target_display_name,
+            "build_name": self.build_name,
             "artifact_name": self.build.artifact_name if self.build else None,
             "requested_version": self.requested_version,
-            "component_names": self.get_selected_packages(),
-            "selected_packages": self.get_selected_packages(),
+            "package_keys": self.package_keys,
+            "package_display_names": self.package_display_names,
             "testing_mode": self.testing_mode,
             "service_types": self.get_service_types(),
             "jira_id": self.jira_id,
@@ -755,6 +782,7 @@ class CurrentDeploymentState(db.Model):
     def to_dict(self):
         mapping = self.environment_host_mapping
         host = mapping.host if mapping else None
+        deployment_request = self.deployment_request
         return {
             "current_deployment_state_id": self.current_deployment_state_id,
             "env_scope_type": self.env_scope_type,
@@ -762,6 +790,11 @@ class CurrentDeploymentState(db.Model):
             "env_type": self.env_type,
             "environment_host_mapping_id": self.environment_host_mapping_id,
             "target_key": self.target_key,
+            "target_display_name": (
+                deployment_request.target_display_name
+                if deployment_request is not None
+                else self.target_key
+            ),
             "package_key": self.package_key,
             "package_name": self.package_name,
             "current_version": self.current_version,

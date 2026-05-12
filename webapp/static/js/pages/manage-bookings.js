@@ -5,6 +5,7 @@
     const userRole = pageData.userRole;
     const environments = pageData.environments || [];
     const componentConfig = pageData.componentConfig || {};
+    const deploymentTargets = pageData.deploymentTargets || [];
     const serverTimezone = pageData.serverTimezone || "UTC";
 
     let allBookings = [];
@@ -246,6 +247,50 @@
         }
     }
 
+    function getTargetByKey(targetKey) {
+        return deploymentTargets.find(function (target) {
+            return target.target_key === targetKey;
+        }) || null;
+    }
+
+    function populateVersionOptionsForRequest(targetKey, selectedPackages, selectedVersion) {
+        const packageKey = (selectedPackages || [])[0] || "";
+        const select = document.getElementById("editVersion");
+        select.innerHTML = '<option value="">Loading...</option>';
+
+        if (!targetKey || !packageKey) {
+            common.resetSelect("editVersion", "Select version...");
+            return Promise.resolve();
+        }
+
+        let url = "/api/component-versions?target_key=" + encodeURIComponent(targetKey);
+        if (targetKey === "TOOLS") {
+            url += "&package_key=" + encodeURIComponent(packageKey);
+        }
+
+        return common.fetchJson(url, {
+            credentials: "include",
+        })
+            .then(function (result) {
+                if (!result.ok) {
+                    throw new Error(result.data.error || "Failed to load versions");
+                }
+                common.resetSelect("editVersion", "Select version...");
+                (result.data.versions || []).forEach(function (version) {
+                    select.insertAdjacentHTML(
+                        "beforeend",
+                        '<option value="' + common.escapeHtml(version) + '">' + common.escapeHtml(version) + "</option>"
+                    );
+                });
+                if (selectedVersion) {
+                    select.value = selectedVersion;
+                }
+            })
+            .catch(function () {
+                common.resetSelect("editVersion", "Select version...");
+            });
+    }
+
     function loadVersions(componentType, selectedVersion) {
         const select = document.getElementById("editVersion");
         select.innerHTML = '<option value="">Loading...</option>';
@@ -255,7 +300,7 @@
             return Promise.resolve();
         }
 
-        return common.fetchJson("/api/component-versions?component_type=" + encodeURIComponent(componentType), {
+        return common.fetchJson("/api/component-versions?target_key=" + encodeURIComponent(componentType), {
             credentials: "include",
         })
             .then(function (result) {
@@ -288,8 +333,8 @@
         const componentType = document.getElementById("editComponentType").value;
         populateComponentNames(componentType, []);
         loadVersions(componentType, null);
-        document.getElementById("editServiceTypesGroup").style.display = componentType === "TCS" ? "block" : "none";
-        if (componentType !== "TCS") {
+        document.getElementById("editServiceTypesGroup").style.display = componentType === "TCS_APP" ? "block" : "none";
+        if (componentType !== "TCS_APP") {
             resetServiceTypes();
         }
     }
@@ -320,11 +365,15 @@
         const deployment = booking.deployment_request || null;
         if (booking.booking_type === "DEPLOYMENT" && deployment) {
             document.getElementById("deploymentSection").style.display = "block";
-            document.getElementById("editComponentType").value = deployment.component_type || "";
-            populateComponentNames(deployment.component_type || "", deployment.component_names || []);
-            loadVersions(deployment.component_type || "", deployment.requested_version || "");
+            document.getElementById("editComponentType").value = deployment.target_key || "";
+            populateComponentNames(deployment.target_key || "", deployment.package_keys || []);
+            populateVersionOptionsForRequest(
+                deployment.target_key || "",
+                deployment.package_keys || [],
+                deployment.requested_version || ""
+            );
             document.getElementById("editTestingMode").value = deployment.testing_mode || "";
-            document.getElementById("editServiceTypesGroup").style.display = deployment.component_type === "TCS" ? "block" : "none";
+            document.getElementById("editServiceTypesGroup").style.display = deployment.target_key === "TCS_APP" ? "block" : "none";
             Array.from(document.getElementById("editServiceTypes").options).forEach(function (option) {
                 option.selected = (deployment.service_types || []).includes(option.value);
             });
@@ -369,14 +418,17 @@
             document.getElementById("editDescription").value = booking.description || "";
 
             document.getElementById("deploymentSection").style.display = "block";
-            document.getElementById("editComponentType").value = deployment.target_key || deployment.component_type || "";
+            document.getElementById("editComponentType").value = deployment.target_key || "";
             document.getElementById("editVersion").innerHTML = '<option value="' + common.escapeHtml(deployment.requested_version || "") + '" selected>' + common.escapeHtml(deployment.requested_version || "N/A") + "</option>";
             document.getElementById("editTestingMode").value = deployment.testing_mode || "";
-            document.getElementById("editComponentNames").innerHTML = (deployment.component_names || []).map(function (name) {
+            document.getElementById("editComponentNames").innerHTML = (deployment.package_keys || []).map(function (name) {
                 return '<option value="' + common.escapeHtml(name) + '" selected>' + common.escapeHtml(name) + "</option>";
             }).join("");
-            document.getElementById("editServiceTypesGroup").style.display = "none";
+            document.getElementById("editServiceTypesGroup").style.display = deployment.target_key === "TCS_APP" ? "block" : "none";
             resetServiceTypes();
+            Array.from(document.getElementById("editServiceTypes").options).forEach(function (option) {
+                option.selected = (deployment.service_types || []).includes(option.value);
+            });
 
             setModalMode("view");
             editModal.show();
@@ -400,10 +452,10 @@
 
         if (payload.booking_type === "DEPLOYMENT") {
             payload.deployment_request = {
-                component_type: document.getElementById("editComponentType").value,
+                target_key: document.getElementById("editComponentType").value,
                 requested_version: document.getElementById("editVersion").value,
                 testing_mode: document.getElementById("editTestingMode").value,
-                component_names: Array.from(document.getElementById("editComponentNames").selectedOptions).map(function (opt) {
+                package_keys: Array.from(document.getElementById("editComponentNames").selectedOptions).map(function (opt) {
                     return opt.value;
                 }),
                 service_types: Array.from(document.getElementById("editServiceTypes").selectedOptions).map(function (opt) {
