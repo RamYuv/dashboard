@@ -31,12 +31,22 @@
 
     function requesterDisplay(item) {
         const userId = String(item.requested_by || "").trim();
-        const fullName = String(item.requested_by_name || "").trim();
-        if (!fullName || fullName === userId) {
+        const explicitDisplay = String(item.requested_by_display || "").trim();
+        const username = String(item.requested_by_name || "").trim();
+        const teamName = String(item.requested_by_team || "").trim();
+        if (explicitDisplay) {
+            return '<div class="fw-semibold">' + common.escapeHtml(explicitDisplay) + "</div>";
+        }
+        if (username && teamName) {
+            return '<div class="fw-semibold">' + common.escapeHtml(username + " (" + teamName + ")") + "</div>";
+        }
+        if (!userId && !teamName) {
             return common.escapeHtml(userId || "-");
         }
-        return '<div class="fw-semibold">' + common.escapeHtml(userId) + '</div>' +
-            '<div class="text-muted small">' + common.escapeHtml(fullName) + "</div>";
+        if (userId && teamName) {
+            return '<div class="fw-semibold">' + common.escapeHtml(userId + " (" + teamName + ")") + "</div>";
+        }
+        return '<div class="fw-semibold">' + common.escapeHtml(userId || username || teamName || "-") + "</div>";
     }
 
     function filteredRequests() {
@@ -57,6 +67,8 @@
                 item.requested_env_type,
                 item.requested_by,
                 item.requested_by_name,
+                item.requested_by_team,
+                item.requested_by_display,
                 item.target_key,
                 item.requested_version,
                 item.status,

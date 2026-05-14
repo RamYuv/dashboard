@@ -1,7 +1,7 @@
 """Monitoring refresh workflow.
 
 The worker performs one complete refresh cycle:
-- load environment/server-role mappings from the database
+- load environment/server-type mappings from the database
 - fetch VM status for each mapped host
 - aggregate VM-level status into environment-level status
 - merge live status with dummy/demo snapshot when live data is incomplete
@@ -28,35 +28,38 @@ class EnvMonitorWorker:
         self.status_fetcher = status_fetcher
         self.status_aggregator = status_aggregator
 
-    def _included_server_roles(self):
-        raw_value = self.app.config.get("MONITOR_INCLUDED_SERVER_ROLES", "")
+    def _included_server_types(self):
+        raw_value = self.app.config.get(
+            "MONITOR_INCLUDED_SERVER_TYPES",
+            self.app.config.get("MONITOR_INCLUDED_SERVER_ROLES", ""),
+        )
         included = []
         for item in str(raw_value).split(","):
-            role_key = (item or "").strip()
-            if role_key and role_key not in included:
-                included.append(role_key)
+            server_type_key = (item or "").strip()
+            if server_type_key and server_type_key not in included:
+                included.append(server_type_key)
         return included
 
     def _include_shared_mappings(self):
         return bool(self.app.config.get("MONITOR_INCLUDE_SHARED_MAPPINGS", False))
 
-    def _should_monitor_mapping(self, mapping, included_server_roles):
+    def _should_monitor_mapping(self, mapping, included_server_types):
         if mapping is None:
             return False
         if not self._include_shared_mappings() and getattr(mapping, "is_shared", False):
             return False
         if not getattr(mapping, "env_id", None):
             return False
-        server_role = mapping.server_role.role_key if mapping.server_role else None
-        return bool(server_role and server_role in included_server_roles)
+        server_type = mapping.server_type.server_type_key if mapping.server_type else None
+        return bool(server_type and server_type in included_server_types)
 
     def _load_environment_mappings(self):
-        """Load environment-to-server-role mappings and fetch raw VM status."""
-        included_server_roles = self._included_server_roles()
+        """Load environment-to-server-type mappings and fetch raw VM status."""
+        included_server_types = self._included_server_types()
         mappings = (
             EnvironmentHostMapping.query
             .options(
-                joinedload(EnvironmentHostMapping.server_role),
+                joinedload(EnvironmentHostMapping.server_type),
                 joinedload(EnvironmentHostMapping.environment),
                 joinedload(EnvironmentHostMapping.host),
             )
@@ -69,12 +72,12 @@ class EnvMonitorWorker:
         host_status_cache = {}
 
         for mapping in mappings:
-            if not self._should_monitor_mapping(mapping, included_server_roles):
+            if not self._should_monitor_mapping(mapping, included_server_types):
                 continue
 
             env_id = mapping.env_id
-            server_role = mapping.server_role.role_key if mapping.server_role else "unknown"
-            vm_id = "{0}:{1}".format(env_id, server_role)
+            server_type = mapping.server_type.server_type_key if mapping.server_type else "unknown"
+            vm_id = "{0}:{1}".format(env_id, server_type)
 
             env_entry = env_index.setdefault(env_id, {
                 "env_id": env_id,

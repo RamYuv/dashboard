@@ -136,13 +136,13 @@ This module is the bridge between JSON target configuration and deployable DB-ba
 `webapp/models.py` is the canonical persistence model and currently contains:
 
 - identity and access models: `User`, `Team`, `TeamMember`
-- infrastructure models: `Environment`, `Host`, `ServerRole`, `EnvironmentHostMapping`
+- infrastructure models: `Environment`, `Host`, `ServerType`, `EnvironmentHostMapping`
 - deployment models: `ComponentBuild`, `DeploymentRequest`, `Deployment`, `CurrentDeploymentState`
 - reservation model: `EnvironmentBooking`
 
 Important design choices:
 
-- `EnvironmentHostMapping` is the central infrastructure join model that ties environment, host, and server role together.
+- `EnvironmentHostMapping` is the central infrastructure join model that ties environment, host, and server type together.
 - `DeploymentRequest` is the workflow parent record.
 - `Deployment` stores per-target execution detail under a request.
 - `CurrentDeploymentState` is the read-optimized snapshot of what is currently deployed per mapping/package.
@@ -161,7 +161,7 @@ Key parts:
 - `VmStatusFetcher`: fetches and parses raw VM/service status.
 - `EnvStatusAggregator`: converts VM-level health into environment summaries and deltas.
 - `MonitorState`: thread-safe in-memory snapshot plus persisted cache file.
-- `monitoring/api.py`: exposes environment health as JSON and enriches it with booking activity and server-role metadata.
+- `monitoring/api.py`: exposes environment health as JSON and enriches it with booking activity and server-type metadata.
 
 ## Main Execution Flows
 

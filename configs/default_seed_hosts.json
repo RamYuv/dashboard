@@ -1,0 +1,420 @@
+{
+  "hosts": [
+    {
+      "hostname": "core-host",
+      "ip_address": "10.0.0.10",
+      "domain": "APP",
+      "description": "Shared host for Core deployments"
+    },
+    {
+      "hostname": "getway-host",
+      "ip_address": "10.0.0.11",
+      "domain": "APP",
+      "description": "Shared host for Getway deployments"
+    },
+    {
+      "hostname": "payapp-host",
+      "ip_address": "10.0.0.12",
+      "domain": "PAYAPP",
+      "description": "Shared host for PayApp deployments"
+    },
+    {
+      "hostname": "coredb-host",
+      "ip_address": "10.0.0.13",
+      "domain": "DB",
+      "description": "Shared host for CoreDb deployments"
+    },
+    {
+      "hostname": "lgdb-host",
+      "ip_address": "10.0.0.14",
+      "domain": "DB",
+      "description": "Shared host for LGDB deployments"
+    },
+    {
+      "hostname": "tool-server-host",
+      "ip_address": "10.0.0.15",
+      "domain": "TOOLS",
+      "description": "Shared host for tool server workloads"
+    }
+  ],
+  "environment_host_mappings": [
+    {
+      "env_id": "DEV-01",
+      "env_type": "DEV",
+      "is_shared": false,
+      "server_type_key": "Core",
+      "hostname": "core-host",
+      "deployment_user": "user1",
+      "deployment_password": "pass1"
+    },
+    {
+      "env_id": "DEV-01",
+      "env_type": "DEV",
+      "is_shared": false,
+      "server_type_key": "Getway",
+      "hostname": "getway-host",
+      "deployment_user": "user1",
+      "deployment_password": "pass1"
+    },
+    {
+      "env_id": "DEV-01",
+      "env_type": "DEV",
+      "is_shared": false,
+      "server_type_key": "PAYApp",
+      "hostname": "payapp-host",
+      "deployment_user": "user1",
+      "deployment_password": "pass1"
+    },
+    {
+      "env_id": "DEV-01",
+      "env_type": "DEV",
+      "is_shared": false,
+      "server_type_key": "CoreDb",
+      "hostname": "coredb-host",
+      "deployment_user": "user1",
+      "deployment_password": "pass1"
+    },
+    {
+      "env_id": "DEV-01",
+      "env_type": "DEV",
+      "is_shared": false,
+      "server_type_key": "LGDB",
+      "hostname": "lgdb-host",
+      "deployment_user": "user1",
+      "deployment_password": "pass1"
+    },
+    {
+      "env_id": "DEV-01",
+      "env_type": "DEV",
+      "is_shared": false,
+      "server_type_key": "Tool_server",
+      "hostname": "tool-server-host",
+      "deployment_user": "user1",
+      "deployment_password": "pass1"
+    },
+    {
+      "env_id": "DEV-02",
+      "env_type": "DEV",
+      "is_shared": false,
+      "server_type_key": "Core",
+      "hostname": "core-host",
+      "deployment_user": "user1",
+      "deployment_password": "pass1"
+    },
+    {
+      "env_id": "DEV-02",
+      "env_type": "DEV",
+      "is_shared": false,
+      "server_type_key": "Getway",
+      "hostname": "getway-host",
+      "deployment_user": "user1",
+      "deployment_password": "pass1"
+    },
+    {
+      "env_id": "DEV-02",
+      "env_type": "DEV",
+      "is_shared": false,
+      "server_type_key": "PAYApp",
+      "hostname": "payapp-host",
+      "deployment_user": "user1",
+      "deployment_password": "pass1"
+    },
+    {
+      "env_id": "DEV-02",
+      "env_type": "DEV",
+      "is_shared": false,
+      "server_type_key": "CoreDb",
+      "hostname": "coredb-host",
+      "deployment_user": "user1",
+      "deployment_password": "pass1"
+    },
+    {
+      "env_id": "DEV-02",
+      "env_type": "DEV",
+      "is_shared": false,
+      "server_type_key": "LGDB",
+      "hostname": "lgdb-host",
+      "deployment_user": "user1",
+      "deployment_password": "pass1"
+    },
+    {
+      "env_id": "DEV-02",
+      "env_type": "DEV",
+      "is_shared": false,
+      "server_type_key": "Tool_server",
+      "hostname": "tool-server-host",
+      "deployment_user": "user1",
+      "deployment_password": "pass1"
+    },
+    {
+      "env_id": "ST-01",
+      "env_type": "ST",
+      "is_shared": false,
+      "server_type_key": "Core",
+      "hostname": "core-host",
+      "deployment_user": "user1",
+      "deployment_password": "pass1"
+    },
+    {
+      "env_id": "ST-01",
+      "env_type": "ST",
+      "is_shared": false,
+      "server_type_key": "Getway",
+      "hostname": "getway-host",
+      "deployment_user": "user1",
+      "deployment_password": "pass1"
+    },
+    {
+      "env_id": "ST-01",
+      "env_type": "ST",
+      "is_shared": false,
+      "server_type_key": "PAYApp",
+      "hostname": "payapp-host",
+      "deployment_user": "user1",
+      "deployment_password": "pass1"
+    },
+    {
+      "env_id": "ST-01",
+      "env_type": "ST",
+      "is_shared": false,
+      "server_type_key": "CoreDb",
+      "hostname": "coredb-host",
+      "deployment_user": "user1",
+      "deployment_password": "pass1"
+    },
+    {
+      "env_id": "ST-01",
+      "env_type": "ST",
+      "is_shared": false,
+      "server_type_key": "LGDB",
+      "hostname": "lgdb-host",
+      "deployment_user": "user1",
+      "deployment_password": "pass1"
+    },
+    {
+      "env_id": "ST-01",
+      "env_type": "ST",
+      "is_shared": false,
+      "server_type_key": "Tool_server",
+      "hostname": "tool-server-host",
+      "deployment_user": "user1",
+      "deployment_password": "pass1"
+    },
+    {
+      "env_id": "QA-01",
+      "env_type": "QA",
+      "is_shared": false,
+      "server_type_key": "Core",
+      "hostname": "core-host",
+      "deployment_user": "user1",
+      "deployment_password": "pass1"
+    },
+    {
+      "env_id": "QA-01",
+      "env_type": "QA",
+      "is_shared": false,
+      "server_type_key": "Getway",
+      "hostname": "getway-host",
+      "deployment_user": "user1",
+      "deployment_password": "pass1"
+    },
+    {
+      "env_id": "QA-01",
+      "env_type": "QA",
+      "is_shared": false,
+      "server_type_key": "PAYApp",
+      "hostname": "payapp-host",
+      "deployment_user": "user1",
+      "deployment_password": "pass1"
+    },
+    {
+      "env_id": "QA-01",
+      "env_type": "QA",
+      "is_shared": false,
+      "server_type_key": "CoreDb",
+      "hostname": "coredb-host",
+      "deployment_user": "user1",
+      "deployment_password": "pass1"
+    },
+    {
+      "env_id": "QA-01",
+      "env_type": "QA",
+      "is_shared": false,
+      "server_type_key": "LGDB",
+      "hostname": "lgdb-host",
+      "deployment_user": "user1",
+      "deployment_password": "pass1"
+    },
+    {
+      "env_id": "QA-01",
+      "env_type": "QA",
+      "is_shared": false,
+      "server_type_key": "Tool_server",
+      "hostname": "tool-server-host",
+      "deployment_user": "user1",
+      "deployment_password": "pass1"
+    },
+    {
+      "env_id": "QA-02",
+      "env_type": "QA",
+      "is_shared": false,
+      "server_type_key": "Core",
+      "hostname": "core-host",
+      "deployment_user": "user1",
+      "deployment_password": "pass1"
+    },
+    {
+      "env_id": "QA-02",
+      "env_type": "QA",
+      "is_shared": false,
+      "server_type_key": "Getway",
+      "hostname": "getway-host",
+      "deployment_user": "user1",
+      "deployment_password": "pass1"
+    },
+    {
+      "env_id": "QA-02",
+      "env_type": "QA",
+      "is_shared": false,
+      "server_type_key": "PAYApp",
+      "hostname": "payapp-host",
+      "deployment_user": "user1",
+      "deployment_password": "pass1"
+    },
+    {
+      "env_id": "QA-02",
+      "env_type": "QA",
+      "is_shared": false,
+      "server_type_key": "CoreDb",
+      "hostname": "coredb-host",
+      "deployment_user": "user1",
+      "deployment_password": "pass1"
+    },
+    {
+      "env_id": "QA-02",
+      "env_type": "QA",
+      "is_shared": false,
+      "server_type_key": "LGDB",
+      "hostname": "lgdb-host",
+      "deployment_user": "user1",
+      "deployment_password": "pass1"
+    },
+    {
+      "env_id": "QA-02",
+      "env_type": "QA",
+      "is_shared": false,
+      "server_type_key": "Tool_server",
+      "hostname": "tool-server-host",
+      "deployment_user": "user1",
+      "deployment_password": "pass1"
+    },
+    {
+      "env_id": "UAT-01",
+      "env_type": "UAT",
+      "is_shared": false,
+      "server_type_key": "Core",
+      "hostname": "core-host",
+      "deployment_user": "user1",
+      "deployment_password": "pass1"
+    },
+    {
+      "env_id": "UAT-01",
+      "env_type": "UAT",
+      "is_shared": false,
+      "server_type_key": "Getway",
+      "hostname": "getway-host",
+      "deployment_user": "user1",
+      "deployment_password": "pass1"
+    },
+    {
+      "env_id": "UAT-01",
+      "env_type": "UAT",
+      "is_shared": false,
+      "server_type_key": "PAYApp",
+      "hostname": "payapp-host",
+      "deployment_user": "user1",
+      "deployment_password": "pass1"
+    },
+    {
+      "env_id": "UAT-01",
+      "env_type": "UAT",
+      "is_shared": false,
+      "server_type_key": "CoreDb",
+      "hostname": "coredb-host",
+      "deployment_user": "user1",
+      "deployment_password": "pass1"
+    },
+    {
+      "env_id": "UAT-01",
+      "env_type": "UAT",
+      "is_shared": false,
+      "server_type_key": "LGDB",
+      "hostname": "lgdb-host",
+      "deployment_user": "user1",
+      "deployment_password": "pass1"
+    },
+    {
+      "env_id": "UAT-01",
+      "env_type": "UAT",
+      "is_shared": false,
+      "server_type_key": "Tool_server",
+      "hostname": "tool-server-host",
+      "deployment_user": "user1",
+      "deployment_password": "pass1"
+    },
+    {
+      "env_id": "PERF-01",
+      "env_type": "PERF",
+      "is_shared": false,
+      "server_type_key": "Core",
+      "hostname": "core-host",
+      "deployment_user": "user1",
+      "deployment_password": "pass1"
+    },
+    {
+      "env_id": "PERF-01",
+      "env_type": "PERF",
+      "is_shared": false,
+      "server_type_key": "Getway",
+      "hostname": "getway-host",
+      "deployment_user": "user1",
+      "deployment_password": "pass1"
+    },
+    {
+      "env_id": "PERF-01",
+      "env_type": "PERF",
+      "is_shared": false,
+      "server_type_key": "PAYApp",
+      "hostname": "payapp-host",
+      "deployment_user": "user1",
+      "deployment_password": "pass1"
+    },
+    {
+      "env_id": "PERF-01",
+      "env_type": "PERF",
+      "is_shared": false,
+      "server_type_key": "CoreDb",
+      "hostname": "coredb-host",
+      "deployment_user": "user1",
+      "deployment_password": "pass1"
+    },
+    {
+      "env_id": "PERF-01",
+      "env_type": "PERF",
+      "is_shared": false,
+      "server_type_key": "LGDB",
+      "hostname": "lgdb-host",
+      "deployment_user": "user1",
+      "deployment_password": "pass1"
+    },
+    {
+      "env_id": "PERF-01",
+      "env_type": "PERF",
+      "is_shared": false,
+      "server_type_key": "Tool_server",
+      "hostname": "tool-server-host",
+      "deployment_user": "user1",
+      "deployment_password": "pass1"
+    }
+  ]
+}

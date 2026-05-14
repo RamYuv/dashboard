@@ -36,6 +36,19 @@ def json_dumps(value):
     return json.dumps(value or [])
 
 
+def build_requester_display(user, fallback_user_id):
+    """Return a consistent requester label for UI rendering."""
+    user_id = (fallback_user_id or "").strip()
+    if user is None:
+        return user_id or None
+
+    display_name = (user.user_id or "").strip() or (user.name or "").strip() or user_id
+    team_label = user.team_names_display.strip() if user.team_names_display else ""
+    if team_label:
+        return "{} ({})".format(display_name, team_label)
+    return display_name or user_id or None
+
+
 # ==========================================================
 # USER
 # ==========================================================
@@ -147,6 +160,7 @@ class Host(db.Model):
     __tablename__ = "hosts"
 
     host_id = db.Column(db.Integer, primary_key=True)
+    # Real server hostname/address, e.g. core-host or serveraddress.
     hostname = db.Column(db.String(100), unique=True, nullable=False)
     ip_address = db.Column(db.String(100))
     domain = db.Column(db.String(50))  # DEV / ST / PROD / TOOLS
@@ -156,32 +170,32 @@ class Host(db.Model):
 
 
 # ==========================================================
-# SERVER ROLE
+# SERVER TYPE
 # ==========================================================
-class ServerRole(db.Model):
-    __tablename__ = "server_roles"
+class ServerType(db.Model):
+    __tablename__ = "server_types"
 
-    server_role_id = db.Column(db.Integer, primary_key=True)
+    server_type_id = db.Column(db.Integer, primary_key=True)
 
-    role_key = db.Column(db.String(100), nullable=False)
-    # Canonical role key, e.g. cor-tcs, gateway-tcs, pay-ui, cordb, tools-server.
+    server_type_key = db.Column(db.String(100), nullable=False)
+    # Server type, e.g. Core, Getway, LGDB, CoreDb, PAYApp.
 
-    role_type = db.Column(db.String(50), nullable=False)
-    # TCS / DB / PAYUI / TOOLS
+    target_type = db.Column(db.String(50), nullable=False)
+    # TCS_APP / DB / PAYAPP / TOOLS
 
     description = db.Column(db.Text)
 
     __table_args__ = (
         db.UniqueConstraint(
-            "role_key",
-            "role_type",
-            name="uq_server_role_key_type"
+            "server_type_key",
+            "target_type",
+            name="uq_server_type_key_target_type"
         ),
     )
 
 
 # ==========================================================
-# ENVIRONMENT ↔ LOGICAL SERVER ↔ HOST
+# ENVIRONMENT -> SERVER TYPE -> HOST
 # ==========================================================
 class EnvironmentHostMapping(db.Model):
     __tablename__ = "environment_host_mappings"
@@ -197,9 +211,9 @@ class EnvironmentHostMapping(db.Model):
     env_type = db.Column(db.String(50))
     is_shared = db.Column(db.Boolean, default=False, nullable=False)
 
-    server_role_id = db.Column(
+    server_type_id = db.Column(
         db.Integer,
-        db.ForeignKey("server_roles.server_role_id"),
+        db.ForeignKey("server_types.server_type_id"),
         nullable=False
     )
 
@@ -208,25 +222,26 @@ class EnvironmentHostMapping(db.Model):
         db.ForeignKey("hosts.host_id"),
         nullable=False
     )
+    # Maps a server type such as Core to the actual target host machine.
 
     deployment_user = db.Column(db.String(100))
     deployment_password = db.Column(db.String(255))
 
     environment = db.relationship("Environment", backref="host_mappings")
-    server_role = db.relationship("ServerRole", backref="environment_mappings")
+    server_type = db.relationship("ServerType", backref="environment_mappings")
     host = db.relationship("Host", backref="environment_mappings")
 
     __table_args__ = (
         db.UniqueConstraint(
             "env_id",
-            "server_role_id",
+            "server_type_id",
             name="uq_environment_host_mapping"
         ),
     )
 
     @property
-    def role_key(self):
-        return self.server_role.role_key if self.server_role else None
+    def server_type_key(self):
+        return self.server_type.server_type_key if self.server_type else None
 
     def to_dict(self):
         return {
@@ -234,9 +249,9 @@ class EnvironmentHostMapping(db.Model):
             "env_id": self.env_id,
             "env_type": self.env_type,
             "is_shared": self.is_shared,
-            "server_role_id": self.server_role_id,
-            "server_role_key": self.server_role.role_key if self.server_role else None,
-            "role_type": self.server_role.role_type if self.server_role else None,
+            "server_type_id": self.server_type_id,
+            "server_type_key": self.server_type.server_type_key if self.server_type else None,
+            "target_type": self.server_type.target_type if self.server_type else None,
             "host_id": self.host_id,
             "hostname": self.host.hostname if self.host else None,
             "ip_address": self.host.ip_address if self.host else None,
@@ -388,11 +403,20 @@ class EnvironmentBooking(db.Model):
         return self.lifecycle_status(now=now) in BOOKING_MUTABLE_LIFECYCLE_STATUSES
 
     def to_dict(self):
+        requester = self.requester
+        requested_by_name = (
+            ((requester.user_id or "").strip() or (requester.name or "").strip())
+            if requester else
+            self.requested_by
+        )
+        requested_by_team = requester.team_names_display if requester else None
         data = {
             "booking_id": self.booking_id,
             "env_id": self.env_id,
             "requested_by": self.requested_by,
-            "requested_by_name": self.requester.name if self.requester else None,
+            "requested_by_name": requested_by_name,
+            "requested_by_team": requested_by_team,
+            "requested_by_display": build_requester_display(requester, self.requested_by),
             "start_time": format_datetime(self.start_time),
             "end_time": format_datetime(self.end_time),
             "booking_type": self.booking_type,
@@ -449,7 +473,7 @@ class DeploymentRequest(db.Model):
     requested_version = db.Column(db.String(50), nullable=False)
 
     package_keys_raw = db.Column("package_keys", db.Text, nullable=False)
-    # JSON list: ["core"] or ["coredb", "cosdb"]
+    # JSON list: ["core"] or ["coredb", "lgdb"]
 
     testing_mode = db.Column(db.String(50), nullable=False, default="")
     service_types = db.Column(db.Text, nullable=False, default="[]")
@@ -584,6 +608,13 @@ class DeploymentRequest(db.Model):
 
     def to_dict(self):
         resolved_hostnames = self.resolved_hostnames()
+        requester = self.requester
+        requested_by_name = (
+            ((requester.user_id or "").strip() or (requester.name or "").strip())
+            if requester else
+            self.requested_by
+        )
+        requested_by_team = requester.team_names_display if requester else None
         return {
             "deployment_request_id": self.deployment_request_id,
             "env_id": self.env_id,
@@ -593,7 +624,9 @@ class DeploymentRequest(db.Model):
             "environment_scope": self.environment_scope,
             "environment_scope_value": self.environment_scope_value,
             "requested_by": self.requested_by,
-            "requested_by_name": self.requester.name if self.requester else self.requested_by,
+            "requested_by_name": requested_by_name,
+            "requested_by_team": requested_by_team,
+            "requested_by_display": build_requester_display(requester, self.requested_by),
             "planned_start_time": format_datetime(self.planned_start_time),
             "build_id": self.build_id,
             "target_key": self.target_key,
@@ -682,11 +715,11 @@ class Deployment(db.Model):
         return mapping.env_id if mapping else None
 
     @property
-    def server_role_key(self):
+    def server_type_key(self):
         mapping = self.environment_host_mapping
-        if mapping is None or mapping.server_role is None:
+        if mapping is None or mapping.server_type is None:
             return None
-        return mapping.server_role.role_key
+        return mapping.server_type.server_type_key
 
     @property
     def host_id(self):
@@ -699,7 +732,7 @@ class Deployment(db.Model):
             "deployment_request_id": self.deployment_request_id,
             "environment_host_mapping_id": self.environment_host_mapping_id,
             "env_id": self.env_id,
-            "server_role_key": self.server_role_key,
+            "server_type_key": self.server_type_key,
             "host_id": self.host_id,
             "package_key": self.package_key,
             "package_name": self.package_name,
@@ -802,7 +835,7 @@ class CurrentDeploymentState(db.Model):
             "status": self.status,
             "updated_by": self.updated_by,
             "deployment_request_id": self.deployment_request_id,
-            "server_role_key": mapping.server_role.role_key if mapping and mapping.server_role else None,
+            "server_type_key": mapping.server_type.server_type_key if mapping and mapping.server_type else None,
             "hostname": host.hostname if host else None,
             "host_id": host.host_id if host else None,
             "updated_at": format_datetime(self.updated_at),

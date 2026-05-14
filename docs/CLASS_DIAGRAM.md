@@ -42,10 +42,10 @@ classDiagram
         +string domain
     }
 
-    class ServerRole {
-        +int server_role_id
-        +string role_key
-        +string role_type
+    class ServerType {
+        +int server_type_id
+        +string server_type_key
+        +string target_type
         +string description
     }
 
@@ -54,11 +54,11 @@ classDiagram
         +string env_id
         +string env_type
         +bool is_shared
-        +int server_role_id
+        +int server_type_id
         +int host_id
         +string deployment_user
         +string deployment_password
-        +string role_key
+        +string server_type_key
         +to_dict()
     }
 
@@ -121,7 +121,7 @@ classDiagram
         +string deployed_version
         +string deployment_status
         +env_id()
-        +server_role_key()
+        +server_type_key()
         +host_id()
         +to_dict()
     }
@@ -225,7 +225,7 @@ classDiagram
     Environment "1" --> "*" EnvironmentBooking : bookings
     User "1" --> "*" EnvironmentBooking : requester
     Environment "1" --> "*" EnvironmentHostMapping : host_mappings
-    ServerRole "1" --> "*" EnvironmentHostMapping : environment_mappings
+    ServerType "1" --> "*" EnvironmentHostMapping : environment_mappings
     Host "1" --> "*" EnvironmentHostMapping : environment_mappings
     ComponentBuild "1" --> "*" DeploymentRequest : build
     User "1" --> "*" DeploymentRequest : requester

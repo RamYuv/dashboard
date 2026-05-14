@@ -72,15 +72,15 @@ class DeploymentRequestService:
         for target in missing_targets:
             resolution_error = target.get("resolution_error")
             missing_descriptions.append(
-                "{} ({}){}".format(
-                    target.get("package_name") or target.get("package_key") or "unknown package",
-                    target.get("server_role_key") or "unknown server role",
+                    "{} ({}){}".format(
+                        target.get("package_name") or target.get("package_key") or "unknown package",
+                    target.get("server_type_key") or "unknown server type",
                     ": {}".format(resolution_error) if resolution_error else "",
                 )
             )
         return (
             "No deployment host mapping was found for {}. "
-            "Missing package/server-role mappings: {}."
+            "Missing package/server-type mappings: {}."
         ).format(scope_label, ", ".join(missing_descriptions))
 
     @staticmethod

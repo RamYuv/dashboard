@@ -194,6 +194,8 @@ def serialize_deployment_request_for_workspace(deployment_request):
         "env_id": deployment_request.env_id,
         "requested_by": deployment_request.requested_by,
         "requested_by_name": data.get("requested_by_name"),
+        "requested_by_team": data.get("requested_by_team"),
+        "requested_by_display": data.get("requested_by_display"),
         "start_time": format_datetime(planned_start),
         "end_time": format_datetime(synthetic_end),
         "booking_type": "DEPLOYMENT",

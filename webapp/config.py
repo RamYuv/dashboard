@@ -1,4 +1,5 @@
 import os
+import tempfile
 from pathlib import Path
 
 
@@ -11,7 +12,7 @@ def _read_bool(value, default=False):
 class Config:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     PROJECT_ROOT = os.path.dirname(BASE_DIR)
-    DEFAULT_DB_PATH = Path(BASE_DIR, "app.db").as_posix()
+    DEFAULT_DB_PATH = Path(tempfile.gettempdir(), "envbooking_app.db").as_posix()
 
     SECRET_KEY = os.environ.get('SECRET_KEY', 'change-this-secret-key')
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL', f"sqlite:///{DEFAULT_DB_PATH}")
@@ -27,9 +28,9 @@ class Config:
     # Monitoring scheduler/cache
     MONITOR_REFRESH_SECONDS = int(os.environ.get('MONITOR_REFRESH_SECONDS', 60))
     MONITOR_SCHEDULER_ENABLED = _read_bool(os.environ.get('MONITOR_SCHEDULER_ENABLED', 'false'))
-    MONITOR_INCLUDED_SERVER_ROLES = os.environ.get(
-        'MONITOR_INCLUDED_SERVER_ROLES',
-        'Core,Gatway'
+    MONITOR_INCLUDED_SERVER_TYPES = os.environ.get(
+        'MONITOR_INCLUDED_SERVER_TYPES',
+        os.environ.get('MONITOR_INCLUDED_SERVER_ROLES', 'Core,Getway')
     )
     MONITOR_INCLUDE_SHARED_MAPPINGS = _read_bool(
         os.environ.get('MONITOR_INCLUDE_SHARED_MAPPINGS', 'false')

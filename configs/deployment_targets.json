@@ -6,12 +6,12 @@
     "packages": {
       "core": {
         "package_name": "tcs_service_core",
-        "server_role_key": "Core",
+        "server_type_key": "Core",
         "deploy_order": 20
       },
       "gatway": {
         "package_name": "tcs_service_gatway",
-        "server_role_key": "Gatway",
+        "server_type_key": "Getway",
         "deploy_order": 30
       }
     }
@@ -22,7 +22,7 @@
     "packages": {
       "payapp": {
         "package_name": "payapp",
-        "server_role_key": "PAYAPP",
+        "server_type_key": "PAYApp",
         "deploy_order": 40
       }
     }
@@ -33,13 +33,13 @@
     "supported_scopes": ["ENV"],
     "packages": {
       "coredb": {
-        "package_name": "coredb",
-        "server_role_key": "CoreDB",
+        "package_name": "tcs_db",
+        "server_type_key": "CoreDb",
         "deploy_order": 10
       },
-      "cosdb": {
-        "package_name": "cosdb",
-        "server_role_key": "CosDB",
+      "lgdb": {
+        "package_name": "tcs_db",
+        "server_type_key": "LGDB",
         "deploy_order": 10
       }
     }
@@ -50,22 +50,22 @@
     "packages": {
       "tool1": {
         "package_name": "tool1",
-        "server_role_key": "TOOL_SERVER",
+        "server_type_key": "Tool_server",
         "deploy_order": 50
       },
       "tool2": {
         "package_name": "tool2",
-        "server_role_key": "Core",
+        "server_type_key": "Core",
         "deploy_order": 50
       },
       "tool3": {
         "package_name": "tool3",
-        "server_role_key": "TOOL_SERVER",
+        "server_type_key": "Tool_server",
         "deploy_order": 50
       },
       "tool5": {
         "package_name": "tool5",
-        "server_role_key": "TOOL_SERVER",
+        "server_type_key": "Tool_server",
         "deploy_order": 50
       }
     }

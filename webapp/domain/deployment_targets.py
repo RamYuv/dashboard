@@ -8,14 +8,14 @@ import json
 import logging
 from pathlib import Path
 
-from ..models import EnvironmentHostMapping, ServerRole
+from ..models import EnvironmentHostMapping, ServerType
 
 
 CONFIG_PATH = Path(__file__).resolve().parents[2] / "configs" / "deployment_targets.json"
 SUPPORTED_ENV_SCOPES = {"ENV", "ENV_TYPE"}
 
 REQUIRED_TARGET_FIELDS = {"display_name", "packages"}
-REQUIRED_PACKAGE_FIELDS = {"package_name", "server_role_key"}
+REQUIRED_PACKAGE_FIELDS = {"package_name", "server_type_key"}
 LOGGER = logging.getLogger(__name__)
 _TARGET_CACHE = {
     "mtime": None,
@@ -40,9 +40,9 @@ def _normalize_supported_scopes(raw_scopes, default_scopes=None):
     return normalized or default_scopes
 
 
-def _normalize_server_role_key(package):
-    """Return the package's single deployment server role key."""
-    return (package.get("server_role_key") or "").strip()
+def _normalize_server_type_key(package):
+    """Return the package's single deployment server type key."""
+    return (package.get("server_type_key") or package.get("server_role_key") or "").strip()
 
 
 def load_deployment_targets():
@@ -104,10 +104,10 @@ def _normalize_target_config(raw_targets):
                     "Package '{}.{}' must be a JSON object.".format(target_key, package_key)
                 )
                 continue
-            server_role_key = _normalize_server_role_key(package)
+            server_type_key = _normalize_server_type_key(package)
             package_keys = set(package.keys())
-            if server_role_key:
-                package_keys.add("server_role_key")
+            if server_type_key:
+                package_keys.add("server_type_key")
 
             if not REQUIRED_PACKAGE_FIELDS.issubset(package_keys):
                 validation_errors.append(
@@ -132,7 +132,7 @@ def _normalize_target_config(raw_targets):
             )
             normalized_packages[package_key] = {
                 "package_name": package.get("package_name") or package_key,
-                "server_role_key": server_role_key,
+                "server_type_key": server_type_key,
                 "deploy_order": package.get("deploy_order", 0),
                 "supported_scopes": package_supported_scopes,
             }
@@ -169,7 +169,7 @@ def get_deployment_target_options():
                     {
                         "package_key": package_key,
                         "package_name": package.get("package_name") or package_key,
-                        "server_role_key": package.get("server_role_key"),
+                        "server_type_key": package.get("server_type_key"),
                         "deploy_order": package.get("deploy_order", 0),
                         "supported_scopes": package.get("supported_scopes") or ["ENV"],
                     }
@@ -218,16 +218,16 @@ def packages_support_scope(target_key, package_keys, env_scope_type):
 
 
 def _build_package_lookup(packages):
-    """Build a lookup that resolves package keys from key/name/server-role aliases."""
+    """Build a lookup that resolves package keys from key/name/server-type aliases."""
     lookup = {}
     for package_key, package in packages.items():
         package_name = package.get("package_name")
-        server_role_key = package.get("server_role_key")
+        server_type_key = package.get("server_type_key")
         lookup[package_key] = package_key
         if package_name:
             lookup[package_name] = package_key
-        if server_role_key:
-            lookup[server_role_key] = package_key
+        if server_type_key:
+            lookup[server_type_key] = package_key
     return lookup
 
 
@@ -260,49 +260,49 @@ def get_selected_package_keys(target_key, deployment_data):
     return resolved
 
 
-def _find_environment_mapping(env_id, server_role_key):
-    """Find the mapping for one server role inside one concrete environment."""
-    if not env_id or not server_role_key:
+def _find_environment_mapping(env_id, server_type_key):
+    """Find the mapping for one server type inside one concrete environment."""
+    if not env_id or not server_type_key:
         return None
-    server_role = ServerRole.query.filter_by(role_key=server_role_key).first()
-    if server_role is None:
+    server_type = ServerType.query.filter_by(server_type_key=server_type_key).first()
+    if server_type is None:
         return None
     return EnvironmentHostMapping.query.filter_by(
         env_id=env_id,
-        server_role_id=server_role.server_role_id,
+        server_type_id=server_type.server_type_id,
     ).first()
 
 
-def _find_shared_environment_mappings(env_type, server_role_key):
+def _find_shared_environment_mappings(env_type, server_type_key):
     """Find shared mappings for environment-type scoped tool deployments."""
-    if not env_type or not server_role_key:
+    if not env_type or not server_type_key:
         return []
-    server_role = ServerRole.query.filter_by(role_key=server_role_key).first()
-    if server_role is None:
+    server_type = ServerType.query.filter_by(server_type_key=server_type_key).first()
+    if server_type is None:
         return []
     return EnvironmentHostMapping.query.filter_by(
         env_type=env_type,
         is_shared=True,
-        server_role_id=server_role.server_role_id,
+        server_type_id=server_type.server_type_id,
     ).all()
 
 
-def _resolve_package_mappings(env_id, requested_env_type, env_scope_type, server_role_key):
+def _resolve_package_mappings(env_id, requested_env_type, env_scope_type, server_type_key):
     """Resolve one package's host mappings for the requested deployment scope."""
     if env_scope_type == "ENV_TYPE":
-        return _find_shared_environment_mappings(requested_env_type, server_role_key)
+        return _find_shared_environment_mappings(requested_env_type, server_type_key)
 
-    exact_mapping = _find_environment_mapping(env_id, server_role_key)
+    exact_mapping = _find_environment_mapping(env_id, server_type_key)
     if exact_mapping is not None:
         return [exact_mapping]
 
     # Fall back to shared env-type mappings when an environment reuses
-    # common hosts for the selected server role.
-    return _find_shared_environment_mappings(requested_env_type, server_role_key)
+    # common hosts for the selected server type.
+    return _find_shared_environment_mappings(requested_env_type, server_type_key)
 
 
 def resolve_request_targets(env_id, deployment_data):
-    """Expand a deployment request into concrete package/server-role deployment targets."""
+    """Expand a deployment request into concrete package/server-type deployment targets."""
     target_key = (deployment_data.get("target_key") or "").strip().upper()
     target = get_target_definition(target_key)
     if not target:
@@ -325,7 +325,7 @@ def resolve_request_targets(env_id, deployment_data):
                 {
                     "package_key": package_key,
                     "package_name": package.get("package_name") or package_key,
-                    "server_role_key": package.get("server_role_key"),
+                    "server_type_key": package.get("server_type_key"),
                     "environment_host_mapping_id": None,
                     "env_scope_type": env_scope_type,
                     "requested_env_type": requested_env_type,
@@ -338,26 +338,26 @@ def resolve_request_targets(env_id, deployment_data):
             )
             continue
 
-        resolved_role_key = package.get("server_role_key")
+        resolved_server_type_key = package.get("server_type_key")
         mappings = _resolve_package_mappings(
             env_id,
             requested_env_type,
             env_scope_type,
-            resolved_role_key,
+            resolved_server_type_key,
         )
 
         for mapping in mappings or [None]:
             host = mapping.host if mapping is not None else None
-            mapping_server_role_key = (
-                mapping.server_role.role_key
-                if mapping is not None and mapping.server_role is not None
-                else resolved_role_key
+            mapping_server_type_key = (
+                mapping.server_type.server_type_key
+                if mapping is not None and mapping.server_type is not None
+                else resolved_server_type_key
             )
             resolved_targets.append(
                 {
                     "package_key": package_key,
                     "package_name": package.get("package_name") or package_key,
-                    "server_role_key": mapping_server_role_key,
+                    "server_type_key": mapping_server_type_key,
                     "environment_host_mapping_id": (
                         mapping.environment_host_mapping_id if mapping is not None else None
                     ),

@@ -1,3 +1,6 @@
+import sqlite3
+import tempfile
+from pathlib import Path
 from flask import Flask
 
 try:
@@ -13,6 +16,34 @@ from monitoring.container import AppContainer
 from .auth_service import current_user
 from .db_init import init_db
 
+
+def _recover_sqlite_database_uri(app):
+    """Switch to a fresh SQLite file when the configured DB is unreadable."""
+    database_uri = app.config.get("SQLALCHEMY_DATABASE_URI", "")
+    prefix = "sqlite:///"
+    if not database_uri.startswith(prefix):
+        return
+
+    db_path = Path(database_uri[len(prefix):])
+    if not db_path.exists():
+        return
+
+    try:
+        connection = sqlite3.connect(db_path)
+        connection.execute("PRAGMA schema_version")
+        connection.close()
+    except sqlite3.Error as exc:
+        recovery_path = Path(tempfile.gettempdir()) / "envbooking_app_recovered.db"
+        app.logger.warning(
+            "Configured SQLite database %s is unreadable (%s). Falling back to %s.",
+            db_path,
+            exc,
+            recovery_path,
+        )
+        app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///{}".format(
+            recovery_path.as_posix()
+        )
+
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
@@ -21,6 +52,7 @@ def create_app(config_class=Config):
         app.logger.removeHandler(default_handler)
     app.logger.propagate = True
 
+    _recover_sqlite_database_uri(app)
     db.init_app(app)
 
     # Initialize shared monitor state

@@ -5,19 +5,22 @@ from datetime import datetime
 
 from flask import Blueprint, current_app, jsonify
 
-from webapp.models import EnvironmentBooking, EnvironmentHostMapping, ServerRole
+from webapp.models import EnvironmentBooking, EnvironmentHostMapping, ServerType
 from webapp.helpers import get_booking_lifecycle_status
 
 monitoring_bp = Blueprint("monitoring", __name__)
 
 
-def _included_server_roles():
-    raw_value = current_app.config.get("MONITOR_INCLUDED_SERVER_ROLES", "")
+def _included_server_types():
+    raw_value = current_app.config.get(
+        "MONITOR_INCLUDED_SERVER_TYPES",
+        current_app.config.get("MONITOR_INCLUDED_SERVER_ROLES", ""),
+    )
     included = []
     for item in str(raw_value).split(","):
-        role_key = (item or "").strip()
-        if role_key and role_key not in included:
-            included.append(role_key)
+        server_type_key = (item or "").strip()
+        if server_type_key and server_type_key not in included:
+            included.append(server_type_key)
     return included
 
 
@@ -51,14 +54,14 @@ def _infer_env_type(env_id):
     return env_id.rstrip("0123456789") or env_id
 
 
-def _build_server_role_map(env_ids):
-    env_server_roles = {}
-    included_server_roles = set(_included_server_roles())
+def _build_server_type_map(env_ids):
+    env_server_types = {}
+    included_server_types = set(_included_server_types())
 
     for env_id in env_ids:
-        role_ids = [
+        server_type_ids = [
             row[0]
-            for row in EnvironmentHostMapping.query.with_entities(EnvironmentHostMapping.server_role_id)
+            for row in EnvironmentHostMapping.query.with_entities(EnvironmentHostMapping.server_type_id)
             .filter(
                 EnvironmentHostMapping.env_id == env_id,
                 EnvironmentHostMapping.is_shared.is_(False),
@@ -66,17 +69,17 @@ def _build_server_role_map(env_ids):
             .distinct()
             .all()
         ]
-        role_keys = []
-        for role_id in role_ids:
-            server_role = ServerRole.query.get(role_id)
+        server_type_keys = []
+        for server_type_id in server_type_ids:
+            server_type = ServerType.query.get(server_type_id)
             if (
-                server_role is not None and
-                server_role.role_key in included_server_roles
+                server_type is not None and
+                server_type.server_type_key in included_server_types
             ):
-                role_keys.append(server_role.role_key)
-        env_server_roles[env_id] = role_keys
+                server_type_keys.append(server_type.server_type_key)
+        env_server_types[env_id] = server_type_keys
 
-    return env_server_roles
+    return env_server_types
 
 
 def _build_environment_health_payload(env_statuses, last_update, active_booking_envs):
@@ -89,7 +92,7 @@ def _build_environment_health_payload(env_statuses, last_update, active_booking_
             if isinstance(env_id, str) and env_id.strip()
         }
     )
-    env_server_roles = _build_server_role_map(env_ids)
+    env_server_types = _build_server_type_map(env_ids)
 
     statuses = []
     summary = {
@@ -119,7 +122,7 @@ def _build_environment_health_payload(env_statuses, last_update, active_booking_
                 "notrunning": int(component_summary.get("notrunning", 0) or 0),
                 "unknown": int(component_summary.get("unknown", 0) or 0),
             },
-            "server_roles": env_server_roles.get(env_id, []),
+            "server_types": env_server_types.get(env_id, []),
         }
         statuses.append(status_item)
         summary["total"] += 1

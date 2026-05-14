@@ -217,7 +217,7 @@
         (target.packages || []).forEach(function (pkg) {
             const scopes = (pkg.supported_scopes || []).join("/");
             const label = pkg.package_key +
-                " (" + (pkg.server_role_key || "-") + ")" +
+                " (" + (pkg.server_type_key || "-") + ")" +
                 (scopes ? " [" + scopes + "]" : "");
             componentNames.insertAdjacentHTML(
                 "beforeend",

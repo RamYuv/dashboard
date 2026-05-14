@@ -65,6 +65,7 @@ def register():
 
         user = User(
             username=username,
+            name=username,
             password_hash=generate_password_hash(password),
             role=role,
         )
@@ -389,118 +390,118 @@ def dashboard_preview():
                 {
                     'env_id': 'DEV01', 'env_type': 'DEV', 'host': 'host1.local', 'owner_team': 'alpha',
                     'status': 'healthy', 'message': 'Running: 8, Not running: 0, Unknown: 0',
-                    'server_roles': ['cor-tcs', 'gateway-tcs']
+                    'server_types': ['Core', 'Getway']
                 },
                 {
                     'env_id': 'DEV02', 'env_type': 'DEV', 'host': 'host1.local', 'owner_team': 'alpha',
                     'status': 'healthy', 'message': 'Running: 4, Not running: 0, Unknown: 0',
-                    'server_roles': ['cor-tcs']
+                    'server_types': ['Core']
                 },
                 {
                     'env_id': 'DEV03', 'env_type': 'DEV', 'host': 'host1.local', 'owner_team': 'beta',
                     'status': 'warning', 'message': 'Running: 5, Not running: 0, Unknown: 0',
-                    'server_roles': ['gateway-tcs']
+                    'server_types': ['Getway']
                 },
                 {
                     'env_id': 'DEV04', 'env_type': 'DEV', 'host': 'host1.local', 'owner_team': 'support',
                     'status': 'healthy', 'message': 'Running: 8, Not running: 0, Unknown: 0',
-                    'server_roles': ['cor-tcs', 'gateway-tcs']
+                    'server_types': ['Core', 'Getway']
                 },
                 {
                     'env_id': 'DEV05', 'env_type': 'DEV', 'host': 'host1.local', 'owner_team': 'alpha',
                     'status': 'healthy', 'message': 'Running: 4, Not running: 0, Unknown: 0',
-                    'server_roles': ['cor-tcs']
+                    'server_types': ['Core']
                 },
                 {
                     'env_id': 'DEV06', 'env_type': 'DEV', 'host': 'host1.local', 'owner_team': 'beta',
                     'status': 'warning', 'message': 'Running: 3, Not running: 2, Unknown: 0',
-                    'server_roles': ['gateway-tcs']
+                    'server_types': ['Getway']
                 },
                 {
                     'env_id': 'DEV07', 'env_type': 'DEV', 'host': 'host1.local', 'owner_team': 'support',
                     'status': 'healthy', 'message': 'Running: 8, Not running: 0, Unknown: 0',
-                    'server_roles': ['cor-tcs', 'gateway-tcs']
+                    'server_types': ['Core', 'Getway']
                 },
                 {
                     'env_id': 'DEV08', 'env_type': 'DEV', 'host': 'host1.local', 'owner_team': 'alpha',
                     'status': 'healthy', 'message': 'Running: 4, Not running: 0, Unknown: 0',
-                    'server_roles': ['cor-tcs']
+                    'server_types': ['Core']
                 },
                 {
                     'env_id': 'DEV09', 'env_type': 'DEV', 'host': 'host1.local', 'owner_team': 'beta',
                     'status': 'healthy', 'message': 'Running: 4, Not running: 0, Unknown: 0',
-                    'server_roles': ['gateway-tcs']
+                    'server_types': ['Getway']
                 },
                 {
                     'env_id': 'DEV10', 'env_type': 'DEV', 'host': 'host1.local', 'owner_team': 'alpha',
                     'status': 'healthy', 'message': 'Running: 8, Not running: 0, Unknown: 0',
-                    'server_roles': ['cor-tcs', 'gateway-tcs']
+                    'server_types': ['Core', 'Getway']
                 }
             ],
             'QA': [
                 {
                     'env_id': 'QA01', 'env_type': 'QA', 'host': 'host2.local', 'owner_team': 'qa',
                     'status': 'healthy', 'message': 'Running: 8, Not running: 0, Unknown: 0',
-                    'server_roles': ['cor-tcs', 'gateway-tcs']
+                    'server_types': ['Core', 'Getway']
                 },
                 {
                     'env_id': 'QA02', 'env_type': 'QA', 'host': 'host2.local', 'owner_team': 'qa',
                     'status': 'warning', 'message': 'Running: 3, Not running: 1, Unknown: 0',
-                    'server_roles': ['cor-tcs']
+                    'server_types': ['Core']
                 },
                 {
                     'env_id': 'QA03', 'env_type': 'QA', 'host': 'host2.local', 'owner_team': 'qa',
                     'status': 'healthy', 'message': 'Running: 4, Not running: 0, Unknown: 0',
-                    'server_roles': ['gateway-tcs']
+                    'server_types': ['Getway']
                 }
             ],
             'ST': [
                 {
                     'env_id': 'ST01', 'env_type': 'ST', 'host': 'host2.local', 'owner_team': 'qa',
                     'status': 'healthy', 'message': 'Running: 8, Not running: 0, Unknown: 0',
-                    'server_roles': ['cor-tcs', 'gateway-tcs']
+                    'server_types': ['Core', 'Getway']
                 },
                 {
                     'env_id': 'ST02', 'env_type': 'ST', 'host': 'host2.local', 'owner_team': 'qa',
                     'status': 'healthy', 'message': 'Running: 4, Not running: 0, Unknown: 0',
-                    'server_roles': ['cor-tcs']
+                    'server_types': ['Core']
                 },
                 {
                     'env_id': 'ST03', 'env_type': 'ST', 'host': 'host2.local', 'owner_team': 'qa',
                     'status': 'healthy', 'message': 'Running: 4, Not running: 0, Unknown: 0',
-                    'server_roles': ['gateway-tcs']
+                    'server_types': ['Getway']
                 }
             ],
             'PROD': [
                 {
                     'env_id': 'PROD01', 'env_type': 'PROD', 'host': 'host2.local', 'owner_team': 'support',
                     'status': 'healthy', 'message': 'Running: 8, Not running: 0, Unknown: 0',
-                    'server_roles': ['cor-tcs', 'gateway-tcs']
+                    'server_types': ['Core', 'Getway']
                 },
                 {
                     'env_id': 'PROD02', 'env_type': 'PROD', 'host': 'host2.local', 'owner_team': 'support',
                     'status': 'healthy', 'message': 'Running: 4, Not running: 0, Unknown: 0',
-                    'server_roles': ['cor-tcs']
+                    'server_types': ['Core']
                 },
                 {
                     'env_id': 'PROD03', 'env_type': 'PROD', 'host': 'host2.local', 'owner_team': 'support',
                     'status': 'critical', 'message': 'Running: 2, Not running: 4, Unknown: 0',
-                    'server_roles': ['cor-tcs', 'gateway-tcs']
+                    'server_types': ['Core', 'Getway']
                 },
                 {
                     'env_id': 'PROD04', 'env_type': 'PROD', 'host': 'host2.local', 'owner_team': 'support',
                     'status': 'healthy', 'message': 'Running: 4, Not running: 0, Unknown: 0',
-                    'server_roles': ['gateway-tcs']
+                    'server_types': ['Getway']
                 },
                 {
                     'env_id': 'PROD05', 'env_type': 'PROD', 'host': 'host2.local', 'owner_team': 'support',
                     'status': 'critical', 'message': 'Running: 1, Not running: 3, Unknown: 0',
-                    'server_roles': ['cor-tcs']
+                    'server_types': ['Core']
                 },
                 {
                     'env_id': 'PROD06', 'env_type': 'PROD', 'host': 'host2.local', 'owner_team': 'support',
                     'status': 'maintenance', 'message': 'Running: 0, Not running: 0, Unknown: 0',
-                    'server_roles': ['cor-tcs', 'gateway-tcs']
+                    'server_types': ['Core', 'Getway']
                 }
             ]
         }

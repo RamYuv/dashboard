@@ -106,82 +106,20 @@ DEFAULT_USERS = [
     {
         "user_id": "user1",
         "email_id": "user1@example.com",
-        "name": "Normal User",
+        "name": "user1",
         "password": "userpass",
         "team": "alpha",
         "role": "user",
     },
 ]
 
-DEFAULT_HOSTS = [
-    {
-        "hostname": "Core",
-        "ip_address": "10.0.0.10",
-        "domain": "APP",
-        "description": "Shared host for Core deployments",
-    },
-    {
-        "hostname": "Gatway",
-        "ip_address": "10.0.0.11",
-        "domain": "APP",
-        "description": "Shared host for Gatway deployments",
-    },
-    {
-        "hostname": "PAYAPP",
-        "ip_address": "10.0.0.12",
-        "domain": "PAYAPP",
-        "description": "Shared host for PayApp deployments",
-    },
-    {
-        "hostname": "CoreDB",
-        "ip_address": "10.0.0.13",
-        "domain": "DB",
-        "description": "Shared host for CoreDB deployments",
-    },
-    {
-        "hostname": "CosDB",
-        "ip_address": "10.0.0.14",
-        "domain": "DB",
-        "description": "Shared host for CosDB deployments",
-    },
-    {
-        "hostname": "TOOL_SERVER",
-        "ip_address": "10.0.0.15",
-        "domain": "TOOLS",
-        "description": "Shared host for tool server workloads",
-    },
-]
-
-DEFAULT_SERVER_ROLES = [
-    {"role_key": "Core", "role_type": "TCS_APP"},
-    {"role_key": "Gatway", "role_type": "TCS_APP"},
-    {"role_key": "PAYAPP", "role_type": "PAYAPP"},
-    {"role_key": "CoreDB", "role_type": "DB"},
-    {"role_key": "CosDB", "role_type": "DB"},
-    {"role_key": "TOOL_SERVER", "role_type": "TOOLS"},
-]
-
-_DEFAULT_HOST_ROLE_MATRIX = [
-    ("Core", "Core"),
-    ("Gatway", "Gatway"),
-    ("PAYAPP", "PAYAPP"),
-    ("CoreDB", "CoreDB"),
-    ("CosDB", "CosDB"),
-    ("TOOL_SERVER", "TOOL_SERVER"),
-]
-
-DEFAULT_ENVIRONMENT_HOST_MAPPINGS = [
-    {
-        "env_id": env_id,
-        "env_type": env_type,
-        "is_shared": False,
-        "server_role_key": role_key,
-        "hostname": hostname,
-        "deployment_user": "user1",
-        "deployment_password": "pass1",
-    }
-    for env_id, env_type in DEFAULT_ENVIRONMENTS
-    for role_key, hostname in _DEFAULT_HOST_ROLE_MATRIX
+DEFAULT_SERVER_TYPES = [
+    {"server_type_key": "Core", "target_type": "TCS_APP"},
+    {"server_type_key": "Getway", "target_type": "TCS_APP"},
+    {"server_type_key": "PAYApp", "target_type": "PAYAPP"},
+    {"server_type_key": "CoreDb", "target_type": "DB"},
+    {"server_type_key": "LGDB", "target_type": "DB"},
+    {"server_type_key": "Tool_server", "target_type": "TOOLS"},
 ]
 
 # Component Version Definitions

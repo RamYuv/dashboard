@@ -98,13 +98,13 @@
         const envId = status.env_id || "UNKNOWN";
         const active = activeEnvIds.includes(envId) ? " active-booking" : "";
         const componentSummary = status.component_summary || {};
-        const serverRoles = (status.server_roles || []).join(", ");
+        const serverTypes = (status.server_types || []).join(", ");
         const tooltip = [
             envId + " - " + serverStatus.toUpperCase(),
             "Running: " + Number(componentSummary.running || 0),
             "Not running: " + Number(componentSummary.notrunning || 0),
             "Unknown: " + Number(componentSummary.unknown || 0),
-            serverRoles ? "Server roles: " + serverRoles : ""
+            serverTypes ? "Server types: " + serverTypes : ""
         ].filter(Boolean).join(" | ");
 
         const redActive = serverStatus === "critical" ? "active" : "";

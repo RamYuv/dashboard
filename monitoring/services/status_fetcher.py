@@ -5,7 +5,7 @@ import random
 
 logger = logging.getLogger(__name__)
 
-STANDARD_STATUS_SUPPORTED_HOSTS = {"Core", "Gatway"}
+STANDARD_STATUS_SUPPORTED_HOSTS = {"core-host", "getway-host"}
 
 
 class VmStatusFetcher:

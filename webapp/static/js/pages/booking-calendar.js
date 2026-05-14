@@ -47,7 +47,9 @@
         }
 
         return String(item.booking.requested_by || "").toLowerCase().includes(requestedBy) ||
-            String(item.booking.requested_by_name || "").toLowerCase().includes(requestedBy);
+            String(item.booking.requested_by_name || "").toLowerCase().includes(requestedBy) ||
+            String(item.booking.requested_by_team || "").toLowerCase().includes(requestedBy) ||
+            String(item.booking.requested_by_display || "").toLowerCase().includes(requestedBy);
     }
 
     function mapBookingToEvent(item) {
@@ -109,6 +111,24 @@
             "</div>";
     }
 
+    function requesterDisplay(booking) {
+        const explicitDisplay = String(booking.requested_by_display || "").trim();
+        if (explicitDisplay) {
+            return explicitDisplay;
+        }
+
+        const userId = String(booking.requested_by || "").trim();
+        const teamName = String(booking.requested_by_team || "").trim();
+        if (userId && teamName) {
+            return userId + " (" + teamName + ")";
+        }
+        if (userId) {
+            return userId;
+        }
+
+        return String(booking.requested_by_name || "").trim() || "-";
+    }
+
     function renderDetails(event) {
         const detailsHost = document.getElementById("bookingDetails");
         const booking = event.extendedProps.booking;
@@ -120,7 +140,7 @@
             buildDetailRow("Booking ID", booking.booking_id),
             buildDetailRow("Environment", booking.env_id),
             buildDetailRow("Environment Type", event.extendedProps.env_type || "-"),
-            buildDetailRow("Requested By", booking.requested_by_name || booking.requested_by || "-"),
+            buildDetailRow("Requested By", requesterDisplay(booking)),
             buildDetailRow("Booking Type", booking.booking_type || "-"),
             buildDetailRow("Status", '<span class="status-pill status-' + common.escapeHtml(status) + '">' + common.escapeHtml(getStatusLabel(status)) + "</span>", true),
             buildDetailRow("Start", localStart + " (" + userTimezone + ")"),

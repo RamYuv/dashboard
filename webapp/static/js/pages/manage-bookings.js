@@ -103,6 +103,8 @@
                 bookingResolvedHostsLabel(booking),
                 booking.requested_by,
                 booking.requested_by_name,
+                booking.requested_by_team,
+                booking.requested_by_display,
                 booking.description,
             ].join(" ").toLowerCase();
             return haystack.includes(search);
