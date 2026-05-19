@@ -6,11 +6,38 @@
         <div class="card border-0 shadow-lg">
             <div class="card-body p-4 p-md-5">
                 <h1 class="h3 mb-2">Register</h1>
-                <p class="text-muted mb-4">Create your local account and choose a team/role for access control.</p>
+                <p class="text-muted mb-4">Create your local account and choose the team you belong to.</p>
                 <form method="post">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label" for="first_name">First Name</label>
+                            <input class="form-control" id="first_name" name="first_name" value="{{ request.form.get('first_name', '') }}" required autofocus>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label" for="last_name">Last Name</label>
+                            <input class="form-control" id="last_name" name="last_name" value="{{ request.form.get('last_name', '') }}" required>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label" for="user_id">User ID</label>
+                            <input class="form-control" id="user_id" name="user_id" value="{{ request.form.get('user_id', '') }}" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label" for="email">Email</label>
+                            <input class="form-control" id="email" name="email" type="email" value="{{ request.form.get('email', '') }}" required>
+                        </div>
+                    </div>
                     <div class="mb-3">
-                        <label class="form-label" for="username">Username</label>
-                        <input class="form-control" id="username" name="username" required autofocus>
+                        <label class="form-label" for="team">User Group</label>
+                        <select class="form-select" id="team" name="team" required>
+                            {% set selected_team = request.form.get('team', 'support') %}
+                            {% for team in team_choices %}
+                                <option value="{{ team.team_name }}" {% if team.team_name == selected_team %}selected{% endif %}>
+                                    {{ team.team_name|upper }}
+                                </option>
+                            {% endfor %}
+                        </select>
                     </div>
                     <div class="row">
                         <div class="col-md-6 mb-3">
@@ -22,28 +49,7 @@
                             <input class="form-control" id="confirm_password" name="confirm_password" type="password" required>
                         </div>
                     </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-4">
-                            <label class="form-label" for="role">Role</label>
-                            <select class="form-select" id="role" name="role">
-                                <option value="user">User</option>
-                                <option value="qa">QA</option>
-                                <option value="manager">Manager</option>
-                                <option value="admin">Admin</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6 mb-4">
-                            <label class="form-label" for="team">Team</label>
-                            <select class="form-select" id="team" name="team">
-                                <option value="env">ENV</option>
-                                <option value="qa">QA</option>
-                                <option value="support">Support</option>
-                                <option value="alpha">Alpha</option>
-                                <option value="beta">Beta</option>
-                            </select>
-                        </div>
-                    </div>
-                    <button class="btn btn-primary w-100" type="submit">Create account</button>
+                    <button class="btn btn-primary w-100 mt-2" type="submit">Create account</button>
                 </form>
                 <p class="mt-4 mb-0 text-center">Already registered? <a href="{{ url_for('main.login') }}">Login</a></p>
             </div>

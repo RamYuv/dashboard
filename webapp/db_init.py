@@ -21,21 +21,12 @@ from .models import (
     EnvironmentBooking,
     EnvironmentHostMapping,
     Host,
+    Role,
     ServerType,
     Team,
     TeamMember,
     User,
     db,
-)
-
-DEFAULT_SEEDERS = (
-    "seed_default_environments",
-    "seed_default_teams",
-    "seed_default_users",
-    "seed_default_team_memberships",
-    "seed_default_hosts",
-    "seed_default_server_types",
-    "seed_default_environment_host_mappings",
 )
 
 RESET_DELETE_ORDER = [
@@ -49,13 +40,21 @@ RESET_DELETE_ORDER = [
     Host,
     TeamMember,
     User,
+    Role,
     Team,
     Environment,
+]
+
+DEFAULT_ROLES = [
+    {"role_name": "user", "description": "Standard user access"},
+    {"role_name": "manager", "description": "Manager access"},
+    {"role_name": "admin", "description": "Administrator access"},
 ]
 
 SEED_HOSTS_CONFIG_PATH = (
     Path(__file__).resolve().parent.parent / "configs" / "default_seed_hosts.json"
 )
+ACCESS_ADMIN_TEAM_NAME = "access_admin"
 
 
 def _first(model, **filters):
@@ -91,13 +90,94 @@ def load_host_seed_data():
     }
 
 
+def _seeders():
+    """Return the ordered set of seeder callables."""
+    return (
+        seed_default_roles,
+        seed_default_environments,
+        seed_default_teams,
+        seed_default_users,
+        seed_default_team_memberships,
+        seed_default_hosts,
+        seed_default_server_types,
+        seed_default_environment_host_mappings,
+    )
+
+
+def _ensure_user_profile_columns():
+    """Add lightweight user columns needed by the current runtime."""
+    existing_columns = {
+        row[1]
+        for row in db.session.execute("PRAGMA table_info(users)").fetchall()
+    }
+    if "first_name" not in existing_columns:
+        db.session.execute("ALTER TABLE users ADD COLUMN first_name VARCHAR(100)")
+    if "last_name" not in existing_columns:
+        db.session.execute("ALTER TABLE users ADD COLUMN last_name VARCHAR(100)")
+
+
+def _migrate_legacy_qa_roles():
+    """Map legacy QA role values to the current manager role."""
+    db.session.execute(
+        "UPDATE users SET role = 'manager' WHERE LOWER(COALESCE(role, '')) = 'qa'"
+    )
+    db.session.execute(
+        "UPDATE team_members SET role = 'manager' WHERE LOWER(COALESCE(role, '')) = 'qa'"
+    )
+
+
+def _resolve_seed_host(host_data):
+    """Resolve a seeded host record with fallback matching rules."""
+    host_filters = {"hostname": host_data["hostname"]}
+    if host_data.get("ip_address"):
+        host_filters["ip_address"] = host_data.get("ip_address")
+
+    host = _first(Host, **host_filters)
+    if host is None and "ip_address" not in host_filters:
+        matching_hosts = Host.query.filter_by(hostname=host_data["hostname"]).all()
+        if len(matching_hosts) == 1:
+            return matching_hosts[0]
+    return host
+
+
+def _seed_team_membership(user, team, role):
+    """Ensure a single user-to-team membership exists with the expected role."""
+    if user is None or team is None:
+        return
+    membership = _create_if_missing(
+        TeamMember,
+        user_id=user.user_id,
+        team_id=team.team_id,
+        defaults={"role": role},
+    )
+    membership.role = role
+
+
+def _seed_access_admin_memberships():
+    """Ensure admin users belong to the dedicated access-admin team."""
+    access_admin_team = _first(Team, team_name=ACCESS_ADMIN_TEAM_NAME)
+    if access_admin_team is None:
+        return
+
+    for admin_user in User.query.filter_by(role="admin").all():
+        _seed_team_membership(admin_user, access_admin_team, admin_user.role)
+
+
 def init_db():
     """Create tables and load the default seed data."""
     db.create_all()
+    ensure_runtime_schema()
     if should_reset_seed_data():
         reset_all_table_data()
         return
     seed_all_default_data()
+
+
+def ensure_runtime_schema():
+    """Apply lightweight schema patches needed for local SQLite development."""
+    _ensure_user_profile_columns()
+    _migrate_legacy_qa_roles()
+    db.session.commit()
 
 
 def should_reset_seed_data():
@@ -109,8 +189,8 @@ def should_reset_seed_data():
 
 def seed_all_default_data():
     """Seed all default application data."""
-    for seeder_name in DEFAULT_SEEDERS:
-        globals()[seeder_name]()
+    for seeder in _seeders():
+        seeder()
 
 
 def reset_all_table_data():
@@ -128,6 +208,20 @@ def seed_default_environments():
             Environment,
             env_id=env_id,
             defaults={"env_type": env_type},
+        )
+    db.session.commit()
+
+
+def seed_default_roles():
+    """Seed default application roles."""
+    for role_data in DEFAULT_ROLES:
+        _create_if_missing(
+            Role,
+            role_name=role_data["role_name"],
+            defaults={
+                "description": role_data["description"],
+                "is_active": True,
+            },
         )
     db.session.commit()
 
@@ -160,15 +254,9 @@ def seed_default_team_memberships():
     for user_data in DEFAULT_USERS:
         user = _first(User, user_id=user_data["user_id"])
         team = _first(Team, team_name=user_data["team"])
-        if user is None or team is None:
-            continue
+        _seed_team_membership(user, team, user_data["role"])
 
-        _create_if_missing(
-            TeamMember,
-            user_id=user.user_id,
-            team_id=team.team_id,
-            defaults={"role": user_data["role"]},
-        )
+    _seed_access_admin_memberships()
     db.session.commit()
 
 
@@ -179,8 +267,8 @@ def seed_default_hosts():
         _create_if_missing(
             Host,
             hostname=host_data["hostname"],
+            ip_address=host_data.get("ip_address"),
             defaults={
-                "ip_address": host_data["ip_address"],
                 "domain": host_data.get("domain"),
                 "description": host_data["description"],
             },
@@ -206,7 +294,7 @@ def seed_default_environment_host_mappings():
         env_id = mapping_data.get("env_id")
         env = _first(Environment, env_id=env_id) if env_id else None
         server_type = _first(ServerType, server_type_key=mapping_data["server_type_key"])
-        host = _first(Host, hostname=mapping_data["hostname"])
+        host = _resolve_seed_host(mapping_data)
         if server_type is None or host is None:
             continue
 

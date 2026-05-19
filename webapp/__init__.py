@@ -1,5 +1,4 @@
 import sqlite3
-import tempfile
 from pathlib import Path
 from flask import Flask
 
@@ -17,6 +16,14 @@ from .auth_service import current_user
 from .db_init import init_db
 
 
+def _project_sqlite_recovery_path(app):
+    """Return a recovery SQLite file path inside the project directory."""
+    project_root = app.config.get("PROJECT_ROOT")
+    if project_root:
+        return Path(project_root) / "envbooking_app_recovered.db"
+    return Path("envbooking_app_recovered.db").resolve()
+
+
 def _recover_sqlite_database_uri(app):
     """Switch to a fresh SQLite file when the configured DB is unreadable."""
     database_uri = app.config.get("SQLALCHEMY_DATABASE_URI", "")
@@ -29,11 +36,11 @@ def _recover_sqlite_database_uri(app):
         return
 
     try:
-        connection = sqlite3.connect(db_path)
+        connection = sqlite3.connect(str(db_path))
         connection.execute("PRAGMA schema_version")
         connection.close()
     except sqlite3.Error as exc:
-        recovery_path = Path(tempfile.gettempdir()) / "envbooking_app_recovered.db"
+        recovery_path = _project_sqlite_recovery_path(app)
         app.logger.warning(
             "Configured SQLite database %s is unreadable (%s). Falling back to %s.",
             db_path,

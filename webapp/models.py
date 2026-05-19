@@ -50,6 +50,18 @@ def build_requester_display(user, fallback_user_id):
 
 
 # ==========================================================
+# ROLE
+# ==========================================================
+class Role(db.Model):
+    __tablename__ = "roles"
+
+    role_name = db.Column(db.String(20), primary_key=True)
+    description = db.Column(db.String(255))
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+# ==========================================================
 # USER
 # ==========================================================
 class User(db.Model):
@@ -57,17 +69,28 @@ class User(db.Model):
 
     user_id = db.Column(db.String(50), primary_key=True)
     email_id = db.Column(db.String(100), unique=True)
+    first_name = db.Column(db.String(100))
+    last_name = db.Column(db.String(100))
     name = db.Column(db.String(100))
     password_hash = db.Column(db.String(255), nullable=False)
 
-    # Optional global role
-    role = db.Column(db.String(20), nullable=False, default="User")
+    # Self-registered accounts start as "user"; admins can promote them later.
+    role = db.Column(db.String(20), nullable=False, default="user")
 
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     username = db.synonym("user_id")
     id = db.synonym("user_id")
+
+    @property
+    def full_name(self):
+        parts = [
+            (self.first_name or "").strip(),
+            (self.last_name or "").strip(),
+        ]
+        full_name = " ".join(part for part in parts if part)
+        return full_name or (self.name or "").strip() or self.user_id
 
     @property
     def team_names(self):
@@ -127,7 +150,7 @@ class TeamMember(db.Model):
         nullable=False
     )
 
-    role = db.Column(db.String(20), nullable=False)  # Admin / QA / User
+    role = db.Column(db.String(20), nullable=False, default="user")
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -161,12 +184,16 @@ class Host(db.Model):
 
     host_id = db.Column(db.Integer, primary_key=True)
     # Real server hostname/address, e.g. core-host or serveraddress.
-    hostname = db.Column(db.String(100), unique=True, nullable=False)
+    hostname = db.Column(db.String(100), nullable=False)
     ip_address = db.Column(db.String(100))
     domain = db.Column(db.String(50))  # DEV / ST / PROD / TOOLS
     description = db.Column(db.Text)
 
     is_active = db.Column(db.Boolean, default=True)
+
+    __table_args__ = (
+        db.UniqueConstraint("hostname", "ip_address", name="uq_host_hostname_ip"),
+    )
 
 
 # ==========================================================

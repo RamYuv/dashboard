@@ -542,19 +542,10 @@
         <a href="{{ url_for('booking.booking_screen') }}" class="menu-item"><i class="fas fa-calendar-alt"></i> Booking Calendar</a>
         <a href="{{ url_for('booking.deployment_request') }}" class="menu-item"><i class="fas fa-rocket"></i> Deployment Request</a>
         <a href="{{ url_for('booking.manage_bookings') }}" class="menu-item"><i class="fas fa-list"></i> My Requests</a>
-        <a href="#" class="menu-item"><i class="fas fa-check-circle"></i> Approvals</a>
-        <a href="#" class="menu-item"><i class="fas fa-chart-line"></i> Reports</a>
-        <a href="{{ url_for('main.admin_screen') }}" class="menu-item"><i class="fas fa-users"></i> Users</a>
-        <a href="#" class="menu-item"><i class="fas fa-cog"></i> Settings</a>
-        <a href="#" class="menu-item"><i class="fas fa-file-alt"></i> Audit Logs</a>
-        <a href="#" class="menu-item"><i class="fas fa-life-ring"></i> Help & Support</a>
-
-        <div class="quick-actions">
-            <div class="quick-actions-title">Quick Actions</div>
-            <a href="{{ url_for('booking.booking_grid') }}" class="action-button"><i class="fas fa-th"></i> Environment Booking</a>
-            <a href="{{ url_for('booking.booking_screen') }}" class="action-button secondary"><i class="fas fa-calendar"></i> View Calendar</a>
-        </div>
-
+        {% if role == "admin" %}
+        <a href="{{ url_for('main.user_management_screen') }}" class="menu-item"><i class="fas fa-user-shield"></i> User Management</a>
+        <a href="{{ url_for('main.admin_screen') }}" class="menu-item"><i class="fas fa-users-cog"></i> Admin Screen</a>
+        {% endif %}
         <div class="theme-toggle">
             <i class="fas fa-moon"></i>
             Dark Mode

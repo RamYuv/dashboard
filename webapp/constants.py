@@ -2,9 +2,8 @@
 Application-wide constants and configuration values.
 """
 
-# Role and Team Definitions
-VALID_ROLES = ["user", "qa", "manager", "admin"]
-VALID_TEAMS = ["alpha", "beta", "support", "qa", "env"]
+# Team Definitions
+VALID_TEAMS = ["alpha", "beta", "support", "qa", "env", "access_admin"]
 VALID_BOOKING_TYPES = ["RESERVATION"]
 
 BOOKING_STATUS = {
@@ -39,6 +38,13 @@ SCREENS = [
         "teams": [],
     },
     {
+        "endpoint": "user_management_screen",
+        "title": "User Management",
+        "description": "Manage user permissions and team membership.",
+        "roles": ["admin"],
+        "teams": ["access_admin"],
+    },
+    {
         "endpoint": "manager_screen",
         "title": "Manager Screen",
         "description": "Managers and admins can open this page.",
@@ -56,14 +62,14 @@ SCREENS = [
         "endpoint": "general_screen",
         "title": "General Screen",
         "description": "Every logged-in user can open this page.",
-        "roles": VALID_ROLES,
+        "roles": [],
         "teams": VALID_TEAMS,
     },
     {
         "endpoint": "booking_screen",
         "title": "Environment Booking",
         "description": "Book environments and manage your own reservations.",
-        "roles": VALID_ROLES,
+        "roles": [],
         "teams": VALID_TEAMS,
     },
     {
@@ -101,7 +107,7 @@ DEFAULT_USERS = [
         "name": "QA User",
         "password": "qapass",
         "team": "qa",
-        "role": "qa",
+        "role": "manager",
     },
     {
         "user_id": "user1",

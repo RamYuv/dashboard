@@ -1,0 +1,546 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="admin-page">
+<div class="admin-sticky-header mb-4">
+    <div class="card shadow-sm border-0">
+        <div class="card-body">
+            <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
+                <div>
+                    <p class="badge text-bg-success mb-2">Admin Workspace</p>
+                    <h1 class="h2 mb-1">Configuration Data Management</h1>
+                    <p class="text-muted mb-0">Add core setup records for teams, environments, hosts, server types, mappings, and component builds.</p>
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                    <a href="{{ url_for('main.user_management_screen') }}" class="btn btn-primary">
+                        <i class="fas fa-user-shield me-2"></i>User Management
+                    </a>
+                    <a href="{{ url_for('main.environment_health') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+                    </a>
+                </div>
+            </div>
+            <ul class="nav nav-pills flex-wrap gap-2 mt-4 admin-tabs">
+                {% set tab_labels = {
+                    "users": "Users",
+                    "roles": "Roles",
+                    "teams": "Teams",
+                    "environments": "Environment",
+                    "hosts": "Host",
+                    "server_types": "ServerType",
+                    "environment_host_mappings": "EnvironmentHostMapping",
+                    "component_builds": "ComponentBuild"
+                } %}
+                {% for tab_name in admin_tabs %}
+                    <li class="nav-item">
+                        <a class="nav-link {% if active_tab == tab_name %}active{% endif %}" href="{{ url_for('main.admin_screen', tab=tab_name) }}">
+                            {{ tab_labels.get(tab_name, tab_name) }}
+                        </a>
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+
+{% if active_tab == "users" %}
+{% set access_map = user_access_map|default({}) %}
+<div class="row g-4">
+    <div class="col-12">
+        <div class="card shadow-sm border-0 admin-panel">
+            <div class="card-body">
+                <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-3">
+                    <div>
+                        <h2 class="h5 mb-1">Manage Users</h2>
+                        <p class="text-muted mb-0">Review registered users, update their role, assign one or more teams, and verify screen access.</p>
+                    </div>
+                </div>
+                <div class="table-responsive admin-table-wrap">
+                    <table class="table align-middle">
+                        <thead>
+                            <tr>
+                                <th>User ID</th>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Teams</th>
+                                <th>Current Role</th>
+                                <th>Change Role</th>
+                                <th>Change Teams</th>
+                                <th>Screen Access</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for user in users %}
+                            <tr>
+                                <td>{{ user.user_id }}</td>
+                                <td>{{ user.full_name or "-" }}</td>
+                                <td>{{ user.email_id or "-" }}</td>
+                                <td>{{ user.team_names_display or "-" }}</td>
+                                <td><span class="badge text-bg-light">{{ user.role }}</span></td>
+                                <td>
+                                    <form method="post" class="d-flex flex-column flex-md-row gap-2 align-items-md-center">
+                                        <input type="hidden" name="action" value="update_role">
+                                        <input type="hidden" name="entity" value="users">
+                                        <input type="hidden" name="tab" value="users">
+                                        <input type="hidden" name="user_id" value="{{ user.user_id }}">
+                                        <select class="form-select" name="role" aria-label="Role for {{ user.user_id }}">
+                                            {% for role_name in valid_roles %}
+                                                <option value="{{ role_name }}" {% if user.role == role_name %}selected{% endif %}>
+                                                    {{ role_name }}
+                                                </option>
+                                            {% endfor %}
+                                        </select>
+                                        <button class="btn btn-primary" type="submit">Update Role</button>
+                                    </form>
+                                </td>
+                                <td>
+                                    <form method="post" class="d-flex flex-column gap-2">
+                                        <input type="hidden" name="action" value="update_teams">
+                                        <input type="hidden" name="entity" value="users">
+                                        <input type="hidden" name="tab" value="users">
+                                        <input type="hidden" name="user_id" value="{{ user.user_id }}">
+                                        <select class="form-select" name="team_ids" multiple size="4" aria-label="Teams for {{ user.user_id }}">
+                                            {% for team in teams %}
+                                                <option value="{{ team.team_id }}" {% if team.team_name in user.team_names %}selected{% endif %}>
+                                                    {{ team.team_name|upper }}
+                                                </option>
+                                            {% endfor %}
+                                        </select>
+                                        <div class="form-text">Hold Ctrl or Cmd to select multiple teams.</div>
+                                        <button class="btn btn-outline-primary" type="submit">Update Teams</button>
+                                    </form>
+                                </td>
+                                <td>
+                                    {% set accessible_screens = access_map.get(user.user_id, []) %}
+                                    {% if accessible_screens %}
+                                        <div class="d-flex flex-wrap gap-1">
+                                            {% for screen_title in accessible_screens %}
+                                                <span class="badge text-bg-secondary">{{ screen_title }}</span>
+                                            {% endfor %}
+                                        </div>
+                                    {% else %}
+                                        <span class="text-muted">No screen access</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% else %}
+                            <tr><td colspan="8" class="text-muted">No users found.</td></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% elif active_tab == "roles" %}
+<div class="row g-4">
+    <div class="col-lg-4">
+        <div class="card shadow-sm border-0 admin-panel admin-form-panel">
+            <div class="card-body">
+                <h2 class="h5 mb-3">Add Role</h2>
+                <form method="post">
+                    <input type="hidden" name="entity" value="roles">
+                    <input type="hidden" name="tab" value="roles">
+                    <div class="mb-3">
+                        <label class="form-label" for="role_name">Role Name</label>
+                        <input class="form-control" id="role_name" name="role_name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="role_description">Description</label>
+                        <textarea class="form-control" id="role_description" name="description" rows="3"></textarea>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="role_active" name="is_active" checked>
+                        <label class="form-check-label" for="role_active">Active</label>
+                    </div>
+                    <button class="btn btn-primary w-100" type="submit">Save Role</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-8">
+        <div class="card shadow-sm border-0 admin-panel">
+            <div class="card-body">
+                <h2 class="h5 mb-3">Existing Roles</h2>
+                <div class="table-responsive admin-table-wrap">
+                    <table class="table align-middle">
+                        <thead><tr><th>Role</th><th>Description</th><th>Active</th><th>Created</th></tr></thead>
+                        <tbody>
+                        {% for role in roles %}
+                            <tr>
+                                <td>{{ role.role_name }}</td>
+                                <td>{{ role.description or "-" }}</td>
+                                <td>{{ "Yes" if role.is_active else "No" }}</td>
+                                <td>{{ role.created_at or "-" }}</td>
+                            </tr>
+                        {% else %}
+                            <tr><td colspan="4" class="text-muted">No roles found.</td></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% elif active_tab == "teams" %}
+<div class="row g-4">
+    <div class="col-lg-4">
+        <div class="card shadow-sm border-0 admin-panel admin-form-panel">
+            <div class="card-body">
+                <h2 class="h5 mb-3">Add Team</h2>
+                <form method="post">
+                    <input type="hidden" name="entity" value="teams">
+                    <input type="hidden" name="tab" value="teams">
+                    <div class="mb-3">
+                        <label class="form-label" for="team_name">Team Name</label>
+                        <input class="form-control" id="team_name" name="team_name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="team_description">Description</label>
+                        <textarea class="form-control" id="team_description" name="description" rows="3"></textarea>
+                    </div>
+                    <button class="btn btn-primary w-100" type="submit">Save Team</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-8">
+        <div class="card shadow-sm border-0 admin-panel">
+            <div class="card-body">
+                <h2 class="h5 mb-3">Existing Teams</h2>
+                <div class="table-responsive admin-table-wrap">
+                    <table class="table align-middle">
+                        <thead><tr><th>Team</th><th>Description</th><th>Created</th></tr></thead>
+                        <tbody>
+                        {% for team in teams %}
+                            <tr>
+                                <td>{{ team.team_name }}</td>
+                                <td>{{ team.description or "-" }}</td>
+                                <td>{{ team.created_at or "-" }}</td>
+                            </tr>
+                        {% else %}
+                            <tr><td colspan="3" class="text-muted">No teams found.</td></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% elif active_tab == "environments" %}
+<div class="row g-4">
+    <div class="col-lg-4">
+        <div class="card shadow-sm border-0 admin-panel admin-form-panel">
+            <div class="card-body">
+                <h2 class="h5 mb-3">Add Environment</h2>
+                <form method="post">
+                    <input type="hidden" name="entity" value="environments">
+                    <input type="hidden" name="tab" value="environments">
+                    <div class="mb-3">
+                        <label class="form-label" for="env_id">Environment ID</label>
+                        <input class="form-control" id="env_id" name="env_id" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="env_type">Environment Type</label>
+                        <input class="form-control" id="env_type" name="env_type" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="env_description">Description</label>
+                        <textarea class="form-control" id="env_description" name="description" rows="3"></textarea>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="env_active" name="is_active" checked>
+                        <label class="form-check-label" for="env_active">Active</label>
+                    </div>
+                    <button class="btn btn-primary w-100" type="submit">Save Environment</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-8">
+        <div class="card shadow-sm border-0 admin-panel">
+            <div class="card-body">
+                <h2 class="h5 mb-3">Existing Environments</h2>
+                <div class="table-responsive admin-table-wrap">
+                    <table class="table align-middle">
+                        <thead><tr><th>Env ID</th><th>Type</th><th>Description</th><th>Active</th></tr></thead>
+                        <tbody>
+                        {% for environment in environments %}
+                            <tr>
+                                <td>{{ environment.env_id }}</td>
+                                <td>{{ environment.env_type }}</td>
+                                <td>{{ environment.description or "-" }}</td>
+                                <td>{{ "Yes" if environment.is_active else "No" }}</td>
+                            </tr>
+                        {% else %}
+                            <tr><td colspan="4" class="text-muted">No environments found.</td></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% elif active_tab == "hosts" %}
+<div class="row g-4">
+    <div class="col-lg-4">
+        <div class="card shadow-sm border-0 admin-panel admin-form-panel">
+            <div class="card-body">
+                <h2 class="h5 mb-3">Add Host</h2>
+                <form method="post">
+                    <input type="hidden" name="entity" value="hosts">
+                    <input type="hidden" name="tab" value="hosts">
+                    <div class="mb-3">
+                        <label class="form-label" for="hostname">Host Name</label>
+                        <input class="form-control" id="hostname" name="hostname" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="ip_address">IP Address</label>
+                        <input class="form-control" id="ip_address" name="ip_address">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="domain">Domain</label>
+                        <input class="form-control" id="domain" name="domain">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="host_description">Description</label>
+                        <textarea class="form-control" id="host_description" name="description" rows="3"></textarea>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="host_active" name="is_active" checked>
+                        <label class="form-check-label" for="host_active">Active</label>
+                    </div>
+                    <button class="btn btn-primary w-100" type="submit">Save Host</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-8">
+        <div class="card shadow-sm border-0 admin-panel">
+            <div class="card-body">
+                <h2 class="h5 mb-3">Existing Hosts</h2>
+                <div class="table-responsive admin-table-wrap">
+                    <table class="table align-middle">
+                        <thead><tr><th>Host</th><th>IP</th><th>Domain</th><th>Description</th><th>Active</th></tr></thead>
+                        <tbody>
+                        {% for host in hosts %}
+                            <tr>
+                                <td>{{ host.hostname }}</td>
+                                <td>{{ host.ip_address or "-" }}</td>
+                                <td>{{ host.domain or "-" }}</td>
+                                <td>{{ host.description or "-" }}</td>
+                                <td>{{ "Yes" if host.is_active else "No" }}</td>
+                            </tr>
+                        {% else %}
+                            <tr><td colspan="5" class="text-muted">No hosts found.</td></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% elif active_tab == "server_types" %}
+<div class="row g-4">
+    <div class="col-lg-4">
+        <div class="card shadow-sm border-0 admin-panel admin-form-panel">
+            <div class="card-body">
+                <h2 class="h5 mb-3">Add ServerType</h2>
+                <form method="post">
+                    <input type="hidden" name="entity" value="server_types">
+                    <input type="hidden" name="tab" value="server_types">
+                    <div class="mb-3">
+                        <label class="form-label" for="server_type_key">Server Type Key</label>
+                        <input class="form-control" id="server_type_key" name="server_type_key" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="target_type">Target Type</label>
+                        <input class="form-control" id="target_type" name="target_type" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="server_type_description">Description</label>
+                        <textarea class="form-control" id="server_type_description" name="description" rows="3"></textarea>
+                    </div>
+                    <button class="btn btn-primary w-100" type="submit">Save ServerType</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-8">
+        <div class="card shadow-sm border-0 admin-panel">
+            <div class="card-body">
+                <h2 class="h5 mb-3">Existing Server Types</h2>
+                <div class="table-responsive admin-table-wrap">
+                    <table class="table align-middle">
+                        <thead><tr><th>ID</th><th>Server Type</th><th>Target Type</th><th>Description</th></tr></thead>
+                        <tbody>
+                        {% for server_type in server_types %}
+                            <tr>
+                                <td>{{ server_type.server_type_id }}</td>
+                                <td>{{ server_type.server_type_key }}</td>
+                                <td>{{ server_type.target_type }}</td>
+                                <td>{{ server_type.description or "-" }}</td>
+                            </tr>
+                        {% else %}
+                            <tr><td colspan="4" class="text-muted">No server types found.</td></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% elif active_tab == "environment_host_mappings" %}
+<div class="row g-4">
+    <div class="col-lg-5">
+        <div class="card shadow-sm border-0 admin-panel admin-form-panel">
+            <div class="card-body">
+                <h2 class="h5 mb-3">Add EnvironmentHostMapping</h2>
+                <form method="post">
+                    <input type="hidden" name="entity" value="environment_host_mappings">
+                    <input type="hidden" name="tab" value="environment_host_mappings">
+                    <div class="mb-3">
+                        <label class="form-label" for="mapping_env_id">Environment</label>
+                        <select class="form-select" id="mapping_env_id" name="env_id">
+                            <option value="">Select environment</option>
+                            {% for environment in mapping_environment_options %}
+                                <option value="{{ environment.env_id }}">{{ environment.env_id }} ({{ environment.env_type }})</option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">Leave blank for shared mappings.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="mapping_env_type">Environment Type</label>
+                        <input class="form-control" id="mapping_env_type" name="env_type">
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="mapping_shared" name="is_shared">
+                        <label class="form-check-label" for="mapping_shared">Shared by environment type</label>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="mapping_server_type_id">ServerType</label>
+                        <select class="form-select" id="mapping_server_type_id" name="server_type_id" required>
+                            <option value="">Select server type</option>
+                            {% for server_type in mapping_server_type_options %}
+                                <option value="{{ server_type.server_type_id }}">{{ server_type.server_type_key }} ({{ server_type.target_type }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="mapping_host_id">Host</label>
+                        <select class="form-select" id="mapping_host_id" name="host_id" required>
+                            <option value="">Select host</option>
+                            {% for host in mapping_host_options %}
+                                <option value="{{ host.host_id }}">{{ host.hostname }}{% if host.ip_address %} ({{ host.ip_address }}){% endif %}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="deployment_user">Deployment User</label>
+                        <input class="form-control" id="deployment_user" name="deployment_user">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="deployment_password">Deployment Password</label>
+                        <input class="form-control" id="deployment_password" name="deployment_password">
+                    </div>
+                    <button class="btn btn-primary w-100" type="submit">Save Mapping</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-7">
+        <div class="card shadow-sm border-0 admin-panel">
+            <div class="card-body">
+                <h2 class="h5 mb-3">Existing EnvironmentHostMappings</h2>
+                <div class="table-responsive admin-table-wrap">
+                    <table class="table align-middle">
+                        <thead><tr><th>Env</th><th>Type</th><th>Shared</th><th>ServerType</th><th>Host</th><th>Deploy User</th></tr></thead>
+                        <tbody>
+                        {% for mapping in environment_host_mappings %}
+                            <tr>
+                                <td>{{ mapping.env_id or "-" }}</td>
+                                <td>{{ mapping.env_type or "-" }}</td>
+                                <td>{{ "Yes" if mapping.is_shared else "No" }}</td>
+                                <td>{{ mapping.server_type.server_type_key if mapping.server_type else "-" }}</td>
+                                <td>{% if mapping.host %}{{ mapping.host.hostname }}{% if mapping.host.ip_address %} ({{ mapping.host.ip_address }}){% endif %}{% else %}-{% endif %}</td>
+                                <td>{{ mapping.deployment_user or "-" }}</td>
+                            </tr>
+                        {% else %}
+                            <tr><td colspan="6" class="text-muted">No mappings found.</td></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% elif active_tab == "component_builds" %}
+<div class="row g-4">
+    <div class="col-lg-4">
+        <div class="card shadow-sm border-0 admin-panel admin-form-panel">
+            <div class="card-body">
+                <h2 class="h5 mb-3">Add ComponentBuild</h2>
+                <form method="post">
+                    <input type="hidden" name="entity" value="component_builds">
+                    <input type="hidden" name="tab" value="component_builds">
+                    <div class="mb-3">
+                        <label class="form-label" for="build_target_key">Target Key</label>
+                        <input class="form-control" id="build_target_key" name="target_key" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="build_name">Build Name</label>
+                        <input class="form-control" id="build_name" name="build_name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="build_version">Version</label>
+                        <input class="form-control" id="build_version" name="version" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="artifact_name">Artifact Name</label>
+                        <input class="form-control" id="artifact_name" name="artifact_name">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="artifact_path">Artifact Path</label>
+                        <input class="form-control" id="artifact_path" name="artifact_path">
+                    </div>
+                    <button class="btn btn-primary w-100" type="submit">Save ComponentBuild</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-8">
+        <div class="card shadow-sm border-0 admin-panel">
+            <div class="card-body">
+                <h2 class="h5 mb-3">Existing ComponentBuilds</h2>
+                <div class="table-responsive admin-table-wrap">
+                    <table class="table align-middle">
+                        <thead><tr><th>Target</th><th>Build</th><th>Version</th><th>Artifact</th><th>Path</th></tr></thead>
+                        <tbody>
+                        {% for build in component_builds %}
+                            <tr>
+                                <td>{{ build.target_key }}</td>
+                                <td>{{ build.build_name }}</td>
+                                <td>{{ build.version }}</td>
+                                <td>{{ build.artifact_name or "-" }}</td>
+                                <td class="text-break">{{ build.artifact_path or "-" }}</td>
+                            </tr>
+                        {% else %}
+                            <tr><td colspan="5" class="text-muted">No component builds found.</td></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+</div>
+{% endblock %}

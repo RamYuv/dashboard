@@ -5,16 +5,17 @@ Utility and helper functions for common operations.
 from datetime import datetime, timedelta, timezone
 from flask import current_app, has_app_context, jsonify
 
-from .models import EnvironmentBooking, ComponentBuild, DeploymentRequest, Environment, format_datetime
+from .models import ComponentBuild, DeploymentRequest, Environment, EnvironmentBooking, Role, format_datetime
 from .constants import (
     BOOKING_LIFECYCLE_STATUS,
     BOOKING_STATUS,
     BOOKING_STATUS_ALIASES,
     COMPONENT_VERSIONS,
     PACKAGE_VERSIONS,
-    VALID_ROLES,
     VALID_TEAMS,
 )
+
+DEFAULT_ROLE_NAMES = ["user", "manager", "admin"]
 
 def json_error(message, status_code):
     """Create a JSON error response."""
@@ -156,10 +157,27 @@ def get_deployment_request_status_label(status):
     return labels.get(status, (status or "").replace("_", " ").title())
 
 
+def get_valid_roles():
+    """Return active roles from the database, with a startup-safe fallback."""
+    if not has_app_context():
+        return list(DEFAULT_ROLE_NAMES)
+
+    try:
+        roles = [
+            role.role_name
+            for role in Role.query.filter_by(is_active=True).order_by(Role.role_name).all()
+            if (role.role_name or "").strip()
+        ]
+    except Exception:
+        roles = []
+
+    return roles or list(DEFAULT_ROLE_NAMES)
+
+
 def normalize_role(role):
     """Normalize role to valid value or default to 'user'."""
     role = (role or "user").strip().lower()
-    return role if role in VALID_ROLES else "user"
+    return role if role in get_valid_roles() else "user"
 
 
 def normalize_team(team):

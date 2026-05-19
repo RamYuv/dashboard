@@ -1,5 +1,4 @@
 import os
-import tempfile
 from pathlib import Path
 
 
@@ -12,7 +11,7 @@ def _read_bool(value, default=False):
 class Config:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     PROJECT_ROOT = os.path.dirname(BASE_DIR)
-    DEFAULT_DB_PATH = Path(tempfile.gettempdir(), "envbooking_app.db").as_posix()
+    DEFAULT_DB_PATH = Path(PROJECT_ROOT, "envbooking_app.db").as_posix()
 
     SECRET_KEY = os.environ.get('SECRET_KEY', 'change-this-secret-key')
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL', f"sqlite:///{DEFAULT_DB_PATH}")

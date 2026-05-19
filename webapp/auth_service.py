@@ -24,8 +24,6 @@ def can_access_screen(user, screen):
     """Check if user has permission to access a screen."""
     if user is None:
         return False
-    if user.role == "admin":
-        return True
     user_team_names = {
         (team_name or "").strip().lower()
         for team_name in getattr(user, "team_names", []) or []
@@ -34,6 +32,14 @@ def can_access_screen(user, screen):
         (team_name or "").strip().lower()
         for team_name in screen["teams"]
     }
+
+    endpoint = (screen.get("endpoint") or "").strip()
+    if endpoint == "user_management_screen":
+        return user.role == "admin" and "access_admin" in user_team_names
+
+    if user.role == "admin":
+        return True
+
     return user.role in screen["roles"] or bool(user_team_names & screen_team_names)
 
 
