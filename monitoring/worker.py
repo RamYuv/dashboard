@@ -4,7 +4,6 @@ The worker performs one complete refresh cycle:
 - load environment/server-type mappings from the database
 - fetch VM status for each mapped host
 - aggregate VM-level status into environment-level status
-- merge live status with dummy/demo snapshot when live data is incomplete
 - persist the latest snapshot into monitor state/cache
 
 This module does not own scheduling. It only performs a single refresh when
@@ -12,7 +11,6 @@ This module does not own scheduling. It only performs a single refresh when
 worker process.
 """
 
-from monitoring.services.health_service import build_dummy_environment_snapshot
 from webapp.models import EnvironmentHostMapping
 from sqlalchemy.orm import joinedload
 
@@ -86,52 +84,25 @@ class EnvMonitorWorker:
             })
             env_entry["vms"].append(vm_id)
 
-            host = mapping.host.hostname if mapping.host else None
+            host = None
+            host_label = None
+            if mapping.host:
+                host = (mapping.host.ip_address or "").strip() or (mapping.host.hostname or "").strip() or None
+                host_label = (mapping.host.hostname or "").strip() or host
             username = mapping.deployment_user or ""
             password = mapping.deployment_password or ""
-            fetch_key = (host, username, password)
+            fetch_key = (host, username, password, server_type)
             if fetch_key not in host_status_cache:
                 host_status_cache[fetch_key] = self.status_fetcher.fetch_vm_status(
                     host,
                     username,
                     password,
+                    server_type=server_type,
+                    host_label=host_label,
                 )
             vm_statuses[vm_id] = host_status_cache[fetch_key]
 
         return list(env_index.values()), vm_statuses
-
-    def _has_meaningful_live_data(self, env_status):
-        """Return True when live status contains real component details/counts."""
-        if not env_status:
-            return False
-
-        component_summary = env_status.get("component_summary") or {}
-        total_components = (
-            int(component_summary.get("running", 0) or 0) +
-            int(component_summary.get("notrunning", 0) or 0) +
-            int(component_summary.get("unknown", 0) or 0)
-        )
-        if total_components > 0:
-            return True
-
-        vm_details = env_status.get("vm_details") or {}
-        for vm_status in vm_details.values():
-            if (vm_status or {}).get("component_data"):
-                return True
-
-        return False
-
-    def _merge_with_dummy_snapshot(self, live_snapshot):
-        """Prefer dummy snapshot when live data exists but contains no detail."""
-        merged_snapshot = dict(build_dummy_environment_snapshot())
-
-        for env_id, live_status in (live_snapshot or {}).items():
-            dummy_status = merged_snapshot.get(env_id)
-            if dummy_status and not self._has_meaningful_live_data(live_status):
-                continue
-            merged_snapshot[env_id] = live_status
-
-        return merged_snapshot
 
     def refresh(self):
         """Run one end-to-end monitoring refresh and persist the snapshot."""
@@ -143,10 +114,9 @@ class EnvMonitorWorker:
             environments, vm_statuses = self._load_environment_mappings()
 
             if environments:
-                live_snapshot = self.status_aggregator.aggregate_env_statuses(vm_statuses, environments)
-                snapshot = self._merge_with_dummy_snapshot(live_snapshot)
+                snapshot = self.status_aggregator.aggregate_env_statuses(vm_statuses, environments)
             else:
-                snapshot = build_dummy_environment_snapshot()
+                snapshot = {}
 
             delta = self.status_aggregator.calculate_status_delta(previous_snapshot, snapshot)
 

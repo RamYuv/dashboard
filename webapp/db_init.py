@@ -104,28 +104,6 @@ def _seeders():
     )
 
 
-def _ensure_user_profile_columns():
-    """Add lightweight user columns needed by the current runtime."""
-    existing_columns = {
-        row[1]
-        for row in db.session.execute("PRAGMA table_info(users)").fetchall()
-    }
-    if "first_name" not in existing_columns:
-        db.session.execute("ALTER TABLE users ADD COLUMN first_name VARCHAR(100)")
-    if "last_name" not in existing_columns:
-        db.session.execute("ALTER TABLE users ADD COLUMN last_name VARCHAR(100)")
-
-
-def _migrate_legacy_qa_roles():
-    """Map legacy QA role values to the current manager role."""
-    db.session.execute(
-        "UPDATE users SET role = 'manager' WHERE LOWER(COALESCE(role, '')) = 'qa'"
-    )
-    db.session.execute(
-        "UPDATE team_members SET role = 'manager' WHERE LOWER(COALESCE(role, '')) = 'qa'"
-    )
-
-
 def _resolve_seed_host(host_data):
     """Resolve a seeded host record with fallback matching rules."""
     host_filters = {"hostname": host_data["hostname"]}
@@ -164,20 +142,12 @@ def _seed_access_admin_memberships():
 
 
 def init_db():
-    """Create tables and load the default seed data."""
+    """Create the current schema and load default seed data."""
     db.create_all()
-    ensure_runtime_schema()
     if should_reset_seed_data():
         reset_all_table_data()
         return
     seed_all_default_data()
-
-
-def ensure_runtime_schema():
-    """Apply lightweight schema patches needed for local SQLite development."""
-    _ensure_user_profile_columns()
-    _migrate_legacy_qa_roles()
-    db.session.commit()
 
 
 def should_reset_seed_data():

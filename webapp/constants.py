@@ -28,59 +28,6 @@ BOOKING_MUTABLE_LIFECYCLE_STATUSES = {
     BOOKING_LIFECYCLE_STATUS["SCHEDULED"],
 }
 
-# Screen Configuration
-SCREENS = [
-    {
-        "endpoint": "admin_screen",
-        "title": "Admin Screen",
-        "description": "Only users with the admin role can open this page.",
-        "roles": ["admin"],
-        "teams": [],
-    },
-    {
-        "endpoint": "user_management_screen",
-        "title": "User Management",
-        "description": "Manage user permissions and team membership.",
-        "roles": ["admin"],
-        "teams": ["access_admin"],
-    },
-    {
-        "endpoint": "manager_screen",
-        "title": "Manager Screen",
-        "description": "Managers and admins can open this page.",
-        "roles": ["manager", "admin"],
-        "teams": [],
-    },
-    {
-        "endpoint": "alpha_screen",
-        "title": "Alpha Team Screen",
-        "description": "Only members of the Alpha team can open this page.",
-        "roles": ["admin"],
-        "teams": ["alpha"],
-    },
-    {
-        "endpoint": "general_screen",
-        "title": "General Screen",
-        "description": "Every logged-in user can open this page.",
-        "roles": [],
-        "teams": VALID_TEAMS,
-    },
-    {
-        "endpoint": "booking_screen",
-        "title": "Environment Booking",
-        "description": "Book environments and manage your own reservations.",
-        "roles": [],
-        "teams": VALID_TEAMS,
-    },
-    {
-        "endpoint": "environment_health",
-        "title": "Environment Health Dashboard",
-        "description": "View live environment health and activity for the ENV team.",
-        "roles": ["admin"],
-        "teams": ["env"],
-    },
-]
-
 # Default Seed Data
 DEFAULT_ENVIRONMENTS = [
     ("DEV-01", "DEV"),

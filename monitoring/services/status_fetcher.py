@@ -1,44 +1,79 @@
 """VM status fetching and parsing helpers used by the monitoring worker."""
 
 import logging
-import random
+
+from .remote_executor import FabricRemoteExecutor
 
 logger = logging.getLogger(__name__)
 
-STANDARD_STATUS_SUPPORTED_HOSTS = {"core-host", "getway-host"}
+STANDARD_STATUS_SUPPORTED_SERVER_TYPES = {"core", "getway", "gateway"}
+NOT_IMPLEMENTED_OUTPUT = "__MONITORING_NOT_IMPLEMENTED__"
+REMOTE_EXECUTION_FAILED_OUTPUT = "__REMOTE_EXECUTION_FAILED__"
 
 
 class VmStatusFetcher:
     """Fetch per-host service status and normalize it into VM health metadata."""
 
-    def __init__(self):
-        pass
+    DEFAULT_COMMANDS = {
+        "service_status": "tcsexecute status",
+    }
 
-    def supports_standard_status_command(self, host):
-        """Return whether the default status command is supported for this host."""
-        normalized_host = (host or "").strip()
-        return normalized_host in STANDARD_STATUS_SUPPORTED_HOSTS
+    def __init__(self, executor=None, command_map=None):
+        self.executor = executor or FabricRemoteExecutor()
+        self.command_map = dict(self.DEFAULT_COMMANDS)
+        if command_map:
+            self.command_map.update(command_map)
 
-    def service_status(self, host, username, password):
-        """Return mock command output for one host.
+    def supports_standard_status_command(self, server_type=None):
+        """Return whether the default status command is supported for this server type."""
+        normalized_server_type = (server_type or "").strip().lower()
+        return normalized_server_type in STANDARD_STATUS_SUPPORTED_SERVER_TYPES
 
-        This remains a stub for now; production implementations can replace
-        it with SSH or other remote execution logic.
-        """
-        if not self.supports_standard_status_command(host):
+    def get_command(self, command_name, host, server_type=None):
+        """Resolve the remote shell command for one monitoring action."""
+        _ = (host, server_type)
+        return self.command_map.get(command_name)
+
+    def execute_command(self, command_name, host, username, password, server_type=None):
+        """Execute one named monitoring command and return raw output."""
+        command = self.get_command(command_name, host, server_type=server_type)
+        if not command:
             logger.info(
-                "Skipping standard service status command for host %s because a dedicated monitor command is not implemented yet.",
+                "Skipping monitoring command %s for host %s because it is not configured.",
+                command_name,
                 host,
             )
-            return "__MONITORING_NOT_IMPLEMENTED__"
+            return NOT_IMPLEMENTED_OUTPUT
 
-        mock_outputs = [
-            "Getting status of instances .....................done\nNo instances running",
-            "Getting status of instances .................. done\nStatus of required instances for session: [24, 40]\napp1\t\t: Running(pid: 12345)\ndisc1\t\t: Running(pid: 44232)\ndisc2\t\t: Running(pid: 63453)\nstat1\t\t: Running(pid: 03984)\napp4\t\t: Running(pid: 65453)",
-            "Getting status of instances .................. done\nStatus of required instances for session: [24, 40]\napp1\t\t: Running(pid: 12345)\ndisc1\t\t: Running(pid: 44232)\ndisc2\t\t: Running(pid: 63453)\nstat1\t\t: Running(pid: 03984)\napp4\t\t: Running(pid: 65453)\nNotif1\t\t: NotRunning(pid: None)\nNotif2\t\t: NotRunning(pid: None)",
-            "-bash: tcsexc: command not found",
-        ]
-        return random.choice(mock_outputs)
+        result = self.executor.run(host, username, password, command)
+        if not result.ok:
+            logger.warning(
+                "Monitoring command %s failed for host %s exit_code=%s stderr=%s",
+                command_name,
+                host,
+                result.exit_code,
+                (result.stderr or "").strip() or "n/a",
+            )
+            return result.combined_output or REMOTE_EXECUTION_FAILED_OUTPUT
+        return result.stdout or result.combined_output
+
+    def service_status(self, host, username, password, server_type=None, host_label=None):
+        """Execute the standard remote status command for one host."""
+        display_host = host_label or host
+        if not self.supports_standard_status_command(server_type=server_type):
+            logger.info(
+                "Skipping standard service status command for host %s server_type=%s because a dedicated monitor command is not implemented yet.",
+                display_host,
+                server_type,
+            )
+            return NOT_IMPLEMENTED_OUTPUT
+        return self.execute_command(
+            "service_status",
+            host,
+            username,
+            password,
+            server_type=server_type,
+        )
 
     def parse_output(self, output_string):
         """Parse raw command output into a normalized VM health payload."""
@@ -47,7 +82,10 @@ class VmStatusFetcher:
             vm_status["vm_color"] = "Black"
             return vm_status
         normalized = output_string.strip().lower()
-        if "__monitoring_not_implemented__" in normalized:
+        if NOT_IMPLEMENTED_OUTPUT.lower() in normalized:
+            vm_status["vm_color"] = "Black"
+            return vm_status
+        if REMOTE_EXECUTION_FAILED_OUTPUT.lower() in normalized:
             vm_status["vm_color"] = "Black"
             return vm_status
         if "command not found" in normalized:
@@ -99,10 +137,16 @@ class VmStatusFetcher:
         vm_status["component_data"] = comp_data
         return vm_status
 
-    def fetch_vm_status(self, host, username, password):
+    def fetch_vm_status(self, host, username, password, server_type=None, host_label=None):
         """Fetch and parse one host's status, returning a safe fallback on errors."""
         try:
-            output = self.service_status(host, username, password)
+            output = self.service_status(
+                host,
+                username,
+                password,
+                server_type=server_type,
+                host_label=host_label,
+            )
             return self.parse_output(output)
         except Exception:
             logger.exception("Failed to fetch VM status for host %s.", host)

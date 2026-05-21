@@ -9,6 +9,7 @@ class AppContainer:
 
     def __init__(self, app, monitor_state):
         from monitoring.events import EventBroker
+        from monitoring.services.remote_executor import FabricRemoteExecutor
         from monitoring.services.status_aggregator import EnvStatusAggregator
         from monitoring.services.status_fetcher import VmStatusFetcher
         from monitoring.worker import EnvMonitorWorker
@@ -16,7 +17,8 @@ class AppContainer:
         self.app = app
         self.monitor_state = monitor_state
         self.event_broker = EventBroker()
-        self.vm_status_fetcher = VmStatusFetcher()
+        self.remote_executor = FabricRemoteExecutor()
+        self.vm_status_fetcher = VmStatusFetcher(executor=self.remote_executor)
         self.env_status_aggregator = EnvStatusAggregator()
 
         self.env_worker = EnvMonitorWorker(

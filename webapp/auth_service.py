@@ -1,13 +1,16 @@
-"""
-Authentication and access control service.
-"""
+"""Authentication and access control service."""
 
 import logging
 from functools import wraps
 from flask import session, redirect, url_for, flash
 
 from .models import User
-from .constants import SCREENS
+from .access_policy import (
+    can_access_env_team_screen,
+    can_access_screen,
+    get_allowed_screens,
+    get_screen_by_endpoint,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -18,53 +21,6 @@ def current_user():
     if not user_id:
         return None
     return User.query.get(user_id)
-
-
-def can_access_screen(user, screen):
-    """Check if user has permission to access a screen."""
-    if user is None:
-        return False
-    user_team_names = {
-        (team_name or "").strip().lower()
-        for team_name in getattr(user, "team_names", []) or []
-    }
-    screen_team_names = {
-        (team_name or "").strip().lower()
-        for team_name in screen["teams"]
-    }
-
-    endpoint = (screen.get("endpoint") or "").strip()
-    if endpoint == "user_management_screen":
-        return user.role == "admin" and "access_admin" in user_team_names
-
-    if user.role == "admin":
-        return True
-
-    return user.role in screen["roles"] or bool(user_team_names & screen_team_names)
-
-
-def get_allowed_screens(user):
-    """Get all screens accessible by the user."""
-    if user is None:
-        return []
-    return [screen for screen in SCREENS if can_access_screen(user, screen)]
-
-
-def can_access_env_team_screen(user):
-    """Return whether the user can access ENV-team deployment operations."""
-    if user is None:
-        return False
-    if user.role == "admin":
-        return True
-    return "env" in {
-        (team_name or "").strip().lower()
-        for team_name in getattr(user, "team_names", []) or []
-    }
-
-
-def get_screen_by_endpoint(endpoint):
-    """Get screen configuration by endpoint."""
-    return next((item for item in SCREENS if item["endpoint"] == endpoint), None)
 
 
 def login_required(view):

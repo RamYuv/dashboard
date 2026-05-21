@@ -69,7 +69,7 @@ def create_app(config_class=Config):
     app.container = AppContainer(app, app.monitor_state)
 
     # Register blueprints
-    from .routes.main import main_bp
+    from .routes import main_bp
     from booking.routes.booking import booking_bp
     from monitoring.api import monitoring_bp
 

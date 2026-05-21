@@ -572,7 +572,7 @@ class DeploymentRequest(db.Model):
 
     @property
     def target_definition(self):
-        from .deployment_targets import get_target_definition
+        from .domain.deployment_targets import get_target_definition
 
         return get_target_definition(self.target_key) or {}
 
