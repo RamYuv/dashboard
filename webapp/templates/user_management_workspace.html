@@ -389,8 +389,9 @@
 
     .team-option {
         display: flex;
-        align-items: center;
-        gap: 10px;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
         padding: 11px 12px;
         border: 1px solid var(--um-line);
         border-radius: 14px;
@@ -404,9 +405,29 @@
         accent-color: var(--um-primary);
     }
 
+    .team-option-main {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
     .team-option span {
         font-weight: 600;
         color: var(--um-text);
+    }
+
+    .team-option-lead {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--um-muted);
+        font-size: 0.85rem;
+        white-space: nowrap;
+    }
+
+    .team-option-lead input {
+        width: 16px;
+        height: 16px;
     }
 
     .access-preview {
@@ -554,6 +575,7 @@
                                 <th>Name</th>
                                 <th>Email</th>
                                 <th>Global Role</th>
+                                <th>Lead Teams</th>
                                 <th>Teams / Groups</th>
                                 <th>Actions</th>
                             </tr>
@@ -578,6 +600,16 @@
                                     </td>
                                     <td>{{ user.email_id or "-" }}</td>
                                     <td><span class="role-pill">{{ user.role|upper }}</span></td>
+                                    <td>
+                                        <div class="chip-list">
+                                            {% for membership in user.team_memberships if membership.team_lead and membership.team %}
+                                                <span class="team-chip green">{{ membership.team.team_name|upper }}</span>
+                                            {% endfor %}
+                                            {% if not user.is_team_lead %}
+                                                <span class="team-chip violet">NONE</span>
+                                            {% endif %}
+                                        </div>
+                                    </td>
                                     <td>
                                         <div class="chip-list">
                                             {% for team_name in user.team_names[:2] %}
@@ -607,7 +639,7 @@
                                 </tr>
                             {% else %}
                                 <tr>
-                                    <td colspan="5">
+                                    <td colspan="6">
                                         <div class="empty-state">No users found.</div>
                                     </td>
                                 </tr>
@@ -706,12 +738,18 @@
                                     <div class="team-grid">
                                         {% for team in teams %}
                                             <label class="team-option">
-                                                <input type="checkbox" name="team_ids" value="{{ team.team_id }}" {% if team.team_name in user.team_names %}checked{% endif %}>
-                                                <span>{{ team.team_name|upper }}</span>
+                                                <span class="team-option-main">
+                                                    <input type="checkbox" name="team_ids" value="{{ team.team_id }}" {% if team.team_name in user.team_names %}checked{% endif %}>
+                                                    <span>{{ team.team_name|upper }}</span>
+                                                </span>
+                                                <span class="team-option-lead">
+                                                    <input type="checkbox" name="team_lead_ids" value="{{ team.team_id }}" {% for membership in user.team_memberships %}{% if membership.team_id == team.team_id and membership.team_lead %}checked{% endif %}{% endfor %}>
+                                                    Lead
+                                                </span>
                                             </label>
                                         {% endfor %}
                                     </div>
-                                    <p class="section-note">Check teams to add access. Uncheck teams to remove access. At least one team must remain assigned.</p>
+                                    <p class="section-note">Check teams to assign access. Mark Lead only for teams where this user should act as a team lead. New teams default to normal member unless Lead is checked.</p>
                                     <div class="text-end mt-3">
                                         <button class="btn btn-outline-primary" type="submit">Save Team Access</button>
                                     </div>

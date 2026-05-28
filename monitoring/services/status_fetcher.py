@@ -19,7 +19,10 @@ class VmStatusFetcher:
     }
 
     def __init__(self, executor=None, command_map=None):
+        """Accept any remote executor implementation, defaulting to Fabric."""
         self.executor = executor or FabricRemoteExecutor()
+        if not hasattr(self.executor, "run"):
+            raise TypeError("executor must provide a run(host, username, password, command) method")
         self.command_map = dict(self.DEFAULT_COMMANDS)
         if command_map:
             self.command_map.update(command_map)

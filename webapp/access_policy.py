@@ -21,9 +21,10 @@ SCREENS = [
     {
         "endpoint": "manager_screen",
         "title": "Manager Screen",
-        "description": "Managers and admins can open this page.",
-        "roles": ["manager", "admin"],
+        "description": "Team leads and admins can open this page.",
+        "roles": ["admin"],
         "teams": [],
+        "requires_team_lead": True,
     },
     {
         "endpoint": "alpha_screen",
@@ -81,6 +82,9 @@ def can_access_screen(user, screen):
     if user.role == "admin":
         if screen.get("endpoint") == "user_management_screen":
             return "access_admin" in user_team_names
+        return True
+
+    if screen.get("requires_team_lead") and getattr(user, "is_team_lead", False):
         return True
 
     return user.role in required_roles or bool(user_team_names & screen_team_names)

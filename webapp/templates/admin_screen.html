@@ -64,6 +64,7 @@
                                 <th>Email</th>
                                 <th>Teams</th>
                                 <th>Current Role</th>
+                                <th>Lead Teams</th>
                                 <th>Change Role</th>
                                 <th>Change Teams</th>
                                 <th>Screen Access</th>
@@ -77,6 +78,16 @@
                                 <td>{{ user.email_id or "-" }}</td>
                                 <td>{{ user.team_names_display or "-" }}</td>
                                 <td><span class="badge text-bg-light">{{ user.role }}</span></td>
+                                <td>
+                                    <div class="d-flex flex-wrap gap-1">
+                                        {% for membership in user.team_memberships if membership.team_lead and membership.team %}
+                                            <span class="badge text-bg-success">{{ membership.team.team_name|upper }}</span>
+                                        {% endfor %}
+                                        {% if not user.is_team_lead %}
+                                            <span class="badge text-bg-secondary">None</span>
+                                        {% endif %}
+                                    </div>
+                                </td>
                                 <td>
                                     <form method="post" class="d-flex flex-column flex-md-row gap-2 align-items-md-center">
                                         <input type="hidden" name="action" value="update_role">
@@ -107,6 +118,15 @@
                                             {% endfor %}
                                         </select>
                                         <div class="form-text">Hold Ctrl or Cmd to select multiple teams.</div>
+                                        <label class="form-label mb-0" for="teamLeadIds{{ loop.index }}">Lead Teams</label>
+                                        <select class="form-select" id="teamLeadIds{{ loop.index }}" name="team_lead_ids" multiple size="4" aria-label="Lead teams for {{ user.user_id }}">
+                                            {% for team in teams %}
+                                                <option value="{{ team.team_id }}" {% for membership in user.team_memberships %}{% if membership.team_id == team.team_id and membership.team_lead %}selected{% endif %}{% endfor %}>
+                                                    {{ team.team_name|upper }}
+                                                </option>
+                                            {% endfor %}
+                                        </select>
+                                        <div class="form-text">Select only the assigned teams where this user should be a team lead.</div>
                                         <button class="btn btn-outline-primary" type="submit">Update Teams</button>
                                     </form>
                                 </td>
@@ -124,7 +144,7 @@
                                 </td>
                             </tr>
                         {% else %}
-                            <tr><td colspan="8" class="text-muted">No users found.</td></tr>
+                            <tr><td colspan="9" class="text-muted">No users found.</td></tr>
                         {% endfor %}
                         </tbody>
                     </table>

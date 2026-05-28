@@ -47,6 +47,7 @@ DEFAULT_USERS = [
         "password": "adminpass",
         "team": "env",
         "role": "admin",
+        "team_lead": 0,
     },
     {
         "user_id": "qa1",
@@ -54,7 +55,8 @@ DEFAULT_USERS = [
         "name": "QA User",
         "password": "qapass",
         "team": "qa",
-        "role": "manager",
+        "role": "user",
+        "team_lead": 1,
     },
     {
         "user_id": "user1",
@@ -63,6 +65,7 @@ DEFAULT_USERS = [
         "password": "userpass",
         "team": "alpha",
         "role": "user",
+        "team_lead": 0,
     },
 ]
 

@@ -47,7 +47,6 @@ RESET_DELETE_ORDER = [
 
 DEFAULT_ROLES = [
     {"role_name": "user", "description": "Standard user access"},
-    {"role_name": "manager", "description": "Manager access"},
     {"role_name": "admin", "description": "Administrator access"},
 ]
 
@@ -84,6 +83,15 @@ def load_host_seed_data():
     with SEED_HOSTS_CONFIG_PATH.open("r", encoding="utf-8") as seed_file:
         data = json.load(seed_file)
 
+    for index, mapping in enumerate(data.get("environment_host_mappings") or [], start=1):
+        if not (mapping.get("ip_address") or "").strip():
+            raise ValueError(
+                "Seed mapping #{} for hostname '{}' must include ip_address.".format(
+                    index,
+                    mapping.get("hostname") or "",
+                )
+            )
+
     return {
         "hosts": data.get("hosts") or [],
         "environment_host_mappings": data.get("environment_host_mappings") or [],
@@ -105,20 +113,13 @@ def _seeders():
 
 
 def _resolve_seed_host(host_data):
-    """Resolve a seeded host record with fallback matching rules."""
-    host_filters = {"hostname": host_data["hostname"]}
-    if host_data.get("ip_address"):
-        host_filters["ip_address"] = host_data.get("ip_address")
-
-    host = _first(Host, **host_filters)
-    if host is None and "ip_address" not in host_filters:
-        matching_hosts = Host.query.filter_by(hostname=host_data["hostname"]).all()
-        if len(matching_hosts) == 1:
-            return matching_hosts[0]
-    return host
+    """Resolve a seeded host record by hostname and IP address."""
+    hostname = host_data["hostname"]
+    ip_address = host_data.get("ip_address")
+    return _first(Host, hostname=hostname, ip_address=ip_address)
 
 
-def _seed_team_membership(user, team, role):
+def _seed_team_membership(user, team, role, team_lead=False):
     """Ensure a single user-to-team membership exists with the expected role."""
     if user is None or team is None:
         return
@@ -126,9 +127,10 @@ def _seed_team_membership(user, team, role):
         TeamMember,
         user_id=user.user_id,
         team_id=team.team_id,
-        defaults={"role": role},
+        defaults={"role": role, "team_lead": team_lead},
     )
     membership.role = role
+    membership.team_lead = bool(team_lead)
 
 
 def _seed_access_admin_memberships():
@@ -224,7 +226,12 @@ def seed_default_team_memberships():
     for user_data in DEFAULT_USERS:
         user = _first(User, user_id=user_data["user_id"])
         team = _first(Team, team_name=user_data["team"])
-        _seed_team_membership(user, team, user_data["role"])
+        _seed_team_membership(
+            user,
+            team,
+            user_data["role"],
+            team_lead=bool(user_data.get("team_lead", 0)),
+        )
 
     _seed_access_admin_memberships()
     db.session.commit()

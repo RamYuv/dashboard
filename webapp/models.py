@@ -109,6 +109,13 @@ class User(db.Model):
     def team_names_display(self):
         return ", ".join(self.team_names)
 
+    @property
+    def is_team_lead(self):
+        return any(
+            bool(getattr(membership, "team_lead", False))
+            for membership in getattr(self, "team_memberships", []) or []
+        )
+
     def has_team(self, team_name):
         normalized_team_name = (team_name or "").strip().lower()
         return any(
@@ -151,6 +158,7 @@ class TeamMember(db.Model):
     )
 
     role = db.Column(db.String(20), nullable=False, default="user")
+    team_lead = db.Column(db.Boolean, nullable=False, default=False)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 

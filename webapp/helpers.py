@@ -15,7 +15,7 @@ from .constants import (
     VALID_TEAMS,
 )
 
-DEFAULT_ROLE_NAMES = ["user", "manager", "admin"]
+DEFAULT_ROLE_NAMES = ["user", "admin"]
 
 def json_error(message, status_code):
     """Create a JSON error response."""

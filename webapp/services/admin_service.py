@@ -1,7 +1,7 @@
 """Service layer for admin configuration and user-management flows."""
 
 from ..auth_service import get_allowed_screens
-from ..helpers import get_valid_roles, normalize_role
+from ..helpers import DEFAULT_ROLE_NAMES, get_valid_roles, normalize_role
 from ..models import (
     ComponentBuild,
     Environment,
@@ -84,8 +84,11 @@ def create_role(form):
     role_name = (form.get("role_name") or "").strip().lower()
     description = (form.get("description") or "").strip() or None
     is_active = normalize_checkbox(form.get("is_active"))
+    supported_roles = set(DEFAULT_ROLE_NAMES)
     if not role_name:
         return "Role name is required."
+    if role_name not in supported_roles:
+        return "Supported roles are admin and user only."
     if Role.query.filter_by(role_name=role_name).first() is not None:
         return "Role already exists."
     db.session.add(Role(role_name=role_name, description=description, is_active=is_active))
@@ -281,6 +284,20 @@ def update_user_teams(form):
     if len(selected_teams) != len(team_ids):
         return "One or more selected teams were not found."
 
+    submitted_team_lead_ids = set()
+    for value in form.getlist("team_lead_ids"):
+        raw_value = (value or "").strip()
+        if not raw_value:
+            continue
+        try:
+            submitted_team_lead_ids.add(int(raw_value))
+        except ValueError:
+            return "One or more selected team lead values are invalid."
+
+    invalid_team_lead_ids = submitted_team_lead_ids - set(team_ids)
+    if invalid_team_lead_ids:
+        return "Team lead can only be enabled for assigned teams."
+
     existing_memberships = {
         membership.team_id: membership
         for membership in (user.team_memberships or [])
@@ -298,10 +315,12 @@ def update_user_teams(form):
                     user_id=user.user_id,
                     team_id=team.team_id,
                     role=user.role,
+                    team_lead=team.team_id in submitted_team_lead_ids,
                 )
             )
         else:
             membership.role = user.role
+            membership.team_lead = team.team_id in submitted_team_lead_ids
 
     return None
 
