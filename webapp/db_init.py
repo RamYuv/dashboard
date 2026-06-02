@@ -4,14 +4,9 @@ import json
 from pathlib import Path
 
 from flask import current_app, has_app_context
+from sqlalchemy import inspect
 from werkzeug.security import generate_password_hash
 
-from .constants import (
-    DEFAULT_ENVIRONMENTS,
-    DEFAULT_SERVER_TYPES,
-    DEFAULT_USERS,
-    VALID_TEAMS,
-)
 from .models import (
     ComponentBuild,
     CurrentDeploymentState,
@@ -76,11 +71,18 @@ def _create_if_missing(model, defaults=None, **filters):
 
 
 def load_host_seed_data():
-    """Load seed-only host data from JSON to keep it separate from runtime constants."""
+    """Load default seed data from JSON config."""
     if not SEED_HOSTS_CONFIG_PATH.exists():
-        return {"hosts": [], "environment_host_mappings": []}
+        return {
+            "teams": [],
+            "environments": [],
+            "users": [],
+            "server_types": [],
+            "hosts": [],
+            "environment_host_mappings": [],
+        }
 
-    with SEED_HOSTS_CONFIG_PATH.open("r", encoding="utf-8") as seed_file:
+    with SEED_HOSTS_CONFIG_PATH.open("r", encoding="utf-8-sig") as seed_file:
         data = json.load(seed_file)
 
     for index, mapping in enumerate(data.get("environment_host_mappings") or [], start=1):
@@ -93,6 +95,10 @@ def load_host_seed_data():
             )
 
     return {
+        "teams": data.get("teams") or [],
+        "environments": data.get("environments") or [],
+        "users": data.get("users") or [],
+        "server_types": data.get("server_types") or [],
         "hosts": data.get("hosts") or [],
         "environment_host_mappings": data.get("environment_host_mappings") or [],
     }
@@ -146,10 +152,96 @@ def _seed_access_admin_memberships():
 def init_db():
     """Create the current schema and load default seed data."""
     db.create_all()
+    upgrade_compatible_schema()
+    validate_required_schema()
     if should_reset_seed_data():
         reset_all_table_data()
         return
     seed_all_default_data()
+
+
+def upgrade_compatible_schema():
+    """Apply safe additive schema upgrades for supported databases."""
+    inspector = inspect(db.engine)
+    table_names = set(inspector.get_table_names())
+    if "component_builds" not in table_names:
+        return
+
+    if db.engine.dialect.name != "sqlite":
+        return
+
+    component_build_columns = {
+        column["name"]
+        for column in inspector.get_columns("component_builds")
+    }
+    add_column_statements = []
+    if "artifact_size_bytes" not in component_build_columns:
+        add_column_statements.append(
+            "ALTER TABLE component_builds ADD COLUMN artifact_size_bytes BIGINT"
+        )
+    if "checksum" not in component_build_columns:
+        add_column_statements.append(
+            "ALTER TABLE component_builds ADD COLUMN checksum VARCHAR(100)"
+        )
+    if "build_metadata" not in component_build_columns:
+        add_column_statements.append(
+            "ALTER TABLE component_builds ADD COLUMN build_metadata JSON"
+        )
+
+    if not add_column_statements:
+        return
+
+    for statement in add_column_statements:
+        db.session.execute(statement)
+    db.session.commit()
+
+
+def validate_required_schema():
+    """Fail fast when an existing database uses an older incompatible schema."""
+    inspector = inspect(db.engine)
+    table_names = set(inspector.get_table_names())
+    database_uri = current_app.config.get("SQLALCHEMY_DATABASE_URI", "")
+
+    if "team_members" in table_names:
+        team_member_columns = {
+            column["name"]
+            for column in inspector.get_columns("team_members")
+        }
+        if "team_lead" not in team_member_columns:
+            raise RuntimeError(
+                "Existing database schema is incompatible: table 'team_members' is missing "
+                "column 'team_lead'. This app now expects a fresh database. Delete the old "
+                "SQLite file or point DATABASE_URL to a new database, then start the app again. "
+                "Current database: {}".format(database_uri)
+            )
+
+    if "component_builds" not in table_names:
+        return
+
+    component_build_columns = {
+        column["name"]
+        for column in inspector.get_columns("component_builds")
+    }
+    required_component_build_columns = {
+        "artifact_size_bytes",
+        "checksum",
+        "build_metadata",
+    }
+    missing_component_build_columns = sorted(
+        required_component_build_columns - component_build_columns
+    )
+    if not missing_component_build_columns:
+        return
+
+    raise RuntimeError(
+        "Existing database schema is incompatible: table 'component_builds' is missing "
+        "column(s) {}. This app now expects the Jira-aligned ComponentBuild schema. "
+        "Delete the old SQLite file or point DATABASE_URL to a new database, then start "
+        "the app again. Current database: {}".format(
+            ", ".join(missing_component_build_columns),
+            database_uri,
+        )
+    )
 
 
 def should_reset_seed_data():
@@ -175,12 +267,20 @@ def reset_all_table_data():
 
 def seed_default_environments():
     """Seed default environment configurations."""
-    for env_id, env_type in DEFAULT_ENVIRONMENTS:
+    seed_data = load_host_seed_data()
+    for environment_data in seed_data["environments"]:
+        env_id = environment_data["env_id"]
+        env_type = environment_data["env_type"]
+        domain = (environment_data.get("domain") or "").strip().lower() or None
         _create_if_missing(
             Environment,
             env_id=env_id,
-            defaults={"env_type": env_type},
+            defaults={"env_type": env_type, "domain": domain},
         )
+        environment = _first(Environment, env_id=env_id)
+        if environment is not None:
+            environment.env_type = env_type
+            environment.domain = domain
     db.session.commit()
 
 
@@ -200,14 +300,16 @@ def seed_default_roles():
 
 def seed_default_teams():
     """Seed default teams used by access control and registration."""
-    for team_name in VALID_TEAMS:
+    seed_data = load_host_seed_data()
+    for team_name in seed_data["teams"]:
         _create_if_missing(Team, team_name=team_name)
     db.session.commit()
 
 
 def seed_default_users():
     """Seed default user accounts."""
-    for user_data in DEFAULT_USERS:
+    seed_data = load_host_seed_data()
+    for user_data in seed_data["users"]:
         _create_if_missing(
             User,
             user_id=user_data["user_id"],
@@ -223,7 +325,8 @@ def seed_default_users():
 
 def seed_default_team_memberships():
     """Ensure seeded users have at least one team membership."""
-    for user_data in DEFAULT_USERS:
+    seed_data = load_host_seed_data()
+    for user_data in seed_data["users"]:
         user = _first(User, user_id=user_data["user_id"])
         team = _first(Team, team_name=user_data["team"])
         _seed_team_membership(
@@ -255,7 +358,8 @@ def seed_default_hosts():
 
 def seed_default_server_types():
     """Seed default server type configurations."""
-    for server_data in DEFAULT_SERVER_TYPES:
+    seed_data = load_host_seed_data()
+    for server_data in seed_data["server_types"]:
         _create_if_missing(
             ServerType,
             server_type_key=server_data["server_type_key"],
@@ -272,33 +376,23 @@ def seed_default_environment_host_mappings():
         env = _first(Environment, env_id=env_id) if env_id else None
         server_type = _first(ServerType, server_type_key=mapping_data["server_type_key"])
         host = _resolve_seed_host(mapping_data)
-        if server_type is None or host is None:
-            continue
-
-        env_type = mapping_data.get("env_type") or (env.env_type if env is not None else None)
-        is_shared = bool(mapping_data.get("is_shared", False))
-        if not is_shared and env is None:
+        if env is None or server_type is None or host is None:
             continue
 
         lookup = {
-            "env_type": env_type,
-            "is_shared": is_shared,
+            "env_id": env.env_id,
+            "env_type": mapping_data.get("env_type") or env.env_type,
             "server_type_id": server_type.server_type_id,
         }
-        if is_shared:
-            lookup["env_id"] = None
-        else:
-            lookup["env_id"] = env.env_id
 
         existing = _first(EnvironmentHostMapping, **lookup)
         if existing is None:
             db.session.add(
                 EnvironmentHostMapping(
                     env_id=lookup["env_id"],
-                    env_type=env_type,
+                    env_type=lookup["env_type"],
                     server_type_id=server_type.server_type_id,
                     host_id=host.host_id,
-                    is_shared=is_shared,
                     deployment_user=mapping_data["deployment_user"],
                     deployment_password=mapping_data["deployment_password"],
                 )

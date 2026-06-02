@@ -44,7 +44,7 @@
             return;
         }
         if (deploymentMode === "tools") {
-            showFormMessage("Tool deployments target the configured server role for the selected environment and are checked against existing bookings.", "muted");
+            showFormMessage("Tool deployments use dedicated logical environments such as DEV_TOOL_01 and resolve through their configured host mappings.", "muted");
             return;
         }
         showFormMessage(
@@ -118,57 +118,8 @@
         common.populateEnvironmentOptions({
             selectId: "formEnvId",
             environments: environments,
-            envType: envType,
+            envType: deploymentMode === "tools" ? "" : envType,
         });
-    }
-
-    function syncToolScopeFields() {
-        if (deploymentMode !== "tools") {
-            return;
-        }
-        const scopeType = document.getElementById("formScopeType").value;
-        const envIdGroup = document.getElementById("formEnvIdGroup");
-        const envTypeGroup = document.getElementById("formEnvTypeGroup");
-        const envIdSelect = document.getElementById("formEnvId");
-        const envTypeSelect = document.getElementById("formEnvType");
-
-        envIdGroup.style.display = scopeType === "ENV" ? "block" : "none";
-        envTypeGroup.className = scopeType === "ENV" ? "col-md-6" : "col-md-12";
-        envIdSelect.required = scopeType === "ENV";
-        envTypeSelect.required = true;
-    }
-
-    function syncToolScopeAvailability() {
-        if (deploymentMode !== "tools") {
-            return;
-        }
-
-        const scopeSelect = document.getElementById("formScopeType");
-        const envTypeOption = Array.from(scopeSelect.options).find(function (option) {
-            return option.value === "ENV_TYPE";
-        });
-        const envOption = Array.from(scopeSelect.options).find(function (option) {
-            return option.value === "ENV";
-        });
-        const selectedPackage = getSelectedPackageConfig();
-        const supportedScopes = selectedPackage && selectedPackage.supported_scopes
-            ? selectedPackage.supported_scopes
-            : ["ENV", "ENV_TYPE"];
-
-        if (envTypeOption) {
-            envTypeOption.disabled = supportedScopes.indexOf("ENV_TYPE") === -1;
-        }
-        if (envOption) {
-            envOption.disabled = supportedScopes.indexOf("ENV") === -1;
-        }
-
-        if (scopeSelect.value === "ENV_TYPE" && supportedScopes.indexOf("ENV_TYPE") === -1) {
-            scopeSelect.value = "ENV";
-        } else if (scopeSelect.value === "ENV" && supportedScopes.indexOf("ENV") === -1) {
-            scopeSelect.value = "ENV_TYPE";
-        }
-
-        syncToolScopeFields();
     }
 
     function resetServiceSelections() {
@@ -231,8 +182,6 @@
             componentNames.value = target.packages[0].package_key;
         }
 
-        syncToolScopeAvailability();
-
         if (componentNames.value) {
             loadVersionOptions();
         } else {
@@ -288,18 +237,16 @@
         const targetKey = document.getElementById("formTargetKey").value;
         const selectedPackage = document.getElementById("formComponentNames").value;
         return {
-            env_id: deploymentMode === "tools" && document.getElementById("formScopeType").value === "ENV_TYPE"
-                ? ""
-                : document.getElementById("formEnvId").value,
-            requested_env_type: document.getElementById("formEnvType").value,
+            env_id: document.getElementById("formEnvId").value,
+            requested_env_type: deploymentMode === "tools"
+                ? "TOOLS"
+                : document.getElementById("formEnvType").value,
             planned_start_time: startValue ? new Date(startValue).toISOString() : "",
             description: document.getElementById("formDescription").value.trim(),
             user_timezone: common.getUserTimezone(serverTimezone),
             deployment_request: {
                 target_key: targetKey,
-                env_scope_type: deploymentMode === "tools"
-                    ? document.getElementById("formScopeType").value
-                    : "ENV",
+                env_scope_type: "ENV",
                 requested_version: document.getElementById("formVersion").value.trim(),
                 testing_mode: targetKey === "TCS_APP" ? document.getElementById("formTestingMode").value : "",
                 package_keys: selectedPackage ? [selectedPackage] : [],
@@ -316,14 +263,15 @@
         if (!payload.planned_start_time) {
             return "Planned start time is required.";
         }
-        if (deploymentMode === "tools") {
-            if (!payload.requested_env_type) {
-                return "Environment type is required.";
-            }
-            if (payload.deployment_request.env_scope_type === "ENV" && !payload.env_id) {
-                return "Specific environment is required for environment-scoped tool deployments.";
-            }
-        } else if (!payload.env_id) {
+        if (!payload.env_id) {
+            return deploymentMode === "tools"
+                ? "Tool environment is required."
+                : "Environment is required.";
+        }
+        if (deploymentMode !== "tools" && !payload.requested_env_type) {
+            return "Environment type is required.";
+        }
+        if (deploymentMode !== "tools" && !payload.env_id) {
             return "Environment is required.";
         }
         const deployment = payload.deployment_request;
@@ -389,8 +337,6 @@
         populateEnvOptions("");
         if (deploymentMode === "tools") {
             document.getElementById("formTargetKey").value = "TOOLS";
-            document.getElementById("formScopeType").value = "ENV_TYPE";
-            syncToolScopeFields();
         }
     }
 
@@ -446,15 +392,14 @@
     }
 
     document.addEventListener("DOMContentLoaded", function () {
-        document.getElementById("formEnvType").addEventListener("change", function () {
-            populateEnvOptions(this.value);
-        });
-        if (deploymentMode === "tools") {
-            document.getElementById("formScopeType").addEventListener("change", syncToolScopeFields);
+        const envTypeField = document.getElementById("formEnvType");
+        if (envTypeField) {
+            envTypeField.addEventListener("change", function () {
+                populateEnvOptions(this.value);
+            });
         }
         document.getElementById("formTargetKey").addEventListener("change", loadDeploymentOptions);
         document.getElementById("formComponentNames").addEventListener("change", function () {
-            syncToolScopeAvailability();
             loadVersionOptions();
         });
         document.getElementById("deploymentRequestForm").addEventListener("submit", handleDeploymentSubmit);
@@ -470,7 +415,6 @@
             testingMode.required = false;
         }
         if (deploymentMode === "tools") {
-            syncToolScopeFields();
             loadDeploymentOptions();
         }
         updatePolicyHint();

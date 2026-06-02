@@ -109,6 +109,11 @@ class DeploymentRequestService:
                 selected_package.get("package_name") or
                 selected_package_keys[0]
             )
+        if target_key == "TCS_APP" and len(selected_package_keys or []) == 1:
+            return (
+                deployment_data.get("artifact_name") or
+                selected_package_keys[0]
+            )
         return (
             deployment_data.get("artifact_name") or
             target_key
@@ -222,7 +227,6 @@ class DeploymentRequestService:
         if not target_key:
             return "Deployment target is required."
 
-        env_scope_type = (deployment.get("env_scope_type") or "ENV").strip().upper()
         env_id = (data.get("env_id") or "").strip()
         requested_env_type = (data.get("requested_env_type") or "").strip().upper()
 
@@ -234,28 +238,26 @@ class DeploymentRequestService:
                 target_key
             )
 
-        if not target_supports_scope(target_key, env_scope_type):
+        if not target_supports_scope(target_key, "ENV"):
             return "Deployment target '{}' does not support {} scope.".format(
                 target_key,
-                env_scope_type,
+                "ENV",
             )
 
-        if not packages_support_scope(target_key, package_keys, env_scope_type):
+        if not packages_support_scope(target_key, package_keys, "ENV"):
             return "One or more selected packages do not support {} scope.".format(
-                env_scope_type
+                "ENV"
             )
 
-        if env_scope_type == "ENV_TYPE":
-            if not requested_env_type:
-                return "Environment type is required for shared deployments."
-        else:
-            if not env_id:
-                return "env_id is required."
-            env = Environment.query.filter_by(env_id=env_id).first()
-            if env is None:
-                return "Invalid environment."
-            if not requested_env_type:
-                requested_env_type = (env.env_type or "").strip().upper()
+        if not env_id:
+            return "env_id is required."
+        env = Environment.query.filter_by(env_id=env_id).first()
+        if env is None:
+            return "Invalid environment."
+        if target_key == "TOOLS" and (env.env_type or "").strip().upper() != "TOOLS":
+            return "Invalid tool environment."
+        if not requested_env_type:
+            requested_env_type = (env.env_type or "").strip().upper()
 
         if not deployment.get("requested_version"):
             return "Build/version is required."
@@ -266,14 +268,13 @@ class DeploymentRequestService:
 
     @staticmethod
     def _resolve_request_scope(data, deployment_data):
-        env_scope_type = (deployment_data.get("env_scope_type") or "ENV").strip().upper()
         env_id = (data.get("env_id") or "").strip() or None
         requested_env_type = (data.get("requested_env_type") or "").strip().upper() or None
         if env_id:
             env = Environment.query.filter_by(env_id=env_id).first()
             if env is not None and not requested_env_type:
                 requested_env_type = (env.env_type or "").strip().upper() or requested_env_type
-        return env_scope_type, env_id, requested_env_type
+        return "ENV", env_id, requested_env_type
 
     @staticmethod
     def _env_notification_recipients():
@@ -321,11 +322,7 @@ class DeploymentRequestService:
             "A new deployment request has been raised for the ENV team.",
             "",
             "Request ID: {}".format(deployment_request.deployment_request_id),
-            "Environment: {}".format(
-                deployment_request.env_id
-                if deployment_request.env_scope_type == "ENV"
-                else deployment_request.requested_env_type or "Not provided"
-            ),
+            "Environment: {}".format(deployment_request.env_id or "Not provided"),
             "Requested by: {}".format(
                 requester.name if requester and requester.name else deployment_request.requested_by
             ),

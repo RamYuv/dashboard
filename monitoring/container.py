@@ -13,6 +13,8 @@ class AppContainer:
         from monitoring.services.status_aggregator import EnvStatusAggregator
         from monitoring.services.status_fetcher import VmStatusFetcher
         from monitoring.worker import EnvMonitorWorker
+        from monitoring.services.version_fetcher import VersionFetcher
+        from monitoring.version_pull_worker import VersionPullWorker
 
         self.app = app
         self.monitor_state = monitor_state
@@ -29,3 +31,6 @@ class AppContainer:
             status_fetcher=self.vm_status_fetcher,
             status_aggregator=self.env_status_aggregator,
         )
+
+        self.version_fetcher = VersionFetcher(executor=self.remote_executor)
+        self.version_worker = VersionPullWorker(app=self.app, version_fetcher=self.version_fetcher)

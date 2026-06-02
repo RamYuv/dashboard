@@ -3,7 +3,7 @@ Application-wide constants and configuration values.
 """
 
 # Team Definitions
-VALID_TEAMS = ["alpha", "beta", "support", "qa", "env", "access_admin"]
+VALID_TEAMS = ["alpha", "beta", "support", "qa", "env", "dev", "access_admin"]
 VALID_BOOKING_TYPES = ["RESERVATION"]
 
 BOOKING_STATUS = {
@@ -27,56 +27,6 @@ BOOKING_STATUS_ALIASES = {
 BOOKING_MUTABLE_LIFECYCLE_STATUSES = {
     BOOKING_LIFECYCLE_STATUS["SCHEDULED"],
 }
-
-# Default Seed Data
-DEFAULT_ENVIRONMENTS = [
-    ("DEV-01", "DEV"),
-    ("DEV-02", "DEV"),
-    ("ST-01", "ST"),
-    ("QA-01", "QA"),
-    ("QA-02", "QA"),
-    ("UAT-01", "UAT"),
-    ("PERF-01", "PERF"),
-]
-
-DEFAULT_USERS = [
-    {
-        "user_id": "admin",
-        "email_id": "admin@example.com",
-        "name": "Admin User",
-        "password": "adminpass",
-        "team": "env",
-        "role": "admin",
-        "team_lead": 0,
-    },
-    {
-        "user_id": "qa1",
-        "email_id": "qa1@example.com",
-        "name": "QA User",
-        "password": "qapass",
-        "team": "qa",
-        "role": "user",
-        "team_lead": 1,
-    },
-    {
-        "user_id": "user1",
-        "email_id": "user1@example.com",
-        "name": "user1",
-        "password": "userpass",
-        "team": "alpha",
-        "role": "user",
-        "team_lead": 0,
-    },
-]
-
-DEFAULT_SERVER_TYPES = [
-    {"server_type_key": "Core", "target_type": "TCS_APP"},
-    {"server_type_key": "Getway", "target_type": "TCS_APP"},
-    {"server_type_key": "PAYApp", "target_type": "PAYAPP"},
-    {"server_type_key": "CoreDb", "target_type": "DB"},
-    {"server_type_key": "LGDB", "target_type": "DB"},
-    {"server_type_key": "Tool_server", "target_type": "TOOLS"},
-]
 
 # Component Version Definitions
 COMPONENT_VERSIONS = {

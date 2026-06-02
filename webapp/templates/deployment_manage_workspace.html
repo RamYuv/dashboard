@@ -1,6 +1,6 @@
 {% extends "booking_workspace_base.html" %}
 {% set workspace_nav = "deployment_manage" %}
-{% block workspace_title %}ENV Deployment Queue{% endblock %}
+{% block workspace_title %}Deployment Operations{% endblock %}
 {% block workspace_styles %}
 .table-actions {
     display: flex;
@@ -23,15 +23,15 @@
     <div class="workspace-card">
         <div class="workspace-card-header">
             <i class="fas fa-diagram-project"></i>
-            <h5>ENV Deployment Queue</h5>
+            <h5>Deployment Operations</h5>
         </div>
         <div class="workspace-card-body">
             {% if not env_dashboard_enabled %}
             <div class="alert alert-warning mb-0">
-                This dashboard is available only to the ENV team.
+                This screen is available only to ENV team members.
             </div>
             {% else %}
-            <div id="pageMessage" class="form-message muted" style="display: none;">
+            <div id="pageMessage" class="form-message muted" style="display: none;" aria-live="polite">
                 <i class="fas fa-info-circle"></i>
                 <span id="pageMessageText">Review OPEN requests and progress them through deployment.</span>
             </div>
@@ -53,7 +53,7 @@
                     </div>
                     <div class="col-md-4">
                         <label for="searchFilter" class="form-label">Search</label>
-                        <input id="searchFilter" class="form-control" placeholder="Env, request id, user, target...">
+                        <input id="searchFilter" class="form-control" type="search" placeholder="Env, request id, user, target...">
                     </div>
                     <div class="col-md-4 d-flex align-items-end">
                         <button type="button" id="refreshQueueBtn" class="btn btn-outline-secondary-custom w-100">

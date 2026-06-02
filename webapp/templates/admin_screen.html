@@ -1,17 +1,176 @@
 {% extends "base.html" %}
 {% block title %}{{ title }}{% endblock %}
+{% block main_class %}container-fluid px-3 px-lg-4 pt-2 pb-4{% endblock %}
+{% block extra_head %}
+<style>
+    .admin-page {
+        max-width: 1480px;
+        margin: 0 auto;
+    }
+
+    .admin-sticky-header {
+        top: var(--app-shell-header-height);
+    }
+
+    .admin-hero.card,
+    .admin-panel.card {
+        border: 1px solid #e4ebf3;
+        border-radius: 20px;
+        box-shadow: 0 8px 24px rgba(16, 36, 71, 0.08) !important;
+    }
+
+    .admin-hero .card-body,
+    .admin-panel .card-body {
+        padding: 1rem 1.1rem;
+    }
+
+    .admin-hero .card-body {
+        padding: 0.55rem 1rem 0.65rem;
+    }
+
+    .admin-title-row {
+        display: flex;
+        flex-direction: column;
+        gap: 0.05rem;
+    }
+
+    .admin-title-row h1 {
+        font-size: clamp(1.7rem, 2.4vw, 2.4rem);
+        margin: 0;
+        line-height: 1.08;
+        color: #243041;
+    }
+
+    .admin-title-row p {
+        margin: 0;
+        max-width: 56rem;
+        color: #5f6c7b;
+    }
+
+    .admin-actions .btn {
+        border-radius: 12px;
+        padding: 0.7rem 1rem;
+        font-weight: 600;
+    }
+
+    .admin-tabs {
+        flex-wrap: nowrap !important;
+        overflow-x: auto;
+        padding-bottom: 0;
+        scrollbar-width: thin;
+    }
+
+    .admin-tabs .nav-link {
+        background: transparent;
+        border: 1px solid transparent;
+        color: #33506f;
+        font-weight: 600;
+        padding: 0.52rem 0.82rem;
+        white-space: nowrap;
+    }
+
+    .admin-tabs .nav-link:hover {
+        background: #f2f6fb;
+        border-color: #dce6f2;
+    }
+
+    .admin-tabs .nav-link.active {
+        background: #1f6feb;
+        color: #ffffff;
+        box-shadow: none;
+    }
+
+    .admin-panel h2 {
+        margin-bottom: 0.3rem;
+        color: #243041;
+    }
+
+    .admin-panel .form-label {
+        font-size: 0.92rem;
+        margin-bottom: 0.35rem;
+        color: #415164;
+    }
+
+    .admin-panel .form-control,
+    .admin-panel .form-select {
+        border-radius: 10px;
+        border-color: #d8e2ef;
+        padding: 0.62rem 0.8rem;
+        box-shadow: none;
+    }
+
+    .admin-panel .form-control:focus,
+    .admin-panel .form-select:focus {
+        border-color: #76a9fa;
+        box-shadow: 0 0 0 0.18rem rgba(31, 111, 235, 0.12);
+    }
+
+    .admin-panel .form-text,
+    .admin-panel .form-check-label {
+        color: #66768a;
+    }
+
+    .admin-table-wrap {
+        max-height: 34rem;
+    }
+
+    .admin-table-wrap table {
+        margin-bottom: 0;
+    }
+
+    .admin-table-wrap thead th {
+        font-size: 0.84rem;
+        letter-spacing: 0.01em;
+        color: #304256;
+        background: #f8fbff;
+    }
+
+    .admin-table-wrap tbody td {
+        vertical-align: middle;
+        color: #2f3e4f;
+    }
+
+    .admin-form-panel {
+        top: calc(var(--app-shell-header-height) + 8.75rem);
+    }
+
+    .admin-form-panel .card-body {
+        padding-left: 1.6rem;
+        padding-right: 1.1rem;
+    }
+
+    @media (max-width: 991.98px) {
+        .admin-page {
+            max-width: none;
+        }
+
+        .admin-hero .card-body,
+        .admin-panel .card-body {
+            padding: 0.95rem;
+        }
+
+        .admin-form-panel .card-body {
+            padding-left: 0.95rem;
+            padding-right: 0.95rem;
+        }
+
+        .admin-form-panel {
+            top: auto;
+        }
+    }
+</style>
+{% endblock %}
 {% block content %}
 <div class="admin-page">
-<div class="admin-sticky-header mb-4">
-    <div class="card shadow-sm border-0">
+<div class="admin-sticky-header mb-2">
+    <div class="card shadow-sm border-0 admin-hero">
         <div class="card-body">
-            <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
-                <div>
-                    <p class="badge text-bg-success mb-2">Admin Workspace</p>
-                    <h1 class="h2 mb-1">Configuration Data Management</h1>
-                    <p class="text-muted mb-0">Add core setup records for teams, environments, hosts, server types, mappings, and component builds.</p>
+            <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2">
+                <div class="admin-title-row">
+                    <h1>Configuration Data Management</h1>
+                    <p>Add core setup records for teams, environments, hosts, server types, mappings, and component builds.</p>
                 </div>
-                <div class="d-flex flex-wrap gap-2">
+                <div class="d-flex flex-wrap gap-2 admin-actions">
                     <a href="{{ url_for('main.user_management_screen') }}" class="btn btn-primary">
                         <i class="fas fa-user-shield me-2"></i>User Management
                     </a>
@@ -20,7 +179,7 @@
                     </a>
                 </div>
             </div>
-            <ul class="nav nav-pills flex-wrap gap-2 mt-4 admin-tabs">
+            <ul class="nav nav-pills flex-wrap gap-2 mt-2 admin-tabs">
                 {% set tab_labels = {
                     "users": "Users",
                     "roles": "Roles",
@@ -155,7 +314,7 @@
 </div>
 {% elif active_tab == "roles" %}
 <div class="row g-4">
-    <div class="col-lg-4">
+    <div class="col-lg-4 col-xl-3">
         <div class="card shadow-sm border-0 admin-panel admin-form-panel">
             <div class="card-body">
                 <h2 class="h5 mb-3">Add Role</h2>
@@ -179,7 +338,7 @@
             </div>
         </div>
     </div>
-    <div class="col-lg-8">
+    <div class="col-lg-8 col-xl-9">
         <div class="card shadow-sm border-0 admin-panel">
             <div class="card-body">
                 <h2 class="h5 mb-3">Existing Roles</h2>
@@ -206,7 +365,7 @@
 </div>
 {% elif active_tab == "teams" %}
 <div class="row g-4">
-    <div class="col-lg-4">
+    <div class="col-lg-4 col-xl-3">
         <div class="card shadow-sm border-0 admin-panel admin-form-panel">
             <div class="card-body">
                 <h2 class="h5 mb-3">Add Team</h2>
@@ -226,7 +385,7 @@
             </div>
         </div>
     </div>
-    <div class="col-lg-8">
+    <div class="col-lg-8 col-xl-9">
         <div class="card shadow-sm border-0 admin-panel">
             <div class="card-body">
                 <h2 class="h5 mb-3">Existing Teams</h2>
@@ -252,7 +411,7 @@
 </div>
 {% elif active_tab == "environments" %}
 <div class="row g-4">
-    <div class="col-lg-4">
+    <div class="col-lg-4 col-xl-3">
         <div class="card shadow-sm border-0 admin-panel admin-form-panel">
             <div class="card-body">
                 <h2 class="h5 mb-3">Add Environment</h2>
@@ -268,6 +427,10 @@
                         <input class="form-control" id="env_type" name="env_type" required>
                     </div>
                     <div class="mb-3">
+                        <label class="form-label" for="env_domain">Domain Team</label>
+                        <input class="form-control" id="env_domain" name="domain" placeholder="env, dev, qa">
+                    </div>
+                    <div class="mb-3">
                         <label class="form-label" for="env_description">Description</label>
                         <textarea class="form-control" id="env_description" name="description" rows="3"></textarea>
                     </div>
@@ -280,23 +443,24 @@
             </div>
         </div>
     </div>
-    <div class="col-lg-8">
+    <div class="col-lg-8 col-xl-9">
         <div class="card shadow-sm border-0 admin-panel">
             <div class="card-body">
                 <h2 class="h5 mb-3">Existing Environments</h2>
                 <div class="table-responsive admin-table-wrap">
                     <table class="table align-middle">
-                        <thead><tr><th>Env ID</th><th>Type</th><th>Description</th><th>Active</th></tr></thead>
+                        <thead><tr><th>Env ID</th><th>Type</th><th>Domain</th><th>Description</th><th>Active</th></tr></thead>
                         <tbody>
                         {% for environment in environments %}
                             <tr>
                                 <td>{{ environment.env_id }}</td>
                                 <td>{{ environment.env_type }}</td>
+                                <td>{{ environment.domain or "-" }}</td>
                                 <td>{{ environment.description or "-" }}</td>
                                 <td>{{ "Yes" if environment.is_active else "No" }}</td>
                             </tr>
                         {% else %}
-                            <tr><td colspan="4" class="text-muted">No environments found.</td></tr>
+                            <tr><td colspan="5" class="text-muted">No environments found.</td></tr>
                         {% endfor %}
                         </tbody>
                     </table>
@@ -307,7 +471,7 @@
 </div>
 {% elif active_tab == "hosts" %}
 <div class="row g-4">
-    <div class="col-lg-4">
+    <div class="col-lg-4 col-xl-3">
         <div class="card shadow-sm border-0 admin-panel admin-form-panel">
             <div class="card-body">
                 <h2 class="h5 mb-3">Add Host</h2>
@@ -339,7 +503,7 @@
             </div>
         </div>
     </div>
-    <div class="col-lg-8">
+    <div class="col-lg-8 col-xl-9">
         <div class="card shadow-sm border-0 admin-panel">
             <div class="card-body">
                 <h2 class="h5 mb-3">Existing Hosts</h2>
@@ -367,7 +531,7 @@
 </div>
 {% elif active_tab == "server_types" %}
 <div class="row g-4">
-    <div class="col-lg-4">
+    <div class="col-lg-4 col-xl-3">
         <div class="card shadow-sm border-0 admin-panel admin-form-panel">
             <div class="card-body">
                 <h2 class="h5 mb-3">Add ServerType</h2>
@@ -391,7 +555,7 @@
             </div>
         </div>
     </div>
-    <div class="col-lg-8">
+    <div class="col-lg-8 col-xl-9">
         <div class="card shadow-sm border-0 admin-panel">
             <div class="card-body">
                 <h2 class="h5 mb-3">Existing Server Types</h2>
@@ -418,7 +582,7 @@
 </div>
 {% elif active_tab == "environment_host_mappings" %}
 <div class="row g-4">
-    <div class="col-lg-5">
+    <div class="col-lg-5 col-xl-4">
         <div class="card shadow-sm border-0 admin-panel admin-form-panel">
             <div class="card-body">
                 <h2 class="h5 mb-3">Add EnvironmentHostMapping</h2>
@@ -427,21 +591,13 @@
                     <input type="hidden" name="tab" value="environment_host_mappings">
                     <div class="mb-3">
                         <label class="form-label" for="mapping_env_id">Environment</label>
-                        <select class="form-select" id="mapping_env_id" name="env_id">
+                        <select class="form-select" id="mapping_env_id" name="env_id" required>
                             <option value="">Select environment</option>
                             {% for environment in mapping_environment_options %}
                                 <option value="{{ environment.env_id }}">{{ environment.env_id }} ({{ environment.env_type }})</option>
                             {% endfor %}
                         </select>
-                        <div class="form-text">Leave blank for shared mappings.</div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label" for="mapping_env_type">Environment Type</label>
-                        <input class="form-control" id="mapping_env_type" name="env_type">
-                    </div>
-                    <div class="form-check mb-3">
-                        <input class="form-check-input" type="checkbox" id="mapping_shared" name="is_shared">
-                        <label class="form-check-label" for="mapping_shared">Shared by environment type</label>
+                        <div class="form-text">Every mapping must belong to one concrete environment.</div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label" for="mapping_server_type_id">ServerType</label>
@@ -474,25 +630,24 @@
             </div>
         </div>
     </div>
-    <div class="col-lg-7">
+    <div class="col-lg-7 col-xl-8">
         <div class="card shadow-sm border-0 admin-panel">
             <div class="card-body">
                 <h2 class="h5 mb-3">Existing EnvironmentHostMappings</h2>
                 <div class="table-responsive admin-table-wrap">
                     <table class="table align-middle">
-                        <thead><tr><th>Env</th><th>Type</th><th>Shared</th><th>ServerType</th><th>Host</th><th>Deploy User</th></tr></thead>
+                        <thead><tr><th>Env</th><th>Type</th><th>ServerType</th><th>Host</th><th>Deploy User</th></tr></thead>
                         <tbody>
                         {% for mapping in environment_host_mappings %}
                             <tr>
-                                <td>{{ mapping.env_id or "-" }}</td>
+                                <td>{{ mapping.env_id }}</td>
                                 <td>{{ mapping.env_type or "-" }}</td>
-                                <td>{{ "Yes" if mapping.is_shared else "No" }}</td>
                                 <td>{{ mapping.server_type.server_type_key if mapping.server_type else "-" }}</td>
                                 <td>{% if mapping.host %}{{ mapping.host.hostname }}{% if mapping.host.ip_address %} ({{ mapping.host.ip_address }}){% endif %}{% else %}-{% endif %}</td>
                                 <td>{{ mapping.deployment_user or "-" }}</td>
                             </tr>
                         {% else %}
-                            <tr><td colspan="6" class="text-muted">No mappings found.</td></tr>
+                            <tr><td colspan="5" class="text-muted">No mappings found.</td></tr>
                         {% endfor %}
                         </tbody>
                     </table>
@@ -503,7 +658,7 @@
 </div>
 {% elif active_tab == "component_builds" %}
 <div class="row g-4">
-    <div class="col-lg-4">
+    <div class="col-lg-4 col-xl-3">
         <div class="card shadow-sm border-0 admin-panel admin-form-panel">
             <div class="card-body">
                 <h2 class="h5 mb-3">Add ComponentBuild</h2>
@@ -530,18 +685,30 @@
                         <label class="form-label" for="artifact_path">Artifact Path</label>
                         <input class="form-control" id="artifact_path" name="artifact_path">
                     </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="artifact_size_bytes">Artifact Size (bytes)</label>
+                        <input class="form-control" id="artifact_size_bytes" name="artifact_size_bytes" type="number">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="checksum">Checksum</label>
+                        <input class="form-control" id="checksum" name="checksum">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="build_metadata">Build Metadata (JSON)</label>
+                        <textarea class="form-control" id="build_metadata" name="build_metadata" rows="3"></textarea>
+                    </div>
                     <button class="btn btn-primary w-100" type="submit">Save ComponentBuild</button>
                 </form>
             </div>
         </div>
     </div>
-    <div class="col-lg-8">
+    <div class="col-lg-8 col-xl-9">
         <div class="card shadow-sm border-0 admin-panel">
             <div class="card-body">
                 <h2 class="h5 mb-3">Existing ComponentBuilds</h2>
                 <div class="table-responsive admin-table-wrap">
                     <table class="table align-middle">
-                        <thead><tr><th>Target</th><th>Build</th><th>Version</th><th>Artifact</th><th>Path</th></tr></thead>
+                        <thead><tr><th>Target</th><th>Build</th><th>Version</th><th>Artifact</th><th>Path</th><th>Size</th><th>Checksum</th></tr></thead>
                         <tbody>
                         {% for build in component_builds %}
                             <tr>
@@ -550,9 +717,11 @@
                                 <td>{{ build.version }}</td>
                                 <td>{{ build.artifact_name or "-" }}</td>
                                 <td class="text-break">{{ build.artifact_path or "-" }}</td>
+                                <td>{{ build.artifact_size_bytes or "-" }}</td>
+                                <td class="text-break">{{ build.checksum or "-" }}</td>
                             </tr>
                         {% else %}
-                            <tr><td colspan="5" class="text-muted">No component builds found.</td></tr>
+                            <tr><td colspan="7" class="text-muted">No component builds found.</td></tr>
                         {% endfor %}
                         </tbody>
                     </table>

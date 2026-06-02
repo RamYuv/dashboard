@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}{{ title }}{% endblock %}
+{% block main_class %}container-fluid px-0 pt-0 pb-4{% endblock %}
 {% block extra_head %}
 <style>
     :root {
@@ -18,6 +19,9 @@
         --um-chip-violet-bg: #efe9ff;
         --um-chip-violet-text: #6d41d8;
         --um-shadow: 0 18px 40px rgba(27, 44, 94, 0.08);
+        --um-sidebar-width: 248px;
+        --um-layout-gap: 14px;
+        --um-sticky-top: var(--app-shell-header-height);
     }
 
     body {
@@ -29,34 +33,37 @@
     }
 
     .user-mgmt-wrap {
-        max-width: 1360px;
-        margin: 0 auto;
+        width: 100%;
+        margin: 0;
+        padding-top: 0;
     }
 
     .user-mgmt-shell {
-        display: grid;
-        grid-template-columns: 220px minmax(0, 1fr);
-        gap: 22px;
-        align-items: start;
+        position: relative;
+        min-height: calc(100vh - var(--um-sticky-top));
     }
 
     .user-mgmt-sidebar {
-        position: sticky;
-        top: 24px;
-        min-height: calc(100vh - 48px);
-        border-radius: 24px;
-        padding: 24px 18px;
+        position: fixed;
+        top: var(--um-sticky-top);
+        left: 0;
+        width: var(--um-sidebar-width);
+        height: calc(100vh - var(--um-sticky-top) - 0.5rem);
+        overflow-y: auto;
+        border-radius: 0 18px 18px 0;
+        padding: 16px 14px;
         background: linear-gradient(180deg, #14213d 0%, #16294c 100%);
         color: #f7fbff;
-        box-shadow: var(--um-shadow);
+        box-shadow: 0 10px 24px rgba(27, 44, 94, 0.08);
+        z-index: 1040;
     }
 
     .brand-lockup {
         display: flex;
         align-items: center;
-        gap: 12px;
-        margin-bottom: 26px;
-        font-size: 1.15rem;
+        justify-content: center;
+        margin-bottom: 16px;
+        font-size: 0.98rem;
         font-weight: 700;
     }
 
@@ -73,15 +80,15 @@
     .side-nav {
         display: flex;
         flex-direction: column;
-        gap: 10px;
+        gap: 6px;
     }
 
     .side-link {
         display: flex;
         align-items: center;
         gap: 12px;
-        padding: 13px 14px;
-        border-radius: 14px;
+        padding: 11px 12px;
+        border-radius: 12px;
         color: #edf4ff;
         text-decoration: none;
         font-weight: 600;
@@ -96,25 +103,34 @@
 
     .sidebar-footer {
         margin-top: auto;
-        padding-top: 20px;
+        padding-top: 14px;
         color: rgba(237, 244, 255, 0.72);
-        font-size: 0.88rem;
+        font-size: 0.84rem;
     }
 
     .content-area {
         min-width: 0;
+        margin-left: calc(var(--um-sidebar-width) + var(--um-layout-gap));
+        padding: 0 12px 0 0;
     }
 
     .page-hero {
         display: flex;
         justify-content: space-between;
         align-items: flex-start;
-        gap: 18px;
-        margin-bottom: 18px;
+        gap: 14px;
+        margin-bottom: 10px;
+        padding: 0.65rem 0.85rem 0.8rem 0;
+        position: sticky;
+        top: var(--um-sticky-top);
+        z-index: 1030;
+        background:
+            linear-gradient(180deg, rgba(249, 251, 255, 0.98), rgba(244, 247, 252, 0.92));
+        backdrop-filter: blur(8px);
     }
 
     .page-title {
-        font-size: clamp(2rem, 3vw, 2.65rem);
+        font-size: clamp(1.8rem, 2.7vw, 2.35rem);
         font-weight: 800;
         margin: 0;
         letter-spacing: -0.03em;
@@ -122,61 +138,31 @@
 
     .page-subtitle {
         color: var(--um-muted);
-        margin: 8px 0 0;
-        font-size: 1rem;
+        margin: 3px 0 0;
+        font-size: 0.93rem;
     }
 
     .hero-actions {
         display: flex;
-        flex-wrap: wrap;
-        gap: 12px;
-    }
-
-    .hero-btn {
-        display: inline-flex;
         align-items: center;
         gap: 10px;
-        padding: 12px 18px;
-        border-radius: 14px;
-        border: 1px solid var(--um-line);
-        background: var(--um-surface);
-        color: var(--um-text);
-        text-decoration: none;
-        font-weight: 700;
-        box-shadow: 0 10px 24px rgba(27, 44, 94, 0.05);
-    }
-
-    .hero-btn:hover {
-        color: var(--um-text);
-        text-decoration: none;
-        transform: translateY(-1px);
-    }
-
-    .hero-btn-primary {
-        border-color: var(--um-primary);
-        background: linear-gradient(135deg, var(--um-primary), var(--um-primary-deep));
-        color: #ffffff;
-    }
-
-    .hero-btn-primary:hover {
-        color: #ffffff;
     }
 
     .management-panel {
         border: 1px solid var(--um-line);
-        border-radius: 24px;
+        border-radius: 20px;
         background: rgba(255, 255, 255, 0.9);
-        box-shadow: var(--um-shadow);
+        box-shadow: 0 10px 24px rgba(27, 44, 94, 0.06);
         overflow: hidden;
     }
 
     .panel-toolbar {
         display: flex;
         flex-wrap: wrap;
-        gap: 14px;
+        gap: 12px;
         justify-content: space-between;
         align-items: center;
-        padding: 18px;
+        padding: 12px 14px;
         border-bottom: 1px solid var(--um-line);
         background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 251, 255, 0.96));
     }
@@ -188,16 +174,34 @@
         align-items: center;
     }
 
+    .toolbar-group.filters-group {
+        flex: 1 1 auto;
+        flex-wrap: nowrap;
+    }
+
     .search-shell {
         position: relative;
-        min-width: 320px;
+        min-width: 280px;
+        flex: 1 1 320px;
     }
 
     .search-shell .form-control,
     .toolbar-select {
-        border-radius: 14px;
+        border-radius: 12px;
         border-color: var(--um-line);
-        min-height: 48px;
+        min-height: 40px;
+    }
+
+    .toolbar-select-group {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex: 0 0 auto;
+    }
+
+    .toolbar-select-group .toolbar-label {
+        margin: 0;
+        white-space: nowrap;
     }
 
     .search-shell .form-control {
@@ -219,9 +223,9 @@
     }
 
     .toolbar-btn {
-        border-radius: 14px;
-        min-height: 48px;
-        padding: 0 18px;
+        border-radius: 12px;
+        min-height: 40px;
+        padding: 0 14px;
         font-weight: 700;
     }
 
@@ -233,14 +237,14 @@
         border-bottom: 1px solid var(--um-line);
         background: linear-gradient(180deg, #fbfdff 0%, #f2f6fb 100%);
         color: #415168;
-        font-size: 0.86rem;
+        font-size: 0.82rem;
         font-weight: 800;
-        padding: 14px 16px;
+        padding: 10px 14px;
         white-space: nowrap;
     }
 
     .user-table tbody td {
-        padding: 18px 16px;
+        padding: 11px 14px;
         border-top: 1px solid #edf2f8;
         vertical-align: middle;
     }
@@ -252,18 +256,18 @@
     .user-summary {
         display: flex;
         align-items: center;
-        gap: 14px;
+        gap: 12px;
     }
 
     .avatar-badge {
-        width: 48px;
-        height: 48px;
+        width: 42px;
+        height: 42px;
         border-radius: 50%;
         display: inline-flex;
         align-items: center;
         justify-content: center;
         font-weight: 800;
-        font-size: 1rem;
+        font-size: 0.92rem;
         background: linear-gradient(135deg, #ece8ff, #dce9ff);
         color: #4d4dd8;
         flex: 0 0 auto;
@@ -276,15 +280,15 @@
 
     .user-id {
         color: var(--um-muted);
-        font-size: 0.88rem;
-        margin-top: 3px;
+        font-size: 0.84rem;
+        margin-top: 2px;
     }
 
     .role-pill {
         display: inline-flex;
         align-items: center;
-        border-radius: 12px;
-        padding: 8px 12px;
+        border-radius: 10px;
+        padding: 7px 10px;
         background: var(--um-chip-violet-bg);
         color: var(--um-chip-violet-text);
         font-weight: 700;
@@ -299,9 +303,9 @@
     .team-chip {
         display: inline-flex;
         align-items: center;
-        border-radius: 12px;
-        padding: 8px 11px;
-        font-size: 0.84rem;
+        border-radius: 10px;
+        padding: 6px 9px;
+        font-size: 0.78rem;
         font-weight: 700;
     }
 
@@ -321,13 +325,32 @@
     }
 
     .edit-btn {
-        width: 42px;
-        height: 42px;
-        border-radius: 12px;
+        min-height: 38px;
+        border-radius: 10px;
         border: 1px solid var(--um-line);
         background: #ffffff;
         color: var(--um-text);
-        box-shadow: 0 8px 16px rgba(27, 44, 94, 0.05);
+        box-shadow: 0 6px 14px rgba(27, 44, 94, 0.04);
+        padding: 0 12px;
+        font-weight: 700;
+    }
+
+    .action-cell {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    .delete-inline-form {
+        margin: 0;
+    }
+
+    .delete-btn {
+        min-height: 38px;
+        border-radius: 10px;
+        padding: 0 12px;
+        font-weight: 700;
     }
 
     .table-footer {
@@ -335,26 +358,57 @@
         justify-content: space-between;
         gap: 12px;
         align-items: center;
-        padding: 16px 18px 20px;
+        padding: 12px 14px 14px;
         color: var(--um-muted);
-        font-size: 0.95rem;
+        font-size: 0.9rem;
         border-top: 1px solid var(--um-line);
+    }
+
+    .table-footer-actions {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .pagination-shell {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    .pagination-status {
+        min-width: 120px;
+        text-align: center;
+        font-weight: 700;
+        color: #415168;
+    }
+
+    .modal.show {
+        background: rgba(13, 22, 43, 0.18);
+        backdrop-filter: blur(5px);
+    }
+
+    .modal-dialog.modal-xl {
+        max-width: 960px;
     }
 
     .modal-content {
         border: 0;
-        border-radius: 24px;
-        box-shadow: 0 28px 60px rgba(27, 44, 94, 0.22);
+        border-radius: 20px;
+        box-shadow: 0 24px 56px rgba(27, 44, 94, 0.2);
         overflow: hidden;
     }
 
     .modal-header {
         border-bottom: 1px solid var(--um-line);
-        padding: 20px 24px 16px;
+        padding: 16px 20px 12px;
     }
 
     .modal-body {
-        padding: 22px 24px 24px;
+        padding: 16px 18px 18px;
         background: linear-gradient(180deg, #ffffff 0%, #f9fbff 100%);
     }
 
@@ -364,9 +418,9 @@
 
     .section-card {
         border: 1px solid var(--um-line);
-        border-radius: 18px;
+        border-radius: 16px;
         background: rgba(255, 255, 255, 0.95);
-        padding: 18px;
+        padding: 14px;
         height: 100%;
     }
 
@@ -431,9 +485,9 @@
     }
 
     .access-preview {
-        margin-top: 16px;
-        padding: 14px;
-        border-radius: 16px;
+        margin-top: 14px;
+        padding: 12px;
+        border-radius: 14px;
         background: var(--um-surface-soft);
         border: 1px dashed var(--um-line);
     }
@@ -451,7 +505,7 @@
 
     .modal-footer {
         border-top: 1px solid var(--um-line);
-        padding: 16px 24px 22px;
+        padding: 12px 18px 16px;
         background: #ffffff;
     }
 
@@ -463,12 +517,28 @@
 
     @media (max-width: 1100px) {
         .user-mgmt-shell {
-            grid-template-columns: 1fr;
+            min-height: auto;
         }
 
         .user-mgmt-sidebar {
-            min-height: auto;
             position: static;
+            width: auto;
+            height: auto;
+            border-radius: 16px;
+            margin: 0 12px 12px;
+            z-index: auto;
+        }
+
+        .content-area {
+            margin-left: 0;
+            padding: 0 12px;
+        }
+
+        .page-hero {
+            position: static;
+            background: transparent;
+            backdrop-filter: none;
+            padding-top: 0;
         }
     }
 
@@ -493,6 +563,31 @@
             flex: 1 1 auto;
         }
 
+        .toolbar-group.filters-group {
+            flex-wrap: wrap;
+        }
+
+        .toolbar-select-group {
+            width: 100%;
+        }
+
+        .toolbar-select-group .toolbar-label {
+            min-width: 42px;
+        }
+
+        .toolbar-select-group .toolbar-select {
+            width: 100%;
+        }
+
+        .table-footer-actions,
+        .pagination-shell {
+            justify-content: flex-start;
+        }
+
+        .pagination-status {
+            width: 100%;
+        }
+
         .team-grid {
             grid-template-columns: 1fr;
         }
@@ -505,7 +600,6 @@
         <aside class="user-mgmt-sidebar d-flex flex-column">
             <div class="brand-lockup">
                 <i class="fas fa-shield-alt"></i>
-                <span>Company</span>
             </div>
 
             <nav class="side-nav">
@@ -536,29 +630,42 @@
                     <p class="page-subtitle">Manage users, roles, and team/group assignments.</p>
                 </div>
                 <div class="hero-actions">
-                    <a class="hero-btn" href="{{ url_for('main.admin_screen', tab='teams') }}">
-                        <i class="fas fa-users-cog"></i> Create Team/Group
-                    </a>
-                    <a class="hero-btn hero-btn-primary" href="{{ url_for('main.environment_health') }}">
-                        <i class="fas fa-arrow-left"></i> Back
-                    </a>
+                    <button
+                        class="btn btn-primary toolbar-btn"
+                        type="button"
+                        data-bs-toggle="modal"
+                        data-bs-target="#addUserModal"
+                    >
+                        <i class="fas fa-user-plus me-2"></i>Add User
+                    </button>
                 </div>
             </div>
 
             <div class="management-panel">
                 <div class="panel-toolbar">
-                    <div class="toolbar-group">
+                    <div class="toolbar-group filters-group">
                         <div class="search-shell">
                             <i class="fas fa-search"></i>
                             <input id="userSearchInput" class="form-control" type="text" placeholder="Search by name or email...">
                         </div>
-                        <span class="toolbar-label">Role</span>
-                        <select id="roleFilterSelect" class="form-select toolbar-select" style="min-width: 180px;">
-                            <option value="">All</option>
-                            {% for role_name in valid_roles %}
-                                <option value="{{ role_name }}">{{ role_name|upper }}</option>
-                            {% endfor %}
-                        </select>
+                        <div class="toolbar-select-group">
+                            <span class="toolbar-label">Role</span>
+                            <select id="roleFilterSelect" class="form-select toolbar-select" style="min-width: 180px;">
+                                <option value="">All</option>
+                                {% for role_name in valid_roles %}
+                                    <option value="{{ role_name }}">{{ role_name|upper }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="toolbar-select-group">
+                            <span class="toolbar-label">Team</span>
+                            <select id="teamFilterSelect" class="form-select toolbar-select" style="min-width: 200px;">
+                                <option value="">All</option>
+                                {% for team in teams %}
+                                    <option value="{{ team.team_name|lower }}">{{ team.team_name|upper }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
                     </div>
                     <div class="toolbar-group">
                         <button id="refreshUserTable" class="btn btn-outline-primary toolbar-btn" type="button">
@@ -574,9 +681,9 @@
                             <tr>
                                 <th>Name</th>
                                 <th>Email</th>
-                                <th>Global Role</th>
-                                <th>Lead Teams</th>
-                                <th>Teams / Groups</th>
+                                <th>Role</th>
+                                <th>Team Membership</th>
+                                <th>Team Lead</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -586,6 +693,7 @@
                                     class="user-row"
                                     data-role="{{ (user.role or '')|lower }}"
                                     data-search="{{ ((user.full_name or '') ~ ' ' ~ (user.user_id or '') ~ ' ' ~ (user.email_id or ''))|lower }}"
+                                    data-teams="{% if user.team_names %}{% for team_name in user.team_names %}{{ team_name|lower }}{% if not loop.last %}||{% endif %}{% endfor %}{% endif %}"
                                 >
                                     <td>
                                         <div class="user-summary">
@@ -602,16 +710,6 @@
                                     <td><span class="role-pill">{{ user.role|upper }}</span></td>
                                     <td>
                                         <div class="chip-list">
-                                            {% for membership in user.team_memberships if membership.team_lead and membership.team %}
-                                                <span class="team-chip green">{{ membership.team.team_name|upper }}</span>
-                                            {% endfor %}
-                                            {% if not user.is_team_lead %}
-                                                <span class="team-chip violet">NONE</span>
-                                            {% endif %}
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div class="chip-list">
                                             {% for team_name in user.team_names[:2] %}
                                                 <span class="team-chip {% if loop.index0 % 3 == 0 %}blue{% elif loop.index0 % 3 == 1 %}green{% else %}violet{% endif %}">
                                                     {{ team_name|upper }}
@@ -626,15 +724,35 @@
                                         </div>
                                     </td>
                                     <td>
-                                        <button
-                                            class="edit-btn"
-                                            type="button"
-                                            data-bs-toggle="modal"
-                                            data-bs-target="#editUserModal{{ loop.index }}"
-                                            aria-label="Edit {{ user.user_id }}"
-                                        >
-                                            <i class="fas fa-ellipsis-v"></i>
-                                        </button>
+                                        <div class="chip-list">
+                                            {% for membership in user.team_memberships if membership.team_lead and membership.team %}
+                                                <span class="team-chip green">{{ membership.team.team_name|upper }}</span>
+                                            {% endfor %}
+                                            {% if not user.is_team_lead %}
+                                                <span class="team-chip violet">NONE</span>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="action-cell">
+                                            <button
+                                                class="edit-btn"
+                                                type="button"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#editUserModal{{ loop.index }}"
+                                                aria-label="Edit {{ user.user_id }}"
+                                            >
+                                                <i class="fas fa-pen me-2"></i>Edit
+                                            </button>
+                                            <form class="delete-inline-form" method="post" onsubmit="return confirm('Delete user {{ user.user_id }}? This cannot be undone.');">
+                                                <input type="hidden" name="action" value="delete_user">
+                                                <input type="hidden" name="entity" value="users">
+                                                <input type="hidden" name="user_id" value="{{ user.user_id }}">
+                                                <button class="btn btn-outline-danger delete-btn" type="submit" aria-label="Delete {{ user.user_id }}">
+                                                    <i class="fas fa-trash-alt me-2"></i>Delete
+                                                </button>
+                                            </form>
+                                        </div>
                                     </td>
                                 </tr>
                             {% else %}
@@ -644,16 +762,122 @@
                                     </td>
                                 </tr>
                             {% endfor %}
+                            <tr id="noResultsRow" style="display: none;">
+                                <td colspan="6">
+                                    <div class="empty-state">No users match the current filters.</div>
+                                </td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
 
                 <div class="table-footer">
                     <span>Showing <strong id="visibleUserCount">{{ users|length }}</strong> of {{ users|length }} users</span>
-                    <span>Use Edit to update permission or team membership</span>
+                    <div class="table-footer-actions">
+                        <span>Use Edit to update permission or team membership</span>
+                        <div class="pagination-shell">
+                            <select id="pageSizeSelect" class="form-select toolbar-select" style="min-width: 110px;">
+                                <option value="5">5 / page</option>
+                                <option value="10" selected>10 / page</option>
+                            </select>
+                            <button id="prevPageButton" class="btn btn-outline-primary toolbar-btn" type="button">Previous</button>
+                            <span id="pageStatus" class="pagination-status">Page 1 of 1</span>
+                            <button id="nextPageButton" class="btn btn-outline-primary toolbar-btn" type="button">Next</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </section>
+    </div>
+</div>
+
+<div class="modal fade" id="addUserModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title">Add User</h5>
+                    <div class="text-muted">Create a new user and assign access.</div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="post">
+                <div class="modal-body">
+                    <input type="hidden" name="action" value="create_user">
+                    <input type="hidden" name="entity" value="users">
+                    {% set add_form = add_user_form if add_user_form is defined and add_user_form else none %}
+                    {% set selected_add_team_ids = add_form.getlist('team_ids') if add_form else [] %}
+                    {% set selected_add_lead_ids = add_form.getlist('team_lead_ids') if add_form else [] %}
+                    {% if add_user_error %}
+                        <div class="alert alert-danger" role="alert">
+                            {{ add_user_error }}
+                        </div>
+                    {% endif %}
+                    <div class="row g-4">
+                        <div class="col-lg-6">
+                            <div class="section-card">
+                                <h6>Basic Details</h6>
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">First Name</label>
+                                        <input class="form-control" name="first_name" type="text" value="{{ add_form.get('first_name', '') if add_form else '' }}">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Last Name</label>
+                                        <input class="form-control" name="last_name" type="text" value="{{ add_form.get('last_name', '') if add_form else '' }}">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">User ID</label>
+                                        <input class="form-control" name="user_id" type="text" value="{{ add_form.get('user_id', '') if add_form else '' }}" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Email</label>
+                                        <input class="form-control" name="email_id" type="email" value="{{ add_form.get('email_id', '') if add_form else '' }}" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Password</label>
+                                        <input class="form-control" name="password" type="password" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Global Role</label>
+                                        <select class="form-select" name="role">
+                                            {% for role_name in valid_roles %}
+                                                <option value="{{ role_name }}" {% if (add_form and add_form.get('role') == role_name) or ((not add_form) and role_name == 'user') %}selected{% endif %}>{{ role_name|upper }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+                                <p class="section-note">New users need a password, one role, and at least one team assignment.</p>
+                            </div>
+                        </div>
+
+                        <div class="col-lg-6">
+                            <div class="section-card">
+                                <h6>Team / Group Assignment</h6>
+                                <div class="team-grid">
+                                    {% for team in teams %}
+                                        <label class="team-option">
+                                            <span class="team-option-main">
+                                                <input type="checkbox" name="team_ids" value="{{ team.team_id }}" {% if (team.team_id|string) in selected_add_team_ids %}checked{% endif %}>
+                                                <span>{{ team.team_name|upper }}</span>
+                                            </span>
+                                            <span class="team-option-lead">
+                                                <input type="checkbox" name="team_lead_ids" value="{{ team.team_id }}" {% if (team.team_id|string) in selected_add_lead_ids %}checked{% endif %}>
+                                                Lead
+                                            </span>
+                                        </label>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create User</button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
 
@@ -769,51 +993,135 @@
 {% block scripts %}
 <script>
 document.addEventListener("DOMContentLoaded", function () {
+    {% if open_add_user_modal %}
+    const addUserModalElement = document.getElementById("addUserModal");
+    if (addUserModalElement) {
+        bootstrap.Modal.getOrCreateInstance(addUserModalElement).show();
+    }
+    {% endif %}
+
     const searchInput = document.getElementById("userSearchInput");
     const roleFilter = document.getElementById("roleFilterSelect");
+    const teamFilter = document.getElementById("teamFilterSelect");
     const refreshButton = document.getElementById("refreshUserTable");
     const rows = Array.from(document.querySelectorAll("#userManagementTable tbody .user-row"));
     const visibleCounter = document.getElementById("visibleUserCount");
+    const noResultsRow = document.getElementById("noResultsRow");
+    const pageSizeSelect = document.getElementById("pageSizeSelect");
+    const prevPageButton = document.getElementById("prevPageButton");
+    const nextPageButton = document.getElementById("nextPageButton");
+    const pageStatus = document.getElementById("pageStatus");
+    let currentPage = 1;
 
-    function applyFilters() {
+    function applyFilters(resetPage) {
         const query = (searchInput.value || "").trim().toLowerCase();
         const selectedRole = (roleFilter.value || "").trim().toLowerCase();
-        let visible = 0;
+        const selectedTeam = (teamFilter.value || "").trim().toLowerCase();
+        const pageSize = Number(pageSizeSelect.value || 10);
+        const filteredRows = [];
+
+        if (resetPage) {
+            currentPage = 1;
+        }
 
         rows.forEach(function (row) {
             const rowSearch = row.getAttribute("data-search") || "";
             const rowRole = row.getAttribute("data-role") || "";
+            const rowTeams = row.getAttribute("data-teams") || "";
             const matchesQuery = !query || rowSearch.indexOf(query) !== -1;
             const matchesRole = !selectedRole || rowRole === selectedRole;
-            const shouldShow = matchesQuery && matchesRole;
-            row.style.display = shouldShow ? "" : "none";
-            if (shouldShow) {
-                visible += 1;
+            const matchesTeam = !selectedTeam || rowTeams.split("||").includes(selectedTeam);
+            const shouldInclude = matchesQuery && matchesRole && matchesTeam;
+
+            row.style.display = "none";
+
+            if (shouldInclude) {
+                filteredRows.push(row);
             }
         });
 
+        const totalVisible = filteredRows.length;
+        const totalPages = Math.max(1, Math.ceil(totalVisible / pageSize));
+        currentPage = Math.min(currentPage, totalPages);
+
+        const startIndex = (currentPage - 1) * pageSize;
+        const endIndex = startIndex + pageSize;
+        filteredRows.slice(startIndex, endIndex).forEach(function (row) {
+            row.style.display = "";
+        });
+
         if (visibleCounter) {
-            visibleCounter.textContent = String(visible);
+            visibleCounter.textContent = String(totalVisible);
+        }
+
+        if (noResultsRow) {
+            noResultsRow.style.display = totalVisible === 0 ? "" : "none";
+        }
+
+        if (pageStatus) {
+            pageStatus.textContent = "Page " + currentPage + " of " + totalPages;
+        }
+
+        if (prevPageButton) {
+            prevPageButton.disabled = currentPage <= 1 || totalVisible === 0;
+        }
+
+        if (nextPageButton) {
+            nextPageButton.disabled = currentPage >= totalPages || totalVisible === 0;
         }
     }
 
     if (searchInput) {
-        searchInput.addEventListener("input", applyFilters);
+        searchInput.addEventListener("input", function () {
+            applyFilters(true);
+        });
     }
 
     if (roleFilter) {
-        roleFilter.addEventListener("change", applyFilters);
+        roleFilter.addEventListener("change", function () {
+            applyFilters(true);
+        });
+    }
+
+    if (teamFilter) {
+        teamFilter.addEventListener("change", function () {
+            applyFilters(true);
+        });
+    }
+
+    if (pageSizeSelect) {
+        pageSizeSelect.addEventListener("change", function () {
+            applyFilters(true);
+        });
+    }
+
+    if (prevPageButton) {
+        prevPageButton.addEventListener("click", function () {
+            if (currentPage > 1) {
+                currentPage -= 1;
+                applyFilters(false);
+            }
+        });
+    }
+
+    if (nextPageButton) {
+        nextPageButton.addEventListener("click", function () {
+            currentPage += 1;
+            applyFilters(false);
+        });
     }
 
     if (refreshButton) {
         refreshButton.addEventListener("click", function () {
             searchInput.value = "";
             roleFilter.value = "";
-            applyFilters();
+            teamFilter.value = "";
+            pageSizeSelect.value = "10";
+            applyFilters(true);
         });
     }
 
-    applyFilters();
+    applyFilters(true);
 });
 </script>
 {% endblock %}

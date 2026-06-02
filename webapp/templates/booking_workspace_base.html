@@ -25,19 +25,20 @@
 
 .sidebar {
     position: fixed;
-    top: 0;
+    top: var(--app-shell-header-height);
     left: 0;
     width: var(--sidebar-width);
-    height: 100vh;
+    height: calc(100vh - var(--app-shell-header-height));
     background: #f8fafc;
     border-right: 1px solid #e2e8f0;
     padding: 0.5rem 0;
     z-index: 1000;
     overflow-y: auto;
+    font-size: 1.02rem;
 }
 
 .sidebar-header {
-    padding: 0.75rem 0.875rem;
+    padding: 0.95rem 1rem;
     border-bottom: 1px solid #e2e8f0;
     background: #ffffff;
 }
@@ -46,7 +47,7 @@
     margin: 0;
     font-weight: 600;
     color: #4a5568;
-    font-size: 0.875rem;
+    font-size: 1rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
 }
@@ -58,7 +59,7 @@
 .sidebar-link {
     display: flex;
     align-items: center;
-    padding: 0.625rem 0.875rem;
+    padding: 0.8rem 1rem;
     color: #4a5568;
     text-decoration: none;
     transition: var(--transition);
@@ -66,6 +67,8 @@
     background: none;
     width: 100%;
     text-align: left;
+    font-size: 1rem;
+    font-weight: 500;
 }
 
 .sidebar-link:hover {
@@ -88,7 +91,7 @@
 .sidebar-toggle {
     display: none;
     position: fixed;
-    top: 16px;
+    top: calc(var(--app-shell-header-height) + 12px);
     left: 10px;
     z-index: 1001;
     background: var(--primary-gradient);
@@ -109,61 +112,9 @@
 
 .main-content {
     margin-left: var(--sidebar-width);
-    padding: 0.5rem 0.75rem 0.75rem;
-    min-height: 100vh;
-}
-
-.workspace-topbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    border-radius: var(--border-radius);
-    box-shadow: var(--card-shadow);
-    margin-bottom: 0.75rem;
-    padding: 0.75rem 1rem;
-}
-
-.workspace-title {
-    display: flex;
-    flex-direction: column;
-    gap: 0.125rem;
-}
-
-.workspace-title-label {
-    font-size: 1.1rem;
-    font-weight: 700;
-    color: #2d3748;
-}
-
-.workspace-title-meta {
-    font-size: 0.85rem;
-    color: #718096;
-}
-
-.workspace-userbar {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-}
-
-.workspace-userchip {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.55rem 0.85rem;
-    border-radius: 999px;
-    background: #edf2f7;
-    color: #2d3748;
-    font-weight: 600;
-}
-
-.workspace-logout {
-    text-decoration: none;
+    padding: 0 0.75rem 0.75rem;
+    min-height: calc(100vh - var(--app-shell-header-height));
+    font-size: 1.02rem;
 }
 
 .workspace-card {
@@ -183,7 +134,7 @@
 .workspace-card-header {
     background: var(--primary-gradient);
     color: #ffffff;
-    padding: 0.875rem 1rem;
+    padding: 1rem 1.15rem;
     border: none;
     display: flex;
     align-items: center;
@@ -191,17 +142,17 @@
 }
 
 .workspace-card-header i {
-    font-size: 1.25rem;
+    font-size: 1.4rem;
 }
 
 .workspace-card-header h5 {
     margin: 0;
     font-weight: 600;
-    font-size: 1.1rem;
+    font-size: 1.3rem;
 }
 
 .workspace-card-body {
-    padding: 0.875rem 1rem 1rem;
+    padding: 1rem 1.15rem 1.15rem;
 }
 
 .form-section {
@@ -219,6 +170,7 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    font-size: 1.1rem;
 }
 
 .section-title i {
@@ -229,8 +181,8 @@
 .form-select {
     border: 2px solid #e2e8f0;
     border-radius: 8px;
-    padding: 0.625rem 0.875rem;
-    font-size: 0.9rem;
+    padding: 0.75rem 0.95rem;
+    font-size: 1rem;
     transition: var(--transition);
 }
 
@@ -251,6 +203,7 @@
     font-weight: 600;
     color: #4a5568;
     margin-bottom: 0.5rem;
+    font-size: 1rem;
 }
 
 .form-group label i {
@@ -260,13 +213,14 @@
 
 .btn-custom {
     border-radius: 8px;
-    padding: 0.625rem 1.25rem;
+    padding: 0.75rem 1.35rem;
     font-weight: 600;
     transition: var(--transition);
     border: none;
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
+    font-size: 1rem;
 }
 
 .btn-custom:hover {
@@ -392,15 +346,6 @@
         padding: 3.5rem 0.5rem 0.75rem;
     }
 
-    .workspace-topbar {
-        align-items: flex-start;
-        flex-direction: column;
-    }
-
-    .workspace-userbar {
-        justify-content: flex-start;
-    }
-
     .sidebar-toggle {
         display: flex;
     }
@@ -433,9 +378,9 @@
         <a href="{{ url_for('booking.tool_deployment_request') }}" class="sidebar-link{% if workspace_nav == 'tool_deployment' %} active{% endif %}">
             <i class="fas fa-toolbox"></i> Tool Deployment
         </a>
-        {% if user is defined and (user.role == "admin" or "env" in user.team_names) %}
+        {% if user is defined and (user.role == "admin" or user.is_env_member) %}
         <a href="{{ url_for('booking.manage_deployment_requests') }}" class="sidebar-link{% if workspace_nav == 'deployment_manage' %} active{% endif %}">
-            <i class="fas fa-diagram-project"></i> ENV Deployment Queue
+            <i class="fas fa-diagram-project"></i> Deployment Operations
         </a>
         {% endif %}
         <a href="{{ url_for('booking.booking_screen') }}" class="sidebar-link{% if workspace_nav == 'calendar' %} active{% endif %}">
@@ -454,21 +399,6 @@
 </div>
 
 <div class="main-content">
-    <div class="workspace-topbar">
-        <div class="workspace-title">
-            <span class="workspace-title-label">{% block workspace_heading %}Booking Workspace{% endblock %}</span>
-            <span class="workspace-title-meta">Manage bookings and deployment requests from one place.</span>
-        </div>
-        <div class="workspace-userbar">
-            <span class="workspace-userchip">
-                <i class="fas fa-user-circle"></i>
-                {{ user.user_id if user is defined and user.user_id else "guest" }}
-            </span>
-            <a href="{{ url_for('main.logout') }}" class="btn btn-outline-secondary-custom btn-custom workspace-logout">
-                <i class="fas fa-sign-out-alt"></i> Logout
-            </a>
-        </div>
-    </div>
     {% block workspace_content %}{% endblock %}
 </div>
 {% endblock %}

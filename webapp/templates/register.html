@@ -11,21 +11,21 @@
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label" for="first_name">First Name</label>
-                            <input class="form-control" id="first_name" name="first_name" value="{{ request.form.get('first_name', '') }}" required autofocus>
+                            <input class="form-control" id="first_name" name="first_name" autocomplete="given-name" value="{{ request.form.get('first_name', '') }}" required autofocus>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label" for="last_name">Last Name</label>
-                            <input class="form-control" id="last_name" name="last_name" value="{{ request.form.get('last_name', '') }}" required>
+                            <input class="form-control" id="last_name" name="last_name" autocomplete="family-name" value="{{ request.form.get('last_name', '') }}" required>
                         </div>
                     </div>
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label" for="user_id">User ID</label>
-                            <input class="form-control" id="user_id" name="user_id" value="{{ request.form.get('user_id', '') }}" required>
+                            <input class="form-control" id="user_id" name="user_id" autocomplete="username" value="{{ request.form.get('user_id', '') }}" required>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label" for="email">Email</label>
-                            <input class="form-control" id="email" name="email" type="email" value="{{ request.form.get('email', '') }}" required>
+                            <input class="form-control" id="email" name="email" type="email" autocomplete="email" value="{{ request.form.get('email', '') }}" required>
                         </div>
                     </div>
                     <div class="mb-3">
@@ -42,11 +42,11 @@
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label" for="password">Password</label>
-                            <input class="form-control" id="password" name="password" type="password" required>
+                            <input class="form-control" id="password" name="password" type="password" autocomplete="new-password" required>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label" for="confirm_password">Confirm Password</label>
-                            <input class="form-control" id="confirm_password" name="confirm_password" type="password" required>
+                            <input class="form-control" id="confirm_password" name="confirm_password" type="password" autocomplete="new-password" required>
                         </div>
                     </div>
                     <button class="btn btn-primary w-100 mt-2" type="submit">Create account</button>

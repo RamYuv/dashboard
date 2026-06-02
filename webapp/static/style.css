@@ -4,9 +4,166 @@ body {
 }
 
 :root {
-    --admin-sticky-top: 1rem;
+    --app-shell-header-height: 70px;
+    --app-shell-header-start: #102447;
+    --app-shell-header-end: #1a3566;
+    --app-shell-header-text: #f8fbff;
+    --app-shell-header-accent: rgba(255, 255, 255, 0.14);
+    --admin-sticky-top: var(--app-shell-header-height);
     --admin-table-height: 29rem;
     --admin-form-height: 29rem;
+}
+
+.app-shell-header {
+    min-height: var(--app-shell-header-height);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.7rem 1.25rem;
+    background: linear-gradient(90deg, var(--app-shell-header-start), var(--app-shell-header-end));
+    color: var(--app-shell-header-text);
+    box-shadow: 0 10px 24px rgba(16, 36, 71, 0.18);
+    position: sticky;
+    top: 0;
+    z-index: 1100;
+}
+
+.app-shell-main {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+
+.app-shell-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    min-width: 0;
+}
+
+.app-shell-branding {
+    display: flex;
+    align-items: center;
+    gap: 1.15rem;
+    min-width: 0;
+    flex-wrap: nowrap;
+}
+
+.app-shell-logo {
+    width: 40px;
+    height: 40px;
+    border-radius: 11px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.1));
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    font-weight: 800;
+    font-size: 1rem;
+    letter-spacing: 0.03em;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.app-shell-title {
+    font-size: 1.28rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    color: #ffffff;
+    white-space: nowrap;
+}
+
+.app-shell-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    flex-wrap: wrap;
+    font-size: 1rem;
+}
+
+.app-shell-actions a,
+.app-shell-actions span {
+    color: #ffffff;
+    text-decoration: none;
+}
+
+.app-shell-actions a:hover {
+    color: #bfdbfe;
+}
+
+.app-shell-home {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    font-size: 1rem;
+    font-weight: 600;
+    color: rgba(248, 251, 255, 0.88) !important;
+}
+
+.app-shell-home:hover {
+    background: transparent;
+    color: #ffffff !important;
+    text-decoration: underline;
+}
+
+.app-shell-user-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: rgba(248, 251, 255, 0.92);
+    font-size: 1rem;
+    font-weight: 600;
+    box-shadow: none !important;
+}
+
+.app-shell-user-toggle:hover,
+.app-shell-user-toggle:focus,
+.app-shell-user-toggle.show {
+    background: transparent !important;
+    color: #ffffff !important;
+}
+
+.app-shell-user-toggle::after {
+    margin-left: 0.4rem;
+    vertical-align: 0.15em;
+}
+
+.app-shell-dropdown {
+    min-width: 12rem;
+    margin-top: 0.55rem;
+    border: 1px solid #dbe4f0;
+    border-radius: 12px;
+    box-shadow: 0 14px 32px rgba(15, 23, 42, 0.14);
+    padding: 0.35rem;
+}
+
+.app-shell-dropdown .dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    border-radius: 8px;
+    padding: 0.5rem 0.65rem;
+    color: #223047;
+    font-size: 0.88rem;
+}
+
+.app-shell-dropdown .dropdown-item i {
+    width: 16px;
+    text-align: center;
+    color: #5a6b82;
+}
+
+.app-shell-dropdown .dropdown-item:hover,
+.app-shell-dropdown .dropdown-item:focus {
+    background: #f4f8fd;
+    color: #16244f;
 }
 
 .navbar-brand {
@@ -107,6 +264,14 @@ body {
 }
 
 @media (max-width: 991.98px) {
+    .app-shell-header {
+        padding: 0.6rem 1rem;
+    }
+
+    .app-shell-title {
+        font-size: 1.12rem;
+    }
+
     .admin-sticky-header,
     .admin-form-panel {
         position: static;
@@ -115,5 +280,21 @@ body {
     .admin-form-panel .card-body,
     .admin-table-wrap {
         max-height: none;
+    }
+}
+
+@media (max-width: 767.98px) {
+    .app-shell-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .app-shell-branding {
+        align-items: flex-start;
+    }
+
+    .app-shell-actions {
+        width: 100%;
+        gap: 0.75rem;
     }
 }

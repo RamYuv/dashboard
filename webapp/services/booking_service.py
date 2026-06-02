@@ -11,7 +11,7 @@ from ..models import (
     db,
 )
 from ..constants import VALID_BOOKING_TYPES, BOOKING_STATUS
-from ..helpers import to_utc_naive
+from ..helpers import can_user_access_environment, to_utc_naive
 from ..domain.reservation_conflict_service import ReservationConflictService
 
 logger = logging.getLogger(__name__)
@@ -37,6 +37,8 @@ class BookingValidator:
         env = Environment.query.filter_by(env_id=data["env_id"]).first()
         if env is None:
             return "Invalid environment."
+        if not can_user_access_environment(user, env):
+            return "You can only book environments assigned to your team."
 
         # Validate datetime format
         try:

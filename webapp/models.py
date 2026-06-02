@@ -93,6 +93,11 @@ class User(db.Model):
         return full_name or (self.name or "").strip() or self.user_id
 
     @property
+    def display_name(self):
+        """Backward-compatible alias used by templates and serializers."""
+        return self.full_name
+
+    @property
     def team_names(self):
         names = []
         for membership in getattr(self, "team_memberships", []) or []:
@@ -178,6 +183,7 @@ class Environment(db.Model):
 
     env_id = db.Column(db.String(50), primary_key=True)  # DEV01, ST01
     env_type = db.Column(db.String(50), nullable=False)  # DEV / ST / QA / PROD
+    domain = db.Column(db.String(100))
     description = db.Column(db.Text)
 
     is_active = db.Column(db.Boolean, default=True)
@@ -240,10 +246,12 @@ class EnvironmentHostMapping(db.Model):
     env_id = db.Column(
         db.String(50),
         db.ForeignKey("environments.env_id"),
-        nullable=True
+        nullable=False,
     )
 
     env_type = db.Column(db.String(50))
+    # Deprecated compatibility column kept so existing SQLite databases
+    # with a NOT NULL is_shared field can still accept inserts.
     is_shared = db.Column(db.Boolean, default=False, nullable=False)
 
     server_type_id = db.Column(
@@ -283,7 +291,6 @@ class EnvironmentHostMapping(db.Model):
             "environment_host_mapping_id": self.environment_host_mapping_id,
             "env_id": self.env_id,
             "env_type": self.env_type,
-            "is_shared": self.is_shared,
             "server_type_id": self.server_type_id,
             "server_type_key": self.server_type.server_type_key if self.server_type else None,
             "target_type": self.server_type.target_type if self.server_type else None,
@@ -306,12 +313,15 @@ class ComponentBuild(db.Model):
     # TCS_APP / DB / PAYAPP / TOOLS
 
     build_name = db.Column(db.String(100), nullable=False)
-    # target/package specific build identifier
+    # component/build identifier such as core, gateway, payapp, tool1
 
     version = db.Column(db.String(50), nullable=False)
 
     artifact_name = db.Column(db.String(255))
     artifact_path = db.Column(db.String(500))
+    artifact_size_bytes = db.Column(db.BigInteger)
+    checksum = db.Column(db.String(100))
+    build_metadata = db.Column(db.JSON)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -323,6 +333,8 @@ class ComponentBuild(db.Model):
             name="uq_component_build"
         ),
         db.Index("idx_component_build_lookup", "target_key", "build_name", "version"),
+        db.Index("idx_component_build_target", "target_key"),
+        db.Index("idx_component_build_version", "version"),
     )
 
     def to_dict(self):
@@ -333,6 +345,9 @@ class ComponentBuild(db.Model):
             "version": self.version,
             "artifact_name": self.artifact_name,
             "artifact_path": self.artifact_path,
+            "artifact_size_bytes": self.artifact_size_bytes,
+            "checksum": self.checksum,
+            "build_metadata": self.build_metadata,
             "created_at": format_datetime(self.created_at),
         }
 
@@ -483,7 +498,7 @@ class DeploymentRequest(db.Model):
     env_id = db.Column(
         db.String(50),
         db.ForeignKey("environments.env_id"),
-        nullable=True
+        nullable=False,
     )
 
     requested_env_type = db.Column(db.String(50))
@@ -594,9 +609,7 @@ class DeploymentRequest(db.Model):
 
     @property
     def environment_scope_value(self):
-        if self.environment_scope == "ENV":
-            return self.env_id
-        return self.requested_env_type
+        return self.env_id
 
     @property
     def package_definitions(self):
@@ -623,13 +636,7 @@ class DeploymentRequest(db.Model):
         ) or self.target_key
 
     def environment_display_label(self):
-        if self.environment_scope == "ENV" and self.env_id:
-            return self.env_id
-        if self.requested_env_type:
-            return "{} (shared)".format(self.requested_env_type)
-        if self.env_id:
-            return self.env_id
-        return "Shared"
+        return self.env_id or "-"
 
     def resolved_hostnames(self):
         hostnames = []
@@ -789,7 +796,7 @@ class CurrentDeploymentState(db.Model):
     env_id = db.Column(
         db.String(50),
         db.ForeignKey("environments.env_id"),
-        nullable=True,
+        nullable=False,
     )
     env_type = db.Column(db.String(50))
 

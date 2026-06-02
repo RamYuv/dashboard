@@ -34,7 +34,7 @@
 
         .app-layout {
             display: flex;
-            min-height: 100vh;
+            min-height: calc(100vh - var(--app-shell-header-height));
         }
 
         .sidebar {
@@ -44,29 +44,13 @@
             padding: 22px 16px;
             position: fixed;
             left: 0;
-            top: 0;
+            top: var(--app-shell-header-height);
             bottom: 0;
+            height: calc(100vh - var(--app-shell-header-height));
         }
 
-        .brand {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 36px;
-            font-size: 20px;
-            font-weight: 700;
-            color: #f8fbff;
-        }
-
-        .brand-icon {
-            width: 38px;
-            height: 38px;
-            border-radius: 10px;
-            background: linear-gradient(180deg, var(--shell-navy), #243773);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 8px 18px rgba(15, 24, 56, 0.22);
+        .sidebar-nav {
+            padding-top: 8px;
         }
 
         .menu-item {
@@ -166,53 +150,34 @@
         .main-content {
             margin-left: 230px;
             width: calc(100% - 230px);
-            min-height: 100vh;
+            min-height: calc(100vh - var(--app-shell-header-height));
             background: linear-gradient(180deg, #fbfdff 0%, #eef3f9 100%);
             position: relative;
         }
 
-        .topbar {
-            min-height: 68px;
-            border-bottom: 1px solid rgba(15, 24, 56, 0.16);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 12px 24px;
-            position: sticky;
-            top: 0;
-            z-index: 20;
-            background: linear-gradient(90deg, var(--shell-navy-deep), var(--shell-navy));
-            box-shadow: 0 8px 18px rgba(15, 24, 56, 0.16);
-        }
-
-        .topbar h1 {
-            font-size: 26px;
-            font-weight: 700;
-            margin: 0;
-            color: #ffffff;
-            letter-spacing: 0.01em;
-        }
-
-        .user-actions {
-            display: flex;
-            align-items: center;
-            gap: 14px;
-            color: #ffffff;
-            font-size: 13px;
-            flex-wrap: wrap;
-        }
-
-        .user-actions a {
-            color: #ffffff;
-            text-decoration: none;
-        }
-
-        .user-actions a:hover {
-            color: #60a5fa;
-        }
-
         .content-wrapper {
             padding: 22px 24px 28px;
+        }
+
+        .page-intro {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+            margin-bottom: 14px;
+        }
+
+        .page-intro h1 {
+            margin: 0;
+            font-size: 30px;
+            font-weight: 800;
+            color: var(--text-strong);
+            letter-spacing: -0.02em;
+        }
+
+        .page-intro p {
+            margin: 8px 0 0;
+            color: #475569;
         }
 
         .toolbar {
@@ -221,7 +186,7 @@
             gap: 8px;
             margin-bottom: 16px;
             position: sticky;
-            top: 68px;
+            top: calc(var(--app-shell-header-height) + 8px);
             z-index: 15;
             background: rgba(244, 247, 251, 0.94);
             padding: 10px 0 8px;
@@ -511,16 +476,8 @@
                 grid-template-columns: 1fr;
             }
 
-            .topbar {
-                height: auto;
-                padding: 18px;
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 14px;
-            }
-
             .toolbar {
-                top: 96px;
+                top: calc(var(--app-shell-header-height) + 8px);
                 justify-content: flex-start;
                 flex-wrap: wrap;
             }
@@ -528,54 +485,59 @@
     </style>
 {% endblock %}
 {% block main_class %}container-fluid px-0 py-0{% endblock %}
+{% block shell_title %}Envista{% endblock %}
+{% block shell_actions %}
+    <div class="dropdown app-shell-user-menu">
+        <button
+            class="btn dropdown-toggle app-shell-user-toggle"
+            type="button"
+            data-bs-toggle="dropdown"
+            aria-expanded="false"
+        >
+            <i class="far fa-user-circle"></i> {{ id }}
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end app-shell-dropdown">
+            <li><a class="dropdown-item" href="{{ url_for('main.profile') }}"><i class="far fa-id-badge"></i> View Profile</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('main.change_password') }}"><i class="fas fa-key"></i> Change Password</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="{{ url_for('main.logout') }}"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+        </ul>
+    </div>
+{% endblock %}
 {% block content %}
 <div class="app-layout">
 
     <aside class="sidebar">
-        <div class="brand">
-            <div class="brand-icon"><i class="fas fa-server"></i></div>
-            <div>Environment<br>Dashboard</div>
-        </div>
-
-        <a href="{{ url_for('main.environment_health') }}" class="menu-item active"><i class="fas fa-home"></i> Home</a>
-        <a href="{{ url_for('booking.booking_grid') }}" class="menu-item"><i class="fas fa-th"></i> Environment Booking</a>
-        <a href="{{ url_for('booking.booking_screen') }}" class="menu-item"><i class="fas fa-calendar-alt"></i> Booking Calendar</a>
-        <a href="{{ url_for('booking.deployment_request') }}" class="menu-item"><i class="fas fa-rocket"></i> Deployment Request</a>
-        <a href="{{ url_for('booking.manage_bookings') }}" class="menu-item"><i class="fas fa-list"></i> My Requests</a>
-        {% if role == "admin" %}
-        <a href="{{ url_for('main.user_management_screen') }}" class="menu-item"><i class="fas fa-user-shield"></i> User Management</a>
-        <a href="{{ url_for('main.admin_screen') }}" class="menu-item"><i class="fas fa-users-cog"></i> Admin Screen</a>
-        {% endif %}
-        <div class="theme-toggle">
-            <i class="fas fa-moon"></i>
-            Dark Mode
-        </div>
+        <nav class="sidebar-nav">
+            <a href="{{ url_for('booking.booking_grid') }}" class="menu-item"><i class="fas fa-th"></i> Environment Booking</a>
+            <a href="{{ url_for('booking.booking_screen') }}" class="menu-item"><i class="fas fa-calendar-alt"></i> Booking Calendar</a>
+            <a href="{{ url_for('booking.deployment_request') }}" class="menu-item"><i class="fas fa-rocket"></i> Deployment Request</a>
+            <a href="{{ url_for('booking.manage_bookings') }}" class="menu-item"><i class="fas fa-list"></i> My Requests</a>
+            {% if role == "admin" %}
+            <a href="{{ url_for('main.user_management_screen') }}" class="menu-item"><i class="fas fa-user-shield"></i> User Management</a>
+            <a href="{{ url_for('main.admin_screen') }}" class="menu-item"><i class="fas fa-users-cog"></i> Admin Screen</a>
+            {% endif %}
+            <div class="theme-toggle">
+                <i class="fas fa-moon"></i>
+                Dark Mode
+            </div>
+        </nav>
 
         <div class="sidebar-footer">
-            © 2024 Environment Dashboard<br>
+            &copy; 2024 Envista<br>
             All rights reserved.
         </div>
     </aside>
 
     <section class="main-content">
 
-        <header class="topbar">
-            <h1>Environment Dashboard</h1>
-
-            <div class="user-actions">
-                <span><i class="far fa-user-circle"></i> {{ id }}</span>
-
-                <a href="#">
-                    <i class="fas fa-lock"></i> Change Password
-                </a>
-
-                <a href="{{ url_for('main.logout') }}">
-                    <i class="fas fa-sign-out-alt"></i> Logout
-                </a>
-            </div>
-        </header>
-
         <section class="content-wrapper">
+            <div class="page-intro">
+                <div>
+                    <h1>Environment Dashboard</h1>
+                    <p>Live environment health, booking visibility, and operational summary in one place.</p>
+                </div>
+            </div>
 
             <div class="toolbar">
                 <button class="btn-dark-custom">
@@ -690,3 +652,4 @@
 {% block scripts %}
     <script src="{{ url_for('static', filename='js/pages/environment-health.js') }}"></script>
 {% endblock %}
+

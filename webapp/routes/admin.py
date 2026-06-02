@@ -1,10 +1,10 @@
 import logging
 
 from flask import flash, redirect, render_template, request, url_for
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from .blueprint import main_bp
-from ..auth_service import screen_required
+from ..auth_service import current_user, screen_required
 from ..models import db
 from ..services.admin_service import ADMIN_TABS, build_admin_page_context, handle_admin_form
 
@@ -17,6 +17,16 @@ def _admin_redirect(tab_name):
 
 def _user_management_redirect():
     return redirect(url_for("main.user_management_screen"))
+
+
+def _render_user_management_page(**extra_context):
+    context = build_admin_page_context(active_tab="users")
+    context.update(extra_context)
+    return render_template(
+        "user_management_workspace.html",
+        title="User Management",
+        **context,
+    )
 
 
 @main_bp.route("/screen/admin", methods=["GET", "POST"])
@@ -56,14 +66,27 @@ def admin_screen():
 def user_management_screen():
     if request.method == "POST":
         action = (request.form.get("action") or "create").strip().lower()
+        actor = current_user()
+        target_user_id = (request.form.get("user_id") or "").strip().lower()
+        if action == "delete_user" and actor is not None and target_user_id == (actor.user_id or "").strip().lower():
+            flash("You cannot delete the account that is currently signed in.", "danger")
+            return _user_management_redirect()
         error = handle_admin_form(request.form)
         if error:
             db.session.rollback()
             flash(error, "danger")
+            if action == "create_user":
+                return _render_user_management_page(
+                    open_add_user_modal=True,
+                    add_user_error=error,
+                    add_user_form=request.form,
+                )
         else:
             try:
                 db.session.commit()
                 flash(
+                    "User created successfully." if action == "create_user" else
+                    "User deleted successfully." if action == "delete_user" else
                     "User role updated successfully." if action == "update_role" else
                     "User teams updated successfully." if action == "update_teams" else
                     "User management updated successfully.",
@@ -72,11 +95,38 @@ def user_management_screen():
             except IntegrityError as exc:
                 db.session.rollback()
                 logger.warning("User management update failed: %s", exc)
-                flash("Unable to save the user update because it conflicts with existing data.", "danger")
+                message = "Unable to save the user update because it conflicts with existing data."
+                flash(message, "danger")
+                if action == "create_user":
+                    return _render_user_management_page(
+                        open_add_user_modal=True,
+                        add_user_error=message,
+                        add_user_form=request.form,
+                    )
+            except SQLAlchemyError as exc:
+                db.session.rollback()
+                logger.exception("User management database error")
+                message = "Unable to save the user because the database reported an error: {}.".format(exc.__class__.__name__)
+                if getattr(exc, "orig", None):
+                    message = "Unable to save the user because the database reported an error: {}.".format(exc.orig)
+                flash(message, "danger")
+                if action == "create_user":
+                    return _render_user_management_page(
+                        open_add_user_modal=True,
+                        add_user_error=message,
+                        add_user_form=request.form,
+                    )
+            except Exception as exc:
+                db.session.rollback()
+                logger.exception("Unexpected user management error")
+                message = "Unable to save the user because of an unexpected server error."
+                flash(message, "danger")
+                if action == "create_user":
+                    return _render_user_management_page(
+                        open_add_user_modal=True,
+                        add_user_error=message,
+                        add_user_form=request.form,
+                    )
         return _user_management_redirect()
 
-    return render_template(
-        "user_management_workspace.html",
-        title="User Management",
-        **build_admin_page_context(active_tab="users"),
-    )
+    return _render_user_management_page()

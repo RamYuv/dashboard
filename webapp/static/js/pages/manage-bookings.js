@@ -224,15 +224,6 @@
         });
     }
 
-    function populateSharedEnvironmentDisplay(selectId, displayLabel) {
-        const select = document.getElementById(selectId);
-        select.innerHTML = "";
-        select.insertAdjacentHTML(
-            "beforeend",
-            '<option value="" selected>' + common.escapeHtml(displayLabel || "Shared") + "</option>"
-        );
-    }
-
     function populateComponentNames(componentType, selectedValues) {
         const select = document.getElementById("editComponentNames");
         select.innerHTML = "";
@@ -411,11 +402,7 @@
             document.getElementById("editStartTime").value = common.formatLocalInput(booking.start_time);
             document.getElementById("editEndTime").value = booking.end_time ? common.formatLocalInput(booking.end_time) : "";
             document.getElementById("editEnvType").value = envType || "";
-            if (booking.env_id) {
-                populateEnvironmentOptions("editEnvId", envType, booking.env_id);
-            } else {
-                populateSharedEnvironmentDisplay("editEnvId", environmentLabel);
-            }
+            populateEnvironmentOptions("editEnvId", envType, booking.env_id);
             document.getElementById("editBookingTypeDisplay").value = "Deployment";
             document.getElementById("editDescription").value = booking.description || "";
 

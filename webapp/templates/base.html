@@ -10,7 +10,45 @@
     {% block extra_head %}{% endblock %}
 </head>
 <body>
-<main class="{% block main_class %}container py-5{% endblock %}">
+<header class="app-shell-header">
+    <div class="app-shell-brand">
+        <div class="app-shell-logo">{% block shell_logo %}EV{% endblock %}</div>
+        <div class="app-shell-branding">
+            <div class="app-shell-title">{% block shell_title %}Envista{% endblock %}</div>
+            {% if session.get("user_id") %}
+            <a class="app-shell-home" href="{{ url_for('main.environment_health') }}">
+                <i class="fas fa-home"></i> Home
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="app-shell-actions">
+        {% block shell_actions %}
+            {% if session.get("user_id") %}
+            <div class="dropdown app-shell-user-menu">
+                <button
+                    class="btn dropdown-toggle app-shell-user-toggle"
+                    type="button"
+                    data-bs-toggle="dropdown"
+                    aria-expanded="false"
+                >
+                    <i class="far fa-user-circle"></i> {{ session.get("user_id") }}
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end app-shell-dropdown">
+                    <li><a class="dropdown-item" href="{{ url_for('main.profile') }}"><i class="far fa-id-badge"></i> View Profile</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('main.change_password') }}"><i class="fas fa-key"></i> Change Password</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" href="{{ url_for('main.logout') }}"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+                </ul>
+            </div>
+            {% else %}
+            <span><i class="fas fa-shield-alt"></i> Secure Access</span>
+            {% endif %}
+        {% endblock %}
+    </div>
+</header>
+<main class="app-shell-main {% block main_class %}container py-5{% endblock %}">
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
             {% for category, message in messages %}

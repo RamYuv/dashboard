@@ -17,6 +17,30 @@ from .constants import (
 
 DEFAULT_ROLE_NAMES = ["user", "admin"]
 
+
+def get_user_team_names(user):
+    """Return normalized team names for a user."""
+    if user is None:
+        return set()
+    return {
+        (team_name or "").strip().lower()
+        for team_name in getattr(user, "team_names", []) or []
+        if (team_name or "").strip()
+    }
+
+
+def can_user_access_environment(user, environment):
+    """Return whether the user may access/book the given environment."""
+    if user is None or environment is None:
+        return False
+    if getattr(user, "role", "") == "admin":
+        return True
+
+    domain = (getattr(environment, "domain", "") or "").strip().lower()
+    if not domain:
+        return False
+    return domain in get_user_team_names(user)
+
 def json_error(message, status_code):
     """Create a JSON error response."""
     response = jsonify({"error": message})
@@ -229,12 +253,28 @@ def serialize_deployment_request_for_workspace(deployment_request):
     }
 
 
-def get_list_bookings():
+def get_list_bookings(user=None):
     """Retrieve bookings plus standalone deployment requests for workspace views."""
     bookings = EnvironmentBooking.query.order_by(EnvironmentBooking.start_time).all()
+    if user is not None:
+        bookings = [
+            booking
+            for booking in bookings
+            if can_user_access_environment(user, booking.environment)
+        ]
+
     deployment_requests = DeploymentRequest.query.order_by(
         DeploymentRequest.planned_start_time
     ).all()
+    if user is not None:
+        deployment_requests = [
+            deployment_request
+            for deployment_request in deployment_requests
+            if (
+                deployment_request.env_id and
+                can_user_access_environment(user, deployment_request.environment)
+            ) or deployment_request.requested_by == getattr(user, "user_id", None)
+        ]
     items = [serialize_booking(booking) for booking in bookings]
     items.extend(
         serialize_deployment_request_for_workspace(deployment_request)
@@ -243,15 +283,22 @@ def get_list_bookings():
     return sorted(items, key=lambda item: item.get("start_time") or "")
 
 
-def get_environments():
-    """Retrieve all environments grouped by type."""
+def get_environments(user=None):
+    """Retrieve environments, optionally filtered to those accessible by the user."""
     environments = Environment.query.order_by(
         Environment.env_type, Environment.env_id
     ).all()
+    if user is not None:
+        environments = [
+            environment
+            for environment in environments
+            if can_user_access_environment(user, environment)
+        ]
     return [
         {
             "env_id": environment.env_id,
             "env_type": environment.env_type,
+            "domain": environment.domain,
             "description": environment.description,
         }
         for environment in environments

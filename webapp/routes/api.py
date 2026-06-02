@@ -18,7 +18,7 @@ from ..services.deployment_request_service import DeploymentRequestService
 @main_bp.route("/api/bookings", methods=["GET"])
 @login_required
 def api_list_bookings():
-    return jsonify(get_list_bookings())
+    return jsonify(get_list_bookings(user=current_user()))
 
 
 @main_bp.route("/api/bookings", methods=["POST"])
@@ -83,7 +83,7 @@ def api_component_versions():
 @main_bp.route("/api/environments")
 @login_required
 def api_environments():
-    return jsonify({"environments": get_environments()})
+    return jsonify({"environments": get_environments(user=current_user())})
 
 
 @main_bp.route("/api/environment-types")

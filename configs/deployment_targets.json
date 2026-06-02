@@ -55,7 +55,7 @@
       },
       "tool2": {
         "package_name": "tool2",
-        "server_type_key": "Core",
+        "server_type_key": "Tool_server",
         "deploy_order": 50
       },
       "tool3": {

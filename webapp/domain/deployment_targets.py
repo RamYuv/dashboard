@@ -12,7 +12,7 @@ from ..models import EnvironmentHostMapping, ServerType
 
 
 CONFIG_PATH = Path(__file__).resolve().parents[2] / "configs" / "deployment_targets.json"
-SUPPORTED_ENV_SCOPES = {"ENV", "ENV_TYPE"}
+SUPPORTED_ENV_SCOPES = {"ENV"}
 
 REQUIRED_TARGET_FIELDS = {"display_name", "packages"}
 REQUIRED_PACKAGE_FIELDS = {"package_name", "server_type_key"}
@@ -273,32 +273,12 @@ def _find_environment_mapping(env_id, server_type_key):
     ).first()
 
 
-def _find_shared_environment_mappings(env_type, server_type_key):
-    """Find shared mappings for environment-type scoped tool deployments."""
-    if not env_type or not server_type_key:
-        return []
-    server_type = ServerType.query.filter_by(server_type_key=server_type_key).first()
-    if server_type is None:
-        return []
-    return EnvironmentHostMapping.query.filter_by(
-        env_type=env_type,
-        is_shared=True,
-        server_type_id=server_type.server_type_id,
-    ).all()
-
-
 def _resolve_package_mappings(env_id, requested_env_type, env_scope_type, server_type_key):
     """Resolve one package's host mappings for the requested deployment scope."""
-    if env_scope_type == "ENV_TYPE":
-        return _find_shared_environment_mappings(requested_env_type, server_type_key)
-
     exact_mapping = _find_environment_mapping(env_id, server_type_key)
     if exact_mapping is not None:
         return [exact_mapping]
-
-    # Fall back to shared env-type mappings when an environment reuses
-    # common hosts for the selected server type.
-    return _find_shared_environment_mappings(requested_env_type, server_type_key)
+    return []
 
 
 def resolve_request_targets(env_id, deployment_data):
