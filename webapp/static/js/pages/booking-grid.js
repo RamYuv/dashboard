@@ -4,8 +4,33 @@
     const environments = pageData.environments || [];
     const serverTimezone = pageData.serverTimezone || "UTC";
     const reservationPolicy = pageData.reservationPolicy || {};
+    const currentDeploymentsApiUrl = pageData.currentDeploymentsApiUrl || "/api/current-deployments";
     const mutualReservationEnabled = !!reservationPolicy.mutual_env_reservation_enabled;
+    const RUNTIME_PLACEHOLDER_MESSAGE = "Select an environment to view the currently deployed TCS version, service, and mode.";
+    const RUNTIME_LOADING_MESSAGE = "Loading current TCS runtime...";
+    const RUNTIME_EMPTY_MESSAGE = "No current TCS runtime details were found for the selected environment.";
+    const RUNTIME_ERROR_MESSAGE = "Unable to load current TCS runtime right now.";
     let cachedBookings = [];
+    const initialEnvId = new URLSearchParams(window.location.search).get("env_id") || "";
+    let runtimeRequestToken = 0;
+    let availabilityToast = null;
+    const elements = {};
+
+    function cacheElements() {
+        elements.form = document.getElementById("quickBookingForm");
+        elements.envType = document.getElementById("formEnvType");
+        elements.envId = document.getElementById("formEnvId");
+        elements.startDate = document.getElementById("formStartDate");
+        elements.startTime = document.getElementById("formStartTime");
+        elements.endDate = document.getElementById("formEndDate");
+        elements.endTime = document.getElementById("formEndTime");
+        elements.description = document.getElementById("formDescription");
+        elements.checkAvailabilityBtn = document.getElementById("checkAvailabilityBtn");
+        elements.runtimeEmpty = document.getElementById("currentTcsRuntimeEmpty");
+        elements.runtimeDetails = document.getElementById("currentTcsRuntimeDetails");
+        elements.availabilityToast = document.getElementById("availabilityToast");
+        elements.availabilityToastBody = document.getElementById("availabilityToastBody");
+    }
 
     function isBlockingDeploymentRequest(booking) {
         if (!booking || !booking.is_standalone_deployment_request) {
@@ -29,6 +54,218 @@
         });
     }
 
+    function uniqueValues(values) {
+        return (values || []).filter(function (value, index, items) {
+            return value && items.indexOf(value) === index;
+        });
+    }
+
+    function versionSortKey(version) {
+        const value = String(version || "").trim();
+        if (!value) {
+            return { numbers: [], patch: -1, text: "" };
+        }
+
+        const numbers = (value.match(/\d+/g) || []).map(function (part) {
+            return Number(part);
+        });
+        const patchMatch = value.match(/_patch(\d+)/i);
+        return {
+            numbers: numbers,
+            patch: patchMatch ? Number(patchMatch[1]) : 0,
+            text: value.toLowerCase(),
+        };
+    }
+
+    function compareVersionKeys(left, right) {
+        const maxLength = Math.max(left.numbers.length, right.numbers.length);
+        let index = 0;
+
+        while (index < maxLength) {
+            const leftValue = left.numbers[index] || 0;
+            const rightValue = right.numbers[index] || 0;
+            if (leftValue !== rightValue) {
+                return leftValue - rightValue;
+            }
+            index += 1;
+        }
+
+        if (left.patch !== right.patch) {
+            return left.patch - right.patch;
+        }
+
+        if (left.text < right.text) {
+            return -1;
+        }
+        if (left.text > right.text) {
+            return 1;
+        }
+        return 0;
+    }
+
+    function selectPreferredVersion(versions) {
+        const candidates = uniqueValues(versions);
+        if (!candidates.length) {
+            return "";
+        }
+
+        return candidates.reduce(function (best, candidate) {
+            if (!best) {
+                return candidate;
+            }
+            return compareVersionKeys(
+                versionSortKey(candidate),
+                versionSortKey(best)
+            ) > 0 ? candidate : best;
+        }, "");
+    }
+
+    function setRuntimeField(id, value) {
+        const element = document.getElementById(id);
+        if (element) {
+            element.textContent = value || "-";
+        }
+    }
+
+    function showRuntimePlaceholder(message) {
+        if (elements.runtimeEmpty) {
+            elements.runtimeEmpty.textContent = message;
+            elements.runtimeEmpty.hidden = false;
+        }
+        if (elements.runtimeDetails) {
+            elements.runtimeDetails.hidden = true;
+        }
+        setRuntimeField("currentTcsRuntimeVersion", "-");
+        setRuntimeField("currentTcsRuntimeService", "-");
+        setRuntimeField("currentTcsRuntimeMode", "-");
+    }
+
+    function showRuntimeDetails(runtime) {
+        if (elements.runtimeEmpty) {
+            elements.runtimeEmpty.hidden = true;
+        }
+        if (elements.runtimeDetails) {
+            elements.runtimeDetails.hidden = false;
+        }
+
+        setRuntimeField("currentTcsRuntimeVersion", runtime.version);
+        setRuntimeField("currentTcsRuntimeService", runtime.serviceTypes);
+        setRuntimeField("currentTcsRuntimeMode", runtime.testingModes);
+    }
+
+    function aggregateTcsRuntime(rows) {
+        const versions = uniqueValues(rows.map(function (row) {
+            return (row.current_version || "").trim();
+        }).filter(Boolean));
+        const serviceTypes = uniqueValues([].concat.apply([], rows.map(function (row) {
+            return Array.isArray(row.service_types) ? row.service_types : [];
+        })));
+        const testingModes = uniqueValues(rows.map(function (row) {
+            return (row.testing_mode || "").trim();
+        }).filter(Boolean));
+
+        return {
+            version: selectPreferredVersion(versions) || "-",
+            serviceTypes: serviceTypes[0] || "-",
+            testingModes: testingModes.join(", ") || "-",
+        };
+    }
+
+    function loadCurrentTcsRuntime(envId) {
+        const selectedEnvId = String(envId || "").trim();
+        runtimeRequestToken += 1;
+        const requestToken = runtimeRequestToken;
+
+        if (!selectedEnvId) {
+            showRuntimePlaceholder(RUNTIME_PLACEHOLDER_MESSAGE);
+            return Promise.resolve();
+        }
+
+        showRuntimePlaceholder(RUNTIME_LOADING_MESSAGE);
+
+        const params = new URLSearchParams({
+            env_scope_type: "ENV",
+            env_id: selectedEnvId,
+            target_key: "TCS_APP",
+        });
+
+        return common.fetchJson(currentDeploymentsApiUrl + "?" + params.toString(), {
+            credentials: "include",
+        }).then(function (result) {
+            if (requestToken !== runtimeRequestToken) {
+                return;
+            }
+
+            if (!result.ok) {
+                throw new Error(result.data.error || "Unable to load current TCS runtime.");
+            }
+
+            const rows = Array.isArray(result.data.current_deployments)
+                ? result.data.current_deployments
+                : [];
+
+            if (!rows.length) {
+                showRuntimePlaceholder(RUNTIME_EMPTY_MESSAGE);
+                return;
+            }
+
+            showRuntimeDetails(aggregateTcsRuntime(rows));
+        }).catch(function () {
+            if (requestToken !== runtimeRequestToken) {
+                return;
+            }
+            showRuntimePlaceholder(RUNTIME_ERROR_MESSAGE);
+        });
+    }
+
+    function applyDefaultDateTimeValues(force) {
+        common.populateTimeSlotOptions({
+            selectId: "formStartTime",
+            placeholder: "Select time...",
+            selectedValue: elements.startTime ? elements.startTime.value : "",
+            slotMinutes: 30,
+        });
+        common.populateTimeSlotOptions({
+            selectId: "formEndTime",
+            placeholder: "Select time...",
+            selectedValue: elements.endTime ? elements.endTime.value : "",
+            slotMinutes: 30,
+        });
+
+        if (elements.startDate && elements.startTime && (force || !elements.startDate.value || !elements.startTime.value)) {
+            const startSlot = common.buildLocalDateTimeParts({ slotMinutes: 30, roundUp: true });
+            elements.startDate.value = startSlot.date;
+            elements.startTime.value = startSlot.time;
+        }
+        if (elements.endDate && elements.endTime && (force || !elements.endDate.value || !elements.endTime.value)) {
+            const endSlot = common.buildLocalDateTimeParts({ slotMinutes: 30, roundUp: true, addMinutes: 60 });
+            elements.endDate.value = endSlot.date;
+            elements.endTime.value = endSlot.time;
+        }
+    }
+
+    function applyInitialEnvironmentSelection() {
+        if (!initialEnvId) {
+            return;
+        }
+
+        const selectedEnvironment = environments.find(function (env) {
+            return env.env_id === initialEnvId;
+        });
+        if (!selectedEnvironment) {
+            return;
+        }
+
+        elements.envType.value = selectedEnvironment.env_type || "";
+        populateQuickEnvOptions(selectedEnvironment.env_type || "");
+        elements.envId.value = selectedEnvironment.env_id;
+        loadCurrentTcsRuntime(selectedEnvironment.env_id);
+        showFormMessage(
+            "Environment " + selectedEnvironment.env_id + " was preselected from the health dashboard.",
+            "muted"
+        );
+    }
+
     function showFormMessage(message, type) {
         common.setInlineMessage({
             messageId: "formMessage",
@@ -36,6 +273,38 @@
             message: message,
             type: type || "muted",
         });
+    }
+
+    function showAvailabilityToast(message) {
+        if (elements.availabilityToastBody) {
+            elements.availabilityToastBody.textContent = message;
+        }
+        if (availabilityToast) {
+            availabilityToast.show();
+        }
+    }
+
+    function getFormValues() {
+        const startDateTime = common.combineLocalDateAndTime(elements.startDate.value, elements.startTime.value);
+        const endDateTime = common.combineLocalDateAndTime(elements.endDate.value, elements.endTime.value);
+
+        return {
+            startTime: startDateTime,
+            endTime: endDateTime,
+            envId: elements.envId.value,
+            description: elements.description.value.trim(),
+        };
+    }
+
+    function hasInvalidTimeRange(startTime, endTime) {
+        return new Date(startTime) >= new Date(endTime);
+    }
+
+    function resetBookingForm() {
+        elements.form.reset();
+        populateQuickEnvOptions("");
+        applyDefaultDateTimeValues(true);
+        showRuntimePlaceholder(RUNTIME_PLACEHOLDER_MESSAGE);
     }
 
     function fetchBookingList() {
@@ -54,26 +323,24 @@
     }
 
     function checkAvailability() {
-        const startTime = document.getElementById("formStartTime").value;
-        const endTime = document.getElementById("formEndTime").value;
-        const envId = document.getElementById("formEnvId").value;
+        const values = getFormValues();
 
-        if (!startTime || !endTime || !envId) {
-            showFormMessage("Select environment, start time, and end time first.", "danger");
+        if (!values.startTime || !values.endTime || !values.envId) {
+            showFormMessage("Select environment, start date/time, and end date/time first.", "danger");
             return;
         }
 
-        if (new Date(startTime) >= new Date(endTime)) {
+        if (hasInvalidTimeRange(values.startTime, values.endTime)) {
             showFormMessage("End time must be after start time.", "danger");
             return;
         }
 
         return fetchBookingList().then(function () {
             const conflictingItem = cachedBookings.find(function (booking) {
-                const overlaps = booking.env_id === envId &&
+                const overlaps = booking.env_id === values.envId &&
                     booking.lifecycle_status !== "cancelled" &&
-                    new Date(startTime) < new Date(booking.end_time) &&
-                    new Date(endTime) > new Date(booking.start_time);
+                    new Date(values.startTime) < new Date(booking.end_time) &&
+                    new Date(values.endTime) > new Date(booking.start_time);
 
                 if (!overlaps) {
                     return false;
@@ -96,6 +363,7 @@
             }
 
             showFormMessage(getAvailabilitySuccessMessage(), "success");
+            showAvailabilityToast(getAvailabilitySuccessMessage());
         });
     }
 
@@ -108,27 +376,24 @@
 
     function handleQuickBookingSubmit(event) {
         event.preventDefault();
-        const startTime = document.getElementById("formStartTime").value;
-        const endTime = document.getElementById("formEndTime").value;
-        const envId = document.getElementById("formEnvId").value;
-        const description = document.getElementById("formDescription").value.trim();
+        const values = getFormValues();
 
-        if (!startTime || !endTime || !envId) {
-            showFormMessage("Please fill start time, end time, and environment.", "danger");
+        if (!values.startTime || !values.endTime || !values.envId) {
+            showFormMessage("Please fill start date/time, end date/time, and environment.", "danger");
             return;
         }
 
-        if (new Date(startTime) >= new Date(endTime)) {
+        if (hasInvalidTimeRange(values.startTime, values.endTime)) {
             showFormMessage("End time must be after start time.", "danger");
             return;
         }
 
         const payload = {
-            env_id: envId,
-            start_time: new Date(startTime).toISOString(),
-            end_time: new Date(endTime).toISOString(),
+            env_id: values.envId,
+            start_time: new Date(values.startTime).toISOString(),
+            end_time: new Date(values.endTime).toISOString(),
             booking_type: "RESERVATION",
-            description: description,
+            description: values.description,
             user_timezone: common.getUserTimezone(serverTimezone),
         };
 
@@ -146,8 +411,7 @@
                     return;
                 }
                 showFormMessage("Booking created successfully.", "success");
-                document.getElementById("quickBookingForm").reset();
-                populateQuickEnvOptions("");
+                resetBookingForm();
                 fetchBookingList();
             })
             .catch(function () {
@@ -156,14 +420,30 @@
     }
 
     document.addEventListener("DOMContentLoaded", function () {
-        document.getElementById("formEnvType").addEventListener("change", function () {
+        cacheElements();
+
+        if (elements.availabilityToast) {
+            availabilityToast = new bootstrap.Toast(elements.availabilityToast, {
+                autohide: true,
+                delay: 3200,
+            });
+        }
+
+        elements.envType.addEventListener("change", function () {
             populateQuickEnvOptions(this.value);
+            showRuntimePlaceholder(RUNTIME_PLACEHOLDER_MESSAGE);
         });
-        document.getElementById("checkAvailabilityBtn").addEventListener("click", checkAvailability);
-        document.getElementById("quickBookingForm").addEventListener("submit", handleQuickBookingSubmit);
+        elements.envId.addEventListener("change", function () {
+            loadCurrentTcsRuntime(this.value);
+        });
+        elements.checkAvailabilityBtn.addEventListener("click", checkAvailability);
+        elements.form.addEventListener("submit", handleQuickBookingSubmit);
 
         populateQuickEnvOptions("");
+        applyDefaultDateTimeValues(false);
+        showRuntimePlaceholder(RUNTIME_PLACEHOLDER_MESSAGE);
         fetchBookingList();
         updatePolicyHint();
+        applyInitialEnvironmentSelection();
     });
 }());

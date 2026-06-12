@@ -3,6 +3,7 @@ import uuid
 from datetime import datetime
 from flask_sqlalchemy import SQLAlchemy
 
+from .component_build_catalog import build_package_entries
 from .constants import (
     BOOKING_LIFECYCLE_STATUS,
     BOOKING_MUTABLE_LIFECYCLE_STATUSES,
@@ -223,6 +224,7 @@ class ServerType(db.Model):
 
     target_type = db.Column(db.String(50), nullable=False)
     # TCS_APP / DB / PAYAPP / TOOLS
+    target_key = db.synonym("target_type")
 
     description = db.Column(db.Text)
 
@@ -293,7 +295,7 @@ class EnvironmentHostMapping(db.Model):
             "env_type": self.env_type,
             "server_type_id": self.server_type_id,
             "server_type_key": self.server_type.server_type_key if self.server_type else None,
-            "target_type": self.server_type.target_type if self.server_type else None,
+            "target_key": self.server_type.target_key if self.server_type else None,
             "host_id": self.host_id,
             "hostname": self.host.hostname if self.host else None,
             "ip_address": self.host.ip_address if self.host else None,
@@ -313,15 +315,9 @@ class ComponentBuild(db.Model):
     # TCS_APP / DB / PAYAPP / TOOLS
 
     build_name = db.Column(db.String(100), nullable=False)
-    # component/build identifier such as core, gateway, payapp, tool1
+    # Stable service/app identity such as tcs_service, tcs_db, payapp, or tool1.
 
     version = db.Column(db.String(50), nullable=False)
-
-    artifact_name = db.Column(db.String(255))
-    artifact_path = db.Column(db.String(500))
-    artifact_size_bytes = db.Column(db.BigInteger)
-    checksum = db.Column(db.String(100))
-    build_metadata = db.Column(db.JSON)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -341,15 +337,42 @@ class ComponentBuild(db.Model):
         return {
             "build_id": self.build_id,
             "target_key": self.target_key,
+            "app_name": self.build_name,
             "build_name": self.build_name,
             "version": self.version,
-            "artifact_name": self.artifact_name,
-            "artifact_path": self.artifact_path,
-            "artifact_size_bytes": self.artifact_size_bytes,
-            "checksum": self.checksum,
-            "build_metadata": self.build_metadata,
+            "package_entries": self.package_entries(),
             "created_at": format_datetime(self.created_at),
         }
+
+    def package_entries(self):
+        from .domain.deployment_targets import get_target_definition
+
+        target_definition = get_target_definition(self.target_key) or {}
+        if self.target_key == "TOOLS":
+            selected_package_keys = [self.build_name]
+        else:
+            selected_package_keys = list((target_definition.get("packages") or {}).keys())
+        return build_package_entries(
+            self.target_key,
+            target_definition=target_definition,
+            selected_package_keys=selected_package_keys,
+            build_name=self.build_name,
+        )
+
+    def get_package_entry(self, package_key):
+        normalized_key = (package_key or "").strip().lower()
+        for package_data in self.package_entries():
+            if (package_data.get("package_key") or "").strip().lower() == normalized_key:
+                return package_data
+        return None
+
+    def package_summary(self):
+        package_keys = [
+            (package_data.get("package_key") or "").strip().lower()
+            for package_data in self.package_entries()
+            if (package_data.get("package_key") or "").strip()
+        ]
+        return ", ".join(package_keys) if package_keys else "-"
 
 
 # ==========================================================
@@ -523,7 +546,9 @@ class DeploymentRequest(db.Model):
     requested_version = db.Column(db.String(50), nullable=False)
 
     package_keys_raw = db.Column("package_keys", db.Text, nullable=False)
-    # JSON list: ["core"] or ["coredb", "lgdb"]
+    # JSON list used only for tool deployments, for example ["tool1"].
+    selected_server_mapping_ids_raw = db.Column("selected_server_mapping_ids", db.Text, nullable=False, default="[]")
+    # JSON list of selected EnvironmentHostMapping ids for deployment execution.
 
     testing_mode = db.Column(db.String(50), nullable=False, default="")
     service_types = db.Column(db.Text, nullable=False, default="[]")
@@ -587,6 +612,27 @@ class DeploymentRequest(db.Model):
     def package_keys(self, packages):
         self.package_keys_raw = json_dumps(packages)
 
+    @property
+    def selected_server_mapping_ids(self):
+        values = parse_json_list(self.selected_server_mapping_ids_raw)
+        normalized = []
+        for value in values:
+            try:
+                normalized.append(int(value))
+            except (TypeError, ValueError):
+                continue
+        return normalized
+
+    @selected_server_mapping_ids.setter
+    def selected_server_mapping_ids(self, mapping_ids):
+        normalized = []
+        for value in mapping_ids or []:
+            try:
+                normalized.append(int(value))
+            except (TypeError, ValueError):
+                continue
+        self.selected_server_mapping_ids_raw = json_dumps(normalized)
+
     def get_service_types(self):
         return parse_json_list(self.service_types)
 
@@ -611,29 +657,87 @@ class DeploymentRequest(db.Model):
     def environment_scope_value(self):
         return self.env_id
 
-    @property
-    def package_definitions(self):
-        packages = self.target_definition.get("packages") or {}
-        return [
-            packages[package_key]
-            for package_key in self.package_keys
-            if package_key in packages
-        ]
-
-    @property
-    def package_display_names(self):
-        names = []
-        packages = self.target_definition.get("packages") or {}
-        for package_key in self.package_keys:
-            package = packages.get(package_key) or {}
-            names.append(package.get("package_name") or package_key)
-        return names
+    def get_package_entry(self, package_key):
+        normalized_key = (package_key or "").strip().lower()
+        package_entries = build_package_entries(
+            self.target_key,
+            target_definition=self.target_definition,
+            selected_package_keys=list((self.target_definition.get("packages") or {}).keys()),
+        )
+        for package in package_entries:
+            package_aliases = {
+                (package.get("package_key") or "").strip().lower(),
+                (package.get("server_type_key") or "").strip().lower(),
+                (package.get("package_name") or "").strip().lower(),
+            }
+            if normalized_key in package_aliases:
+                return package
+        return None
 
     @property
     def build_name(self):
         return (
             self.build.build_name if self.build else None
         ) or self.target_key
+
+    @property
+    def build_version(self):
+        return self.requested_version
+
+    @property
+    def selected_server_mappings(self):
+        mappings = []
+        seen_ids = set()
+        for deployment in self.deployments or []:
+            mapping = deployment.environment_host_mapping
+            if mapping is None or mapping.environment_host_mapping_id in seen_ids:
+                continue
+            seen_ids.add(mapping.environment_host_mapping_id)
+            mappings.append(mapping)
+        if mappings:
+            return mappings
+
+        selected_ids = self.selected_server_mapping_ids
+        if not selected_ids:
+            return []
+
+        mapping_by_id = {
+            mapping.environment_host_mapping_id: mapping
+            for mapping in EnvironmentHostMapping.query.filter(
+                EnvironmentHostMapping.environment_host_mapping_id.in_(selected_ids)
+            ).all()
+        }
+        return [
+            mapping_by_id[mapping_id]
+            for mapping_id in selected_ids
+            if mapping_id in mapping_by_id
+        ]
+
+    @property
+    def selected_servers(self):
+        servers = []
+        for mapping in self.selected_server_mappings:
+            host = mapping.host
+            server_type = mapping.server_type
+            hostname = host.hostname if host is not None else None
+            server_type_key = server_type.server_type_key if server_type is not None else None
+            label_parts = [part for part in [server_type_key, hostname] if part]
+            servers.append(
+                {
+                    "environment_host_mapping_id": mapping.environment_host_mapping_id,
+                    "server_type_key": server_type_key,
+                    "host_id": host.host_id if host is not None else None,
+                    "hostname": hostname,
+                    "ip_address": host.ip_address if host is not None else None,
+                    "label": " / ".join(label_parts) if label_parts else str(mapping.environment_host_mapping_id),
+                }
+            )
+        return servers
+
+    @property
+    def selected_servers_summary(self):
+        labels = [server.get("label") for server in self.selected_servers if server.get("label")]
+        return ", ".join(labels)
 
     def environment_display_label(self):
         return self.env_id or "-"
@@ -673,11 +777,14 @@ class DeploymentRequest(db.Model):
             "build_id": self.build_id,
             "target_key": self.target_key,
             "target_display_name": self.target_display_name,
+            "app_name": self.build_name,
             "build_name": self.build_name,
-            "artifact_name": self.build.artifact_name if self.build else None,
+            "build_version": self.build_version,
             "requested_version": self.requested_version,
             "package_keys": self.package_keys,
-            "package_display_names": self.package_display_names,
+            "selected_server_mapping_ids": self.selected_server_mapping_ids,
+            "selected_servers": self.selected_servers,
+            "selected_servers_summary": self.selected_servers_summary,
             "testing_mode": self.testing_mode,
             "service_types": self.get_service_types(),
             "jira_id": self.jira_id,
@@ -693,7 +800,7 @@ class DeploymentRequest(db.Model):
             "last_notified_at": format_datetime(self.last_notified_at),
             "resolved_hostnames": resolved_hostnames,
             "resolved_hosts_summary": ", ".join(resolved_hostnames),
-            "resolved_targets": [deployment.to_dict() for deployment in self.deployments],
+            "deployments": [deployment.to_dict() for deployment in self.deployments],
             "created_at": format_datetime(self.created_at),
             "updated_at": format_datetime(self.updated_at),
         }
@@ -723,7 +830,7 @@ class Deployment(db.Model):
     # cor / gateway / cordb / paydb / lg / tool1
 
     package_name = db.Column(db.String(150), nullable=False)
-    # tcs_service_cor / tcs_service_gateway / cordb / tool1
+    # display/package label snapshot for this execution line
 
     deployed_version = db.Column(db.String(50), nullable=False)
 
@@ -768,6 +875,18 @@ class Deployment(db.Model):
         mapping = self.environment_host_mapping
         return mapping.host_id if mapping else None
 
+    @property
+    def target_key(self):
+        request = self.deployment_request
+        return request.target_key if request else None
+
+    @property
+    def package_metadata(self):
+        request = self.deployment_request
+        if request is None:
+            return None
+        return request.get_package_entry(self.package_key)
+
     def to_dict(self):
         return {
             "deployment_id": self.deployment_id,
@@ -776,9 +895,27 @@ class Deployment(db.Model):
             "env_id": self.env_id,
             "server_type_key": self.server_type_key,
             "host_id": self.host_id,
+            "hostname": (
+                self.environment_host_mapping.host.hostname
+                if self.environment_host_mapping and self.environment_host_mapping.host
+                else None
+            ),
+            "target_key": self.target_key,
             "package_key": self.package_key,
+            "app_name": self.package_name,
             "package_name": self.package_name,
+            "package_metadata": self.package_metadata,
             "deployed_version": self.deployed_version,
+            "server_label": " / ".join([
+                part for part in [
+                    self.server_type_key,
+                    (
+                        self.environment_host_mapping.host.hostname
+                        if self.environment_host_mapping and self.environment_host_mapping.host
+                        else None
+                    ),
+                ] if part
+            ]),
             "deployment_status": self.deployment_status,
             "log_excerpt": self.log_excerpt,
             "started_at": format_datetime(self.started_at),
@@ -810,6 +947,8 @@ class CurrentDeploymentState(db.Model):
     package_key = db.Column(db.String(100), nullable=False)
     package_name = db.Column(db.String(150), nullable=False)
     current_version = db.Column(db.String(50))
+    testing_mode = db.Column(db.String(50), nullable=False, default="")
+    service_types = db.Column(db.Text, nullable=False, default="[]")
     source = db.Column(db.String(30), nullable=False, default="DEPLOYMENT")
     status = db.Column(db.String(30), nullable=False, default="CURRENT")
     updated_by = db.Column(
@@ -820,6 +959,11 @@ class CurrentDeploymentState(db.Model):
     deployment_request_id = db.Column(
         db.String(50),
         db.ForeignKey("deployment_requests.deployment_request_id"),
+        nullable=True,
+    )
+    deployment_id = db.Column(
+        db.Integer,
+        db.ForeignKey("deployments.deployment_id"),
         nullable=True,
     )
     notes = db.Column(db.Text)
@@ -833,6 +977,7 @@ class CurrentDeploymentState(db.Model):
     environment = db.relationship("Environment", backref="current_deployment_states")
     environment_host_mapping = db.relationship("EnvironmentHostMapping", backref="current_states")
     deployment_request = db.relationship("DeploymentRequest", backref="current_state_updates")
+    deployment = db.relationship("Deployment", backref="current_state_updates")
     updated_by_user = db.relationship("User")
 
     __table_args__ = (
@@ -854,6 +999,12 @@ class CurrentDeploymentState(db.Model):
         ),
     )
 
+    def get_service_types(self):
+        return parse_json_list(self.service_types)
+
+    def set_service_types(self, service_types):
+        self.service_types = json_dumps(service_types)
+
     def to_dict(self):
         mapping = self.environment_host_mapping
         host = mapping.host if mapping else None
@@ -871,12 +1022,21 @@ class CurrentDeploymentState(db.Model):
                 else self.target_key
             ),
             "package_key": self.package_key,
+            "app_name": self.package_name,
             "package_name": self.package_name,
             "current_version": self.current_version,
+            "testing_mode": self.testing_mode,
+            "service_types": self.get_service_types(),
             "source": self.source,
             "status": self.status,
             "updated_by": self.updated_by,
             "deployment_request_id": self.deployment_request_id,
+            "deployment_id": self.deployment_id,
+            "package_metadata": (
+                deployment_request.get_package_entry(self.package_key)
+                if deployment_request is not None else
+                None
+            ),
             "server_type_key": mapping.server_type.server_type_key if mapping and mapping.server_type else None,
             "hostname": host.hostname if host else None,
             "host_id": host.host_id if host else None,

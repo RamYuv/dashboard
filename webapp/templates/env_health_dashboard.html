@@ -3,6 +3,7 @@
 {% block navbar %}{% endblock %}
 {% block extra_head %}
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/environment-dashboard-sidebar.css') }}">
     <style>
         :root {
             --shell-navy: #16244f;
@@ -28,7 +29,9 @@
             margin: 0;
             background: var(--canvas);
             color: var(--text-main);
-            font-family: "Trebuchet MS", Arial, sans-serif;
+            font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+            font-size: 14px;
+            line-height: 1.5;
             min-height: 100vh;
         }
 
@@ -37,159 +40,42 @@
             min-height: calc(100vh - var(--app-shell-header-height));
         }
 
-        .sidebar {
-            width: 230px;
-            background: linear-gradient(180deg, var(--sidebar-start), var(--sidebar-end));
-            border-right: 1px solid rgba(21, 32, 51, 0.18);
-            padding: 22px 16px;
-            position: fixed;
-            left: 0;
-            top: var(--app-shell-header-height);
-            bottom: 0;
-            height: calc(100vh - var(--app-shell-header-height));
-        }
-
-        .sidebar-nav {
-            padding-top: 8px;
-        }
-
-        .menu-item {
-            display: flex;
-            align-items: center;
-            gap: 14px;
-            color: #f8fbff;
-            padding: 13px 14px;
-            border-radius: 8px;
-            margin-bottom: 12px;
-            text-decoration: none;
-            font-size: 15px;
-        }
-
-        .menu-item i {
-            width: 22px;
-            font-size: 18px;
-        }
-
-        .menu-item.active,
-        .menu-item:hover {
-            background: var(--active-strip);
-            color: #ffffff;
-            text-decoration: none;
-        }
-
-        .quick-actions {
-            margin-top: 24px;
-            padding: 16px;
-            border-radius: 14px;
-            background: rgba(255, 255, 255, 0.12);
-            border: 1px solid rgba(255, 255, 255, 0.18);
-        }
-
-        .quick-actions-title {
-            font-size: 13px;
-            margin-bottom: 12px;
-            text-transform: uppercase;
-            color: #e7eef8;
-            letter-spacing: 0.08em;
-            font-weight: 700;
-        }
-
-        .action-button {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            width: 100%;
-            margin-bottom: 10px;
-            padding: 12px 14px;
-            text-decoration: none;
-            border-radius: 10px;
-            background: rgba(255, 255, 255, 0.18);
-            color: #ffffff;
-            font-weight: 600;
-            transition: background 0.2s ease;
-        }
-
-        .action-button:hover {
-            background: rgba(255, 255, 255, 0.28);
-        }
-
-        .action-button.secondary {
-            background: rgba(14, 25, 58, 0.3);
-        }
-
-        .theme-toggle {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-top: 18px;
-            padding: 12px 14px;
-            border-radius: 12px;
-            background: rgba(255, 255, 255, 0.16);
-            color: #ffffff;
-            font-size: 13px;
-            cursor: pointer;
-        }
-
-        .theme-toggle i {
-            width: 18px;
-            text-align: center;
-        }
-
-        .sidebar-footer {
-            position: absolute;
-            left: 16px;
-            right: 16px;
-            bottom: 22px;
-            color: #e7eef8;
-            font-size: 12px;
-            border-top: 1px solid rgba(255, 255, 255, 0.2);
-            padding-top: 14px;
-        }
-
-        .main-content {
-            margin-left: 230px;
-            width: calc(100% - 230px);
-            min-height: calc(100vh - var(--app-shell-header-height));
-            background: linear-gradient(180deg, #fbfdff 0%, #eef3f9 100%);
-            position: relative;
-        }
-
         .content-wrapper {
-            padding: 22px 24px 28px;
+            padding: 16px 20px 24px;
         }
 
         .page-intro {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            gap: 16px;
-            margin-bottom: 14px;
+            margin-bottom: 8px;
+            text-align: center;
         }
 
         .page-intro h1 {
             margin: 0;
-            font-size: 30px;
-            font-weight: 800;
+            font-size: 24px;
+            font-weight: 500;
             color: var(--text-strong);
             letter-spacing: -0.02em;
         }
 
-        .page-intro p {
-            margin: 8px 0 0;
-            color: #475569;
-        }
-
         .toolbar {
             display: flex;
-            justify-content: flex-end;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
             gap: 8px;
-            margin-bottom: 16px;
+            margin-bottom: 4px;
             position: sticky;
             top: calc(var(--app-shell-header-height) + 8px);
             z-index: 15;
             background: rgba(244, 247, 251, 0.94);
-            padding: 10px 0 8px;
+            padding: 6px 0;
+        }
+
+        .toolbar-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
         }
 
         .toolbar .btn-dark-custom {
@@ -204,33 +90,59 @@
             box-shadow: 0 3px 8px rgba(34, 51, 84, 0.08);
         }
 
+        .sidebar-toggle-btn {
+            width: 42px;
+            height: 42px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(15, 24, 56, 0.18);
+            border-radius: 10px;
+            background: linear-gradient(180deg, #1f2f5c 0%, #111b3b 100%);
+            color: #f8fbff;
+            box-shadow: 0 10px 20px rgba(17, 27, 59, 0.18);
+            transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+        }
+
+        .sidebar-toggle-btn:hover,
+        .sidebar-toggle-btn:focus {
+            color: #ffffff;
+            background: linear-gradient(180deg, #243768 0%, #16244f 100%);
+            box-shadow: 0 12px 22px rgba(17, 27, 59, 0.24);
+            transform: translateY(-1px);
+        }
+
+        .sidebar-toggle-btn i {
+            font-size: 16px;
+        }
+
         .summary-grid {
             display: grid;
             grid-template-columns: repeat(5, 1fr);
-            gap: 16px;
-            margin-bottom: 24px;
+            gap: 10px;
+            margin-bottom: 12px;
         }
 
         .summary-card {
-            background: linear-gradient(180deg, #ffffff 0%, #eef4fb 100%);
+            background: #eaedee;
             border: 1px solid var(--panel-line);
-            border-radius: 14px;
-            min-height: 108px;
-            padding: 16px;
+            border-radius: 12px;
+            min-height: 82px;
+            padding: 12px 14px;
             display: flex;
             align-items: center;
-            gap: 14px;
+            gap: 10px;
             box-shadow: 0 8px 18px rgba(34, 51, 84, 0.08);
         }
 
         .summary-icon {
-            width: 54px;
-            height: 54px;
+            width: 40px;
+            height: 40px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 24px;
+            font-size: 18px;
         }
 
         .summary-icon.total { background: rgba(37, 99, 235, 0.24); color: #3b82f6; }
@@ -240,14 +152,15 @@
         .summary-icon.maintenance { background: rgba(59, 130, 246, 0.22); color: #3b82f6; }
 
         .summary-title {
-            font-size: 13px;
+            font-size: 12px;
             color: var(--text-strong);
-            margin-bottom: 4px;
+            margin-bottom: 2px;
             font-weight: 700;
+            line-height: 1.15;
         }
 
         .summary-number {
-            font-size: 28px;
+            font-size: 20px;
             font-weight: 700;
             color: var(--text-strong);
             line-height: 1;
@@ -255,15 +168,16 @@
 
         .summary-subtitle {
             color: #475569;
-            font-size: 12px;
-            margin-top: 6px;
+            font-size: 11px;
+            margin-top: 3px;
+            line-height: 1.1;
         }
 
         .group-card {
             background: var(--panel);
             border: 1px solid var(--panel-line);
             border-radius: 16px;
-            margin-bottom: 18px;
+            margin-bottom: 12px;
             padding: 18px 18px 20px;
             box-shadow: 0 10px 24px rgba(34, 51, 84, 0.07);
         }
@@ -289,61 +203,135 @@
 
         .server-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
             gap: 12px;
         }
 
         .env-card {
-            background: linear-gradient(180deg, var(--card-blue) 0%, var(--card-blue-dark) 100%);
-            border: 1px solid rgba(76, 112, 158, 0.32);
+            background: #eaedee;
+            border: 1px solid rgba(154, 169, 188, 0.72);
             border-radius: 16px;
-            min-height: 126px;
-            padding: 10px 8px;
+            min-height: auto;
+            padding: 8px 6px 7px;
             text-align: center;
             color: #0f1c33;
             transition: 0.2s ease;
             cursor: pointer;
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 8px 16px rgba(53, 93, 140, 0.12);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 8px 16px rgba(53, 93, 140, 0.08);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 4px;
+            position: relative;
+            overflow: visible;
         }
 
         .env-card:hover {
             transform: translateY(-3px);
             border-color: rgba(41, 73, 120, 0.55);
-            box-shadow: 0 10px 22px rgba(53, 93, 140, 0.22);
+            box-shadow: 0 10px 22px rgba(53, 93, 140, 0.14);
         }
 
         .env-card.active-booking {
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 0 0 2px rgba(34, 197, 94, 0.38), 0 10px 22px rgba(53, 93, 140, 0.22);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 0 0 2px rgba(34, 197, 94, 0.38), 0 10px 22px rgba(53, 93, 140, 0.14);
+        }
+
+        .env-card:focus-visible {
+            outline: 2px solid rgba(26, 33, 64, 0.42);
+            outline-offset: 2px;
+        }
+
+        .env-card[data-tooltip]:hover::after,
+        .env-card[data-tooltip]:focus-visible::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            left: 50%;
+            bottom: calc(100% + 12px);
+            transform: translateX(-50%);
+            width: max-content;
+            max-width: min(360px, calc(100vw - 24px));
+            background: rgba(15, 23, 42, 0.97);
+            color: #ffffff;
+            padding: 10px 12px;
+            border-radius: 10px;
+            box-shadow: 0 14px 28px rgba(15, 23, 42, 0.28);
+            font-size: 12px;
+            font-weight: 500;
+            line-height: 1.45;
+            text-align: left;
+            white-space: pre-line;
+            pointer-events: none;
+            z-index: 1300;
+        }
+
+        .env-card.tooltip-align-left:hover::after,
+        .env-card.tooltip-align-left:focus-visible::after {
+            left: 0;
+            transform: none;
+        }
+
+        .env-card.tooltip-align-right:hover::after,
+        .env-card.tooltip-align-right:focus-visible::after {
+            left: auto;
+            right: 0;
+            transform: none;
+        }
+
+        .env-card[data-tooltip]:hover::before,
+        .env-card[data-tooltip]:focus-visible::before {
+            content: "";
+            position: absolute;
+            left: 50%;
+            bottom: calc(100% + 4px);
+            transform: translateX(-50%);
+            border-left: 7px solid transparent;
+            border-right: 7px solid transparent;
+            border-top: 8px solid rgba(15, 23, 42, 0.97);
+            pointer-events: none;
+            z-index: 1299;
+        }
+
+        .env-card.tooltip-align-left:hover::before,
+        .env-card.tooltip-align-left:focus-visible::before {
+            left: 20px;
+            transform: none;
+        }
+
+        .env-card.tooltip-align-right:hover::before,
+        .env-card.tooltip-align-right:focus-visible::before {
+            left: auto;
+            right: 20px;
+            transform: none;
         }
 
         .env-card-title {
             font-weight: 700;
-            font-size: 20px;
-            margin-bottom: 8px;
+            font-size: 17px;
+            margin-bottom: 0;
             letter-spacing: 0.01em;
             color: var(--text-strong);
             line-height: 1.15;
         }
 
         .traffic-light {
-            width: 32px;
-            height: 66px;
-            margin: 0 auto 6px;
+            width: 58px;
+            height: 24px;
+            margin: 0 auto;
             background: linear-gradient(145deg, #1f2937, #111827);
-            border-radius: 10px;
-            padding: 6px;
+            border-radius: 8px;
+            padding: 4px 6px;
             display: flex;
-            flex-direction: column;
+            align-items: center;
             justify-content: space-between;
             box-shadow: inset 0 0 7px rgba(0,0,0,0.8);
         }
 
         .light {
-            width: 18px;
-            height: 18px;
+            width: 14px;
+            height: 14px;
             border-radius: 50%;
             background: #374151;
-            margin: 0 auto;
             border: 1px solid rgba(255,255,255,0.08);
         }
 
@@ -367,33 +355,11 @@
             box-shadow: 0 0 12px #3b82f6;
         }
 
-        .env-card-status {
-            font-size: 12px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-            text-shadow: 0 1px 0 rgba(255, 255, 255, 0.28);
-            background: rgba(255, 255, 255, 0.42);
-            border: 1px solid rgba(15, 23, 42, 0.12);
-            border-radius: 999px;
-            padding: 3px 8px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            min-width: 78px;
-        }
-
-        .env-card-status.healthy { color: #166534; }
-        .env-card-status.warning { color: #92400e; }
-        .env-card-status.critical { color: #991b1b; }
-        .env-card-status.maintenance { color: #1d4ed8; }
-        .env-card-status.unknown { color: #334155; }
-
         .bottom-info {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 18px;
-            margin-top: 14px;
+            grid-template-columns: 1fr;
+            gap: 12px;
+            margin-top: 8px;
         }
 
         .info-card {
@@ -440,7 +406,178 @@
         .mini-light.green { background: #22c55e; }
         .mini-light.yellow { background: #eab308; }
         .mini-light.red { background: #ef4444; }
-        .mini-light.blue { background: #3b82f6; }
+        .mini-light.gray { background: #94a3b8; }
+
+        .env-context-menu {
+            position: fixed;
+            min-width: 200px;
+            background: #ffffff;
+            border: 1px solid rgba(15, 23, 42, 0.14);
+            border-radius: 12px;
+            box-shadow: 0 18px 34px rgba(15, 23, 42, 0.18);
+            padding: 8px;
+            z-index: 1200;
+        }
+
+        .env-context-menu[hidden] {
+            display: none;
+        }
+
+        .env-context-menu-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text-soft);
+            padding: 4px 8px 8px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.26);
+            margin-bottom: 6px;
+        }
+
+        .env-context-menu button {
+            width: 100%;
+            border: 0;
+            background: transparent;
+            color: var(--text-main);
+            border-radius: 8px;
+            padding: 9px 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-align: left;
+            font-size: 13px;
+        }
+
+        .env-context-menu button:hover,
+        .env-context-menu button:focus-visible {
+            background: rgba(59, 130, 246, 0.1);
+            outline: none;
+        }
+
+        .env-context-menu button[disabled] {
+            color: #94a3b8;
+            cursor: not-allowed;
+        }
+
+        .about-modal .modal-dialog {
+            margin-top: calc(var(--app-shell-header-height) + 1rem);
+        }
+
+        .about-modal .modal-content {
+            border: 1px solid rgba(15, 23, 42, 0.12);
+            border-radius: 18px;
+            box-shadow: 0 24px 44px rgba(15, 23, 42, 0.18);
+            overflow: hidden;
+        }
+
+        .about-modal .modal-header {
+            background: linear-gradient(180deg, #f8fbff 0%, #eef3f9 100%);
+            border-bottom: 1px solid rgba(154, 169, 188, 0.35);
+            padding: 14px 18px;
+        }
+
+        .about-modal .modal-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--text-strong);
+        }
+
+        .about-modal .modal-body {
+            padding: 18px;
+            background: #fbfcfe;
+        }
+
+        .about-guide-card {
+            background: #ffffff;
+            border: 1px solid rgba(154, 169, 188, 0.35);
+            border-radius: 14px;
+            padding: 14px 16px;
+            box-shadow: 0 8px 18px rgba(34, 51, 84, 0.05);
+        }
+
+        .about-summary {
+            background: #ffffff;
+            border: 1px solid rgba(154, 169, 188, 0.35);
+            border-radius: 14px;
+            padding: 16px 18px;
+            box-shadow: 0 8px 18px rgba(34, 51, 84, 0.05);
+            margin-bottom: 16px;
+        }
+
+        .about-summary-row + .about-summary-row {
+            margin-top: 14px;
+        }
+
+        .about-label {
+            font-size: 17.25px;
+            font-weight: 600;
+            color: var(--text-strong);
+            margin-bottom: 4px;
+        }
+
+        .about-value {
+            color: #5f6d82;
+            font-size: 14px;
+            font-weight: 500;
+            line-height: 1.35;
+        }
+
+        .about-guide-title {
+            font-size: 20.7px;
+            font-weight: 600;
+            color: var(--text-strong);
+            margin-bottom: 12px;
+        }
+
+        .about-guide-row {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+
+        .guide-traffic-block {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            min-width: 120px;
+            padding: 10px 12px;
+            border: 1px solid rgba(154, 169, 188, 0.8);
+            border-radius: 14px;
+            background: #eaedee;
+        }
+
+        .guide-caption {
+            font-size: 12px;
+            color: #334155;
+            font-weight: 700;
+            text-align: center;
+        }
+
+        .about-guide-note {
+            color: #334155;
+            font-size: 14px;
+            margin-bottom: 12px;
+        }
+
+        .about-guide-list {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px 16px;
+        }
+
+        .about-guide-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            color: var(--text-strong);
+            font-size: 13px;
+        }
+
+        .about-guide-item .mini-light {
+            margin-top: 2px;
+            flex: 0 0 auto;
+        }
 
         .no-results {
             background: var(--panel);
@@ -454,21 +591,22 @@
 
         @media (max-width: 1200px) {
             .summary-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 992px) {
+            .summary-grid {
                 grid-template-columns: repeat(2, 1fr);
             }
         }
 
         @media (max-width: 768px) {
-            .sidebar {
-                display: none;
-            }
-
-            .main-content {
-                margin-left: 0;
-                width: 100%;
-            }
-
             .summary-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .about-guide-list {
                 grid-template-columns: 1fr;
             }
 
@@ -478,8 +616,11 @@
 
             .toolbar {
                 top: calc(var(--app-shell-header-height) + 8px);
-                justify-content: flex-start;
-                flex-wrap: wrap;
+                align-items: stretch;
+            }
+
+            .toolbar-actions {
+                width: 100%;
             }
         }
     </style>
@@ -505,48 +646,78 @@
     </div>
 {% endblock %}
 {% block content %}
-<div class="app-layout">
+<div class="app-layout" id="environmentDashboardLayout">
+    <div class="sidebar-backdrop" id="environmentDashboardSidebarBackdrop" hidden></div>
 
-    <aside class="sidebar">
+    <aside class="sidebar" id="environmentDashboardSidebar">
+        <div class="sidebar-menu-title">Menu</div>
+
         <nav class="sidebar-nav">
-            <a href="{{ url_for('booking.booking_grid') }}" class="menu-item"><i class="fas fa-th"></i> Environment Booking</a>
-            <a href="{{ url_for('booking.booking_screen') }}" class="menu-item"><i class="fas fa-calendar-alt"></i> Booking Calendar</a>
-            <a href="{{ url_for('booking.deployment_request') }}" class="menu-item"><i class="fas fa-rocket"></i> Deployment Request</a>
-            <a href="{{ url_for('booking.manage_bookings') }}" class="menu-item"><i class="fas fa-list"></i> My Requests</a>
-            {% if role == "admin" %}
-            <a href="{{ url_for('main.user_management_screen') }}" class="menu-item"><i class="fas fa-user-shield"></i> User Management</a>
-            <a href="{{ url_for('main.admin_screen') }}" class="menu-item"><i class="fas fa-users-cog"></i> Admin Screen</a>
-            {% endif %}
-            <div class="theme-toggle">
-                <i class="fas fa-moon"></i>
-                Dark Mode
-            </div>
-        </nav>
+            <a href="{{ url_for('main.environment_health') }}" class="menu-item active">Home</a>
+            <a href="{{ url_for('main.dashboard') }}" class="menu-item menu-item-light">Dashboards</a>
+            <a href="#" class="menu-item menu-item-light" data-bs-toggle="modal" data-bs-target="#aboutApplicationModal">About</a>
 
-        <div class="sidebar-footer">
-            &copy; 2024 Envista<br>
-            All rights reserved.
-        </div>
+            <details class="menu-group" open>
+                <summary class="menu-group-header">Services <i class="fas fa-chevron-down"></i></summary>
+                <div class="menu-group-body">
+                    <a href="{{ url_for('booking.booking_grid') }}" class="submenu-item">Bookings</a>
+                    <a href="{{ url_for('booking.deployment_request') }}" class="submenu-item">Deployment Request</a>
+                    {% if role == "admin" %}
+                    <a href="{{ url_for('main.admin_screen') }}" class="submenu-item">Admin</a>
+                    {% endif %}
+                </div>
+            </details>
+
+            <details class="menu-group" open>
+                <summary class="menu-group-header">Features <i class="fas fa-chevron-down"></i></summary>
+                <div class="menu-group-body">
+                    <a href="{{ url_for('booking.booking_screen') }}" class="submenu-item">Booking Calendar</a>
+                    <a href="{{ url_for('booking.manage_bookings') }}" class="submenu-item">Automated Correspondence</a>
+                    {% if role == "admin" %}
+                    <a href="{{ url_for('main.user_management_screen') }}" class="submenu-item">User Management</a>
+                    {% endif %}
+                </div>
+            </details>
+
+            <a href="{{ url_for('main.profile') }}" class="menu-item menu-item-light">Contact</a>
+        </nav>
     </aside>
 
     <section class="main-content">
 
         <section class="content-wrapper">
-            <div class="page-intro">
-                <div>
-                    <h1>Environment Dashboard</h1>
-                    <p>Live environment health, booking visibility, and operational summary in one place.</p>
+            <div class="toolbar">
+                <button
+                    id="toggleSidebarButton"
+                    class="btn-dark-custom sidebar-toggle-btn"
+                    type="button"
+                    aria-controls="environmentDashboardSidebar"
+                    aria-expanded="true"
+                    aria-label="Hide Sidebar"
+                    title="Hide Sidebar"
+                >
+                    <i class="fas fa-bars"></i>
+                </button>
+
+                <div class="toolbar-actions">
+                    <button class="btn-dark-custom" type="button">
+                        <i class="far fa-clock"></i> <span id="refreshSecondsText">{{ refresh_seconds }}</span>s
+                    </button>
+
+                    <button id="refreshButton" class="btn-dark-custom" type="button">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+
+                    <button class="btn-dark-custom" type="button">
+                        Last updated: <span id="lastUpdated">{{ summary.last_updated }}</span>
+                    </button>
                 </div>
             </div>
 
-            <div class="toolbar">
-                <button class="btn-dark-custom">
-                    <i class="far fa-clock"></i> <span id="refreshSecondsText">{{ refresh_seconds }}</span>s
-                </button>
-
-                <button id="refreshButton" class="btn-dark-custom">
-                    <i class="fas fa-sync-alt"></i> Refresh
-                </button>
+            <div class="page-intro">
+                <div>
+                    <h1>Environment Dashboard</h1>
+                </div>
             </div>
 
             <div class="summary-grid">
@@ -571,7 +742,7 @@
                 <div class="summary-card">
                     <div class="summary-icon warning"><i class="fas fa-exclamation-triangle"></i></div>
                     <div>
-                        <div class="summary-title">Warning</div>
+                        <div class="summary-title">Idle</div>
                         <div class="summary-number" id="warningCount">{{ summary.warning }}</div>
                         <div class="summary-subtitle" id="warningPercent">0%</div>
                     </div>
@@ -589,7 +760,7 @@
                 <div class="summary-card">
                     <div class="summary-icon maintenance"><i class="fas fa-wrench"></i></div>
                     <div>
-                        <div class="summary-title">Maintenance</div>
+                        <div class="summary-title">Unavailable</div>
                         <div class="summary-number" id="maintenanceCount">{{ summary.maintenance if summary.maintenance is defined else 0 }}</div>
                         <div class="summary-subtitle" id="maintenancePercent">0%</div>
                     </div>
@@ -598,39 +769,97 @@
 
             <div id="dashboardGroups"></div>
 
+            <div id="envContextMenu" class="env-context-menu" hidden>
+                <div id="envContextMenuTitle" class="env-context-menu-title">Environment</div>
+                <button type="button" data-action="booking" disabled><i class="fas fa-calendar-plus"></i> Booking</button>
+                <button type="button" data-action="investigate-env" disabled><i class="fas fa-search"></i> Investigate Environment</button>
+                <button type="button" data-action="auto-remediate" disabled><i class="fas fa-tools"></i> Auto Remediate</button>
+                <button type="button" data-action="logs" disabled><i class="fas fa-file-alt"></i> Tail Logs</button>
+            </div>
+
             <div class="bottom-info">
                 <div class="info-card">
                     <strong>Traffic Light Legend</strong>
                     <div class="legend-row mt-3">
                         <div class="legend-item">
                             <span class="mini-light green"></span>
-                            <div><strong>Healthy</strong><br><small class="text-muted">Normal traffic</small></div>
+                            <div><strong>Green</strong><br><small class="text-muted">TCS installed, all applications running</small></div>
                         </div>
                         <div class="legend-item">
                             <span class="mini-light yellow"></span>
-                            <div><strong>Warning</strong><br><small class="text-muted">High traffic</small></div>
+                            <div><strong>Yellow</strong><br><small class="text-muted">TCS installed, no applications running</small></div>
                         </div>
                         <div class="legend-item">
                             <span class="mini-light red"></span>
-                            <div><strong>Critical</strong><br><small class="text-muted">Very high traffic</small></div>
+                            <div><strong>Red</strong><br><small class="text-muted">TCS installed, one or more applications crashed</small></div>
                         </div>
                         <div class="legend-item">
-                            <span class="mini-light blue"></span>
-                            <div><strong>Maintenance</strong><br><small class="text-muted">Planned downtime</small></div>
+                            <span class="mini-light gray"></span>
+                            <div><strong>Grey (No lights on)</strong><br><small class="text-muted">TCS not found</small></div>
                         </div>
                     </div>
                 </div>
+            </div>
 
-                <div class="info-card">
-                    <div>
-                        <i class="fas fa-info-circle text-primary"></i>
-                        <span class="ml-2">Status is derived from server type and component checks.</span>
-                    </div>
-                    <div class="text-muted mt-2">
-                        Environment color comes from the aggregated VM and component state.
-                    </div>
-                    <div class="text-muted mt-2">
-                        Last updated: <span id="lastUpdated">{{ summary.last_updated }}</span>
+            <div class="modal fade about-modal" id="aboutApplicationModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h2 class="modal-title">About {{ app_short_name }}</h2>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="about-summary">
+                                <div class="about-summary-row">
+                                    <div class="about-label">Application Name</div>
+                                    <div class="about-value">{{ app_short_name }}</div>
+                                </div>
+                                <div class="about-summary-row">
+                                    <div class="about-label">Full Application Name:</div>
+                                    <div class="about-value">{{ app_full_name }}</div>
+                                </div>
+                                <div class="about-summary-row">
+                                    <div class="about-label">Version</div>
+                                    <div class="about-value">{{ app_version }}</div>
+                                </div>
+                            </div>
+
+                            <div class="about-guide-card">
+                                <div class="about-guide-title">Environment DashBoard Guide</div>
+                                <div class="about-guide-row">
+                                    <div class="guide-traffic-block">
+                                        <div class="traffic-light" aria-hidden="true">
+                                            <span class="light red active"></span>
+                                            <span class="light yellow active"></span>
+                                            <span class="light green active"></span>
+                                        </div>
+                                        <div class="guide-caption">DEV01</div>
+                                    </div>
+                                    <div class="about-guide-note">
+                                        <strong>Trafic Light: TCS Staus</strong>
+                                    </div>
+                                </div>
+
+                                <div class="about-guide-list">
+                                    <div class="about-guide-item">
+                                        <span class="mini-light green"></span>
+                                        <div><strong>Green:</strong> TCS installed and all applications running.</div>
+                                    </div>
+                                    <div class="about-guide-item">
+                                        <span class="mini-light yellow"></span>
+                                        <div><strong>Yellow:</strong> TCS installed but no applications are running.</div>
+                                    </div>
+                                    <div class="about-guide-item">
+                                        <span class="mini-light red"></span>
+                                        <div><strong>Red:</strong> TCS installed and one or more applications are down.</div>
+                                    </div>
+                                    <div class="about-guide-item">
+                                        <span class="mini-light gray"></span>
+                                        <div><strong>Grey:</strong> TCS not found or not available on the host.</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -642,7 +871,11 @@
 <script id="environmentHealthConfig" type="application/json">
     {{ {
         "apiUrl": url_for("monitoring.api_environment_health"),
+        "bookingGridUrl": url_for("booking.booking_grid"),
         "refreshSeconds": refresh_seconds,
+        "userRole": role,
+        "userTeams": team_names | default([], true),
+        "bookableEnvIds": bookable_env_ids | default([], true),
         "statuses": statuses,
         "activeEnvs": active_envs,
         "summary": summary
@@ -652,4 +885,3 @@
 {% block scripts %}
     <script src="{{ url_for('static', filename='js/pages/environment-health.js') }}"></script>
 {% endblock %}
-

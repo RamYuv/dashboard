@@ -1,0 +1,398 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block main_class %}container-fluid px-3 px-lg-4 pt-2 pb-5{% endblock %}
+{% block extra_head %}
+<style>
+    .admin-page {
+        max-width: 1360px;
+        margin: 0 auto;
+        padding-top: 0.35rem;
+    }
+
+    .admin-utility-row {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 0.35rem;
+    }
+
+    .admin-actions {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.7rem;
+        flex-wrap: wrap;
+    }
+
+    .admin-actions .btn {
+        border-radius: 10px;
+        padding: 0.5rem 0.9rem;
+        font-weight: 600;
+    }
+
+    .admin-tabs {
+        display: flex;
+        flex-wrap: nowrap !important;
+        overflow-x: auto;
+        gap: 1.3rem;
+        padding: 0 0 0.35rem;
+        margin: 0 0 0.55rem;
+        border-bottom: 1px solid #e4e8ee;
+        scrollbar-width: thin;
+    }
+
+    .admin-tabs .nav-link {
+        background: transparent;
+        border: 0;
+        border-bottom: 3px solid transparent;
+        border-radius: 999px;
+        color: #1063c9;
+        font-weight: 500;
+        padding: 0.35rem 0.8rem 0.7rem;
+        white-space: nowrap;
+        transition: color 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+    }
+
+    .admin-tabs .nav-link:hover {
+        color: #3d4147;
+        background: #ffffff;
+        border-bottom-color: #ccd5df;
+        box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+        transform: translateY(-1px);
+    }
+
+    .admin-tabs .nav-link.active {
+        color: #01070d;
+        background: transparent;
+        border-bottom-color: #c66f6f;
+        box-shadow: none;
+    }
+
+    .admin-panel.card {
+        border: 1px solid #edf1f6;
+        border-radius: 18px;
+        box-shadow: none !important;
+    }
+
+    .admin-panel .card-body {
+        padding: 1rem 1.1rem;
+    }
+
+    .admin-panel h2,
+    .admin-panel h3 {
+        color: #445363;
+    }
+
+    .admin-panel .form-label {
+        font-size: 0.92rem;
+        margin-bottom: 0.35rem;
+        color: #607081;
+    }
+
+    .admin-panel .form-control,
+    .admin-panel .form-select {
+        border-radius: 10px;
+        border-color: #d8e2ef;
+        padding: 0.62rem 0.8rem;
+        box-shadow: none;
+    }
+
+    .admin-panel .form-control:focus,
+    .admin-panel .form-select:focus {
+        border-color: #76a9fa;
+        box-shadow: 0 0 0 0.18rem rgba(31, 111, 235, 0.12);
+    }
+
+    .admin-panel .form-text,
+    .admin-panel .form-check-label {
+        color: #7c8898;
+    }
+
+    .admin-table-wrap {
+        max-height: 34rem;
+    }
+
+    .admin-table-wrap table {
+        margin-bottom: 0;
+    }
+
+    .admin-table-wrap thead th {
+        font-size: 0.84rem;
+        letter-spacing: 0.01em;
+        color: #1a3b5b;
+        background: #fbfcfe;
+    }
+
+    .admin-table-wrap tbody td {
+        vertical-align: middle;
+        color: #131313;
+    }
+
+    .admin-form-panel {
+        top: calc(var(--app-shell-header-height) + 8rem);
+    }
+
+    .admin-section-heading {
+        font-size: clamp(1.15rem, 1.5vw, 1.6rem);
+        font-weight: 600;
+        color: #455362;
+        margin: 0 0 0.35rem;
+    }
+
+    .admin-action-cell {
+        white-space: nowrap;
+        width: 1%;
+    }
+
+    .admin-row-actions {
+        display: inline-flex;
+        gap: 0.5rem;
+        align-items: center;
+    }
+
+    .admin-icon-btn {
+        width: 2.2rem;
+        height: 2.2rem;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 10px;
+    }
+
+    .admin-add-modal .modal-dialog {
+        width: min(42vw, 620px);
+        max-width: min(42vw, 620px);
+        margin-top: calc(var(--app-shell-header-height, 64px) + 1rem);
+        margin-bottom: 1rem;
+    }
+
+    .admin-add-modal .modal-content {
+        border-radius: 18px;
+        max-height: calc(100vh - var(--app-shell-header-height, 64px) - 2rem);
+        display: flex;
+        flex-direction: column;
+    }
+
+    .admin-add-modal {
+        z-index: 2100;
+    }
+
+    .admin-add-modal .modal-body {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        padding-top: 0.9rem;
+        padding-bottom: 0.9rem;
+    }
+
+    .admin-add-modal .modal-header,
+    .admin-add-modal .modal-footer {
+        padding-top: 0.8rem;
+        padding-bottom: 0.8rem;
+    }
+
+    @media (max-width: 991.98px) {
+        .admin-page {
+            max-width: none;
+        }
+
+        .admin-utility-row {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .admin-panel .card-body {
+            padding: 0.95rem;
+        }
+
+        .admin-form-panel {
+            top: auto;
+        }
+
+        .admin-add-modal .modal-dialog {
+            width: calc(100vw - 2rem);
+            max-width: calc(100vw - 2rem);
+            margin-top: calc(var(--app-shell-header-height, 64px) + 0.75rem);
+        }
+
+        .admin-add-modal .modal-content {
+            max-height: calc(100vh - var(--app-shell-header-height, 64px) - 1.5rem);
+        }
+    }
+</style>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const targetField = document.getElementById("build_target_key");
+        const toolRow = document.getElementById("toolBuildNameRow");
+        const toolField = document.getElementById("tool_build_name");
+        const appNamePreviewRow = document.getElementById("buildNamePreviewRow");
+        const appNamePreviewField = document.getElementById("build_name_preview");
+        const targetOptions = window.componentBuildTargetOptions || [];
+        const modalTriggers = document.querySelectorAll("[data-admin-modal-trigger]");
+
+        function syncVersionAdminForm() {
+            if (!targetField || !toolRow || !toolField || !appNamePreviewRow || !appNamePreviewField) {
+                return;
+            }
+            const selectedTarget = targetField.value || "";
+            const selectedTargetOption = targetOptions.find(function (target) {
+                return target.target_key === selectedTarget;
+            }) || null;
+            const toolPackages = (selectedTargetOption && selectedTargetOption.packages) || [];
+            const defaultBuildName = (selectedTargetOption && selectedTargetOption.default_build_name) || "";
+
+            toolField.innerHTML = '<option value="">Select tool</option>';
+            toolPackages.forEach(function (tool) {
+                const toolKey = tool.package_key || "";
+                if (!toolKey) {
+                    return;
+                }
+                toolField.insertAdjacentHTML(
+                    "beforeend",
+                    '<option value="' + toolKey + '">' + (tool.package_name || toolKey).toUpperCase() + "</option>"
+                );
+            });
+
+            const showToolField = selectedTarget === "TOOLS";
+            toolRow.style.display = showToolField ? "block" : "none";
+            appNamePreviewRow.style.display = showToolField ? "none" : "block";
+            toolField.required = showToolField;
+            appNamePreviewField.value = defaultBuildName;
+            if (!showToolField) {
+                toolField.value = "";
+            }
+        }
+
+        syncVersionAdminForm();
+        if (targetField) {
+            targetField.addEventListener("change", syncVersionAdminForm);
+        }
+
+        function applyFormValues(form, values) {
+            Object.keys(values || {}).forEach(function (fieldName) {
+                const field = form.querySelector('[name="' + fieldName + '"]');
+                if (!field) {
+                    return;
+                }
+                if (field.type === "checkbox") {
+                    field.checked = !!values[fieldName];
+                    return;
+                }
+                field.value = values[fieldName] == null ? "" : String(values[fieldName]);
+            });
+        }
+
+        modalTriggers.forEach(function (trigger) {
+            trigger.addEventListener("click", function () {
+                const formSelector = trigger.getAttribute("data-admin-form");
+                const form = formSelector ? document.querySelector(formSelector) : null;
+                if (!form) {
+                    return;
+                }
+
+                form.reset();
+
+                const valuesRaw = trigger.getAttribute("data-admin-values") || "{}";
+                let values = {};
+                try {
+                    values = JSON.parse(valuesRaw);
+                } catch (error) {
+                    values = {};
+                }
+                applyFormValues(form, values);
+
+                const actionField = form.querySelector('[name="action"]');
+                if (actionField) {
+                    actionField.value = trigger.getAttribute("data-admin-action") || "create";
+                }
+
+                const titleSelector = trigger.getAttribute("data-admin-title");
+                const titleText = trigger.getAttribute("data-admin-title-text");
+                if (titleSelector && titleText) {
+                    const titleNode = document.querySelector(titleSelector);
+                    if (titleNode) {
+                        titleNode.textContent = titleText;
+                    }
+                }
+
+                const submitSelector = trigger.getAttribute("data-admin-submit");
+                const submitText = trigger.getAttribute("data-admin-submit-text");
+                if (submitSelector && submitText) {
+                    const submitNode = document.querySelector(submitSelector);
+                    if (submitNode) {
+                        submitNode.textContent = submitText;
+                    }
+                }
+
+                if (targetField && form.contains(targetField)) {
+                    syncVersionAdminForm();
+                    applyFormValues(form, values);
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}
+{% block content %}
+{% set tab_labels = {
+    "users": "Admin Home",
+    "roles": "Roles",
+    "teams": "Teams",
+    "environments": "Environments",
+    "hosts": "Hosts",
+    "server_types": "Server Types",
+    "environment_host_mappings": "Environment Host Mappings",
+    "component_builds": "USP Versions"
+} %}
+{% set tab_titles = {
+    "users": "Admin Management",
+    "roles": "Role Management",
+    "teams": "Team Management",
+    "environments": "Environment Inventory Management",
+    "hosts": "Host Inventory Management",
+    "server_types": "Server Type Management",
+    "environment_host_mappings": "Environment Mapping Management",
+    "component_builds": "Version Catalog Management"
+} %}
+<div class="admin-page">
+    <div class="admin-utility-row">
+        <div class="d-flex flex-wrap gap-2 admin-actions">
+            <a href="{{ url_for('main.user_management_screen') }}" class="btn btn-primary">
+                <i class="fas fa-user-shield me-2"></i>User Management
+            </a>
+            <a href="{{ url_for('main.admin_export_config') }}" class="btn btn-outline-primary">
+                <i class="fas fa-file-export me-2"></i>Export Live Config
+            </a>
+        </div>
+    </div>
+
+    <ul class="nav admin-tabs">
+    {% for tab_name in admin_tabs %}
+            <li class="nav-item">
+                <a class="nav-link {% if active_tab == tab_name %}active{% endif %}" href="{{ url_for('main.admin_screen', tab=tab_name) }}">
+                    {{ tab_labels.get(tab_name, tab_name) }}
+                </a>
+            </li>
+        {% endfor %}
+    </ul>
+
+    {% set admin_partial_map = {
+        "users": "admin_tabs/_users.html",
+        "roles": "admin_tabs/_roles.html",
+        "teams": "admin_tabs/_teams.html",
+        "environments": "admin_tabs/_environments.html",
+        "hosts": "admin_tabs/_hosts.html",
+        "server_types": "admin_tabs/_server_types.html",
+        "environment_host_mappings": "admin_tabs/_environment_host_mappings.html",
+        "component_builds": "admin_tabs/_component_builds.html"
+    } %}
+    {% if active_tab in admin_partial_map %}
+        {% include admin_partial_map[active_tab] %}
+    {% endif %}
+</div>
+<script>
+window.componentBuildTargetOptions = {{ component_build_target_options|default([], true)|tojson }};
+</script>
+{% endblock %}

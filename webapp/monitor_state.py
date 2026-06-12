@@ -78,9 +78,23 @@ class MonitorState:
             "last_update_ts": self._last_update_ts,
         }
         temp_path = cache_path + ".tmp"
-        with open(temp_path, "w") as cache_file:
-            json.dump(cache_data, cache_file)
-        os.replace(temp_path, cache_path)
+        try:
+            with open(temp_path, "w", encoding="utf-8") as cache_file:
+                json.dump(cache_data, cache_file)
+            os.replace(temp_path, cache_path)
+        except (IOError, OSError, PermissionError) as exc:
+            current_app.logger.warning(
+                "Unable to persist monitoring cache to %s: %s",
+                cache_path,
+                exc,
+            )
+            try:
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+            except (IOError, OSError, PermissionError):
+                pass
+            self._cache_mtime = None
+            return
         try:
             self._cache_mtime = os.path.getmtime(cache_path)
         except (IOError, OSError):

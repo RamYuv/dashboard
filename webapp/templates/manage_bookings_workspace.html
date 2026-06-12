@@ -1,6 +1,9 @@
 {% extends "booking_workspace_base.html" %}
+{% from "components/_datetime_fields.html" import datetime_input_group %}
 {% set workspace_nav = "manage" %}
 {% block workspace_title %}Manage Requests{% endblock %}
+{% block workspace_shell_title %}Manage Booking Requests{% endblock %}
+{% block workspace_shell_subtitle %}See your reservations and deployment requests, then update or cancel the ones that are still scheduled.{% endblock %}
 {% block workspace_styles %}
 .page-card {
     background: #ffffff;
@@ -9,36 +12,23 @@
     overflow: hidden;
 }
 
-.page-header {
-    background: var(--primary-gradient);
-    color: #ffffff;
-    padding: 1.25rem 1.5rem;
-}
-
-.page-header h2 {
-    margin: 0;
-    font-size: 1.65rem;
-    font-weight: 700;
-}
-
-.page-header p {
-    margin: 0.35rem 0 0;
-    opacity: 0.92;
-}
-
 .page-body {
-    padding: 1.25rem 1.5rem 1.5rem;
+    padding: 0.9rem 1rem 1rem;
 }
 
 .summary-grid,
 .toolbar-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 0.9rem;
+    gap: 0.65rem;
+}
+
+.toolbar-grid {
+    align-items: end;
 }
 
 .summary-grid {
-    margin-bottom: 1rem;
+    margin-bottom: 0.75rem;
 }
 
 .summary-card,
@@ -46,21 +36,21 @@
     background: #f8fafc;
     border: 1px solid #e2e8f0;
     border-radius: 12px;
-    padding: 1rem;
+    padding: 0.75rem 0.85rem;
 }
 
 .summary-label {
     color: #64748b;
-    font-size: 0.78rem;
+    font-size: 0.72rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
 }
 
 .summary-value {
-    margin-top: 0.35rem;
+    margin-top: 0.2rem;
     color: #0f172a;
-    font-size: 1.45rem;
+    font-size: 1.15rem;
     font-weight: 700;
 }
 
@@ -70,18 +60,38 @@
     overflow: hidden;
 }
 
+.toolbar-card .form-label {
+    margin-bottom: 0.3rem;
+    font-size: 0.88rem;
+}
+
+.toolbar-card .form-control,
+.toolbar-card .form-select {
+    min-height: 2.6rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.92rem;
+}
+
 .table thead th {
     background: #eff6ff;
     color: #334155;
-    font-size: 0.8rem;
+    font-size: 0.74rem;
     text-transform: uppercase;
     letter-spacing: 0.04em;
     border-bottom: 1px solid #dbeafe;
+    padding-top: 0.8rem;
+    padding-bottom: 0.8rem;
 }
 
 .table td,
 .table th {
     vertical-align: middle;
+}
+
+.table tbody td {
+    padding-top: 0.8rem;
+    padding-bottom: 0.8rem;
+    font-size: 0.93rem;
 }
 
 .type-pill {
@@ -98,12 +108,12 @@
 
 .row-note {
     color: #64748b;
-    font-size: 0.82rem;
+    font-size: 0.78rem;
 }
 
 .action-group {
     display: flex;
-    gap: 0.5rem;
+    gap: 0.4rem;
     flex-wrap: wrap;
 }
 
@@ -111,20 +121,47 @@
     background: #f8fafc;
     border: 1px solid #e2e8f0;
     border-radius: 10px;
-    padding: 1rem;
-    margin-bottom: 1rem;
+    padding: 0.8rem 0.9rem;
+    margin-bottom: 0.75rem;
 }
 
 .modal-section-title {
     font-weight: 700;
     color: #334155;
-    margin-bottom: 0.9rem;
+    margin-bottom: 0.65rem;
+    font-size: 0.96rem;
 }
 
 .empty-state {
     text-align: center;
     color: #64748b;
-    padding: 2rem 1rem;
+    padding: 1.5rem 0.9rem;
+}
+
+.manage-requests-modal .modal-header,
+.manage-requests-modal .modal-footer {
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+}
+
+.manage-requests-modal .form-label {
+    margin-bottom: 0.3rem;
+    font-size: 0.88rem;
+}
+
+.manage-requests-modal .form-control,
+.manage-requests-modal .form-select {
+    min-height: 2.6rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.92rem;
+}
+
+.manage-requests-modal textarea.form-control {
+    min-height: 3.4rem;
+}
+
+.manage-requests-modal .btn {
+    font-size: 0.92rem;
 }
 
 @media (max-width: 991px) {
@@ -136,15 +173,10 @@
 {% endblock %}
 {% block workspace_content %}
 <div class="page-card">
-    <div class="page-header">
-        <h2><i class="fas fa-list-check me-2"></i>Manage Booking Requests</h2>
-        <p>See your environment reservations and deployment requests, then modify or cancel the ones that are still scheduled.</p>
-    </div>
-
     <div class="page-body">
         <div id="pageMessage" style="display: none;"></div>
         {% if reservation_policy.mutual_env_reservation_enabled %}
-        <div class="alert alert-light border mb-3">
+        <div class="alert alert-light border mb-2 py-2 px-3">
             <i class="fas fa-shield-alt me-2"></i>
             Environment bookings and env-scoped deployment requests now reserve the same time window.
         </div>
@@ -202,7 +234,7 @@
                     <input id="filterSearch" class="form-control" type="text" placeholder="Env, booking id, requester">
                 </div>
             </div>
-            <div class="d-flex justify-content-end mt-3">
+            <div class="d-flex justify-content-end mt-2">
                 <button id="clearFiltersButton" type="button" class="btn btn-outline-secondary btn-sm">
                     <i class="fas fa-rotate-left me-1"></i>Clear Filters
                 </button>
@@ -233,7 +265,7 @@
     </div>
 </div>
 
-<div class="modal fade" id="editBookingModal" tabindex="-1" aria-hidden="true">
+<div class="modal fade manage-requests-modal" id="editBookingModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
@@ -247,12 +279,10 @@
                         <div class="modal-section-title">Booking Details</div>
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <label for="editStartTime" class="form-label">Start Date & Time</label>
-                                <input type="datetime-local" id="editStartTime" class="form-control" required>
+                                {{ datetime_input_group("Start Date & Time", "editStartDate", "editStartTime", "Start Date", "Start Time", time_aria_label="Start time", timezone_fallback=(server_timezone or "UTC"), show_timezone_note=true) }}
                             </div>
                             <div class="col-md-6">
-                                <label for="editEndTime" class="form-label">End Date & Time</label>
-                                <input type="datetime-local" id="editEndTime" class="form-control" required>
+                                {{ datetime_input_group("End Date & Time", "editEndDate", "editEndTime", "End Date", "End Time", time_aria_label="End time", timezone_fallback=(server_timezone or "UTC"), show_timezone_note=false) }}
                             </div>
                             <div class="col-md-4">
                                 <label for="editEnvType" class="form-label">Environment Type</label>
@@ -285,39 +315,23 @@
                         <div class="row g-3">
                             <div class="col-md-4">
                                 <label for="editComponentType" class="form-label">Deployment Target</label>
-                                <select id="editComponentType" class="form-select">
-                                    <option value="">Select deployment target...</option>
-                                    {% for component in manage_deployment_options.edit_components | default([], true) %}
-                                    <option value="{{ component.value }}">{{ component.label }}</option>
-                                    {% endfor %}
-                                </select>
+                                <input type="text" id="editComponentType" class="form-control" readonly>
                             </div>
                             <div class="col-md-4">
-                                <label for="editVersion" class="form-label">Version</label>
-                                <select id="editVersion" class="form-select">
-                                    <option value="">Select version...</option>
-                                </select>
+                                <label for="editVersion" class="form-label">Requested Version</label>
+                                <input type="text" id="editVersion" class="form-control" readonly>
                             </div>
                             <div class="col-md-4">
                                 <label for="editTestingMode" class="form-label">Testing Mode</label>
-                                <select id="editTestingMode" class="form-select">
-                                    <option value="">Select mode...</option>
-                                    {% for mode in manage_deployment_options.testing_modes | default([], true) %}
-                                    <option value="{{ mode.value }}">{{ mode.label }}</option>
-                                    {% endfor %}
-                                </select>
+                                <input type="text" id="editTestingMode" class="form-control" readonly>
                             </div>
                             <div class="col-md-6">
-                                <label for="editComponentNames" class="form-label">Packages</label>
-                                <select id="editComponentNames" class="form-select" multiple size="5"></select>
+                                <label for="editComponentNames" class="form-label">Servers</label>
+                                <textarea id="editComponentNames" class="form-control" rows="4" readonly></textarea>
                             </div>
                             <div class="col-md-6" id="editServiceTypesGroup" style="display: none;">
                                 <label for="editServiceTypes" class="form-label">Service Types</label>
-                                <select id="editServiceTypes" class="form-select" multiple size="5">
-                                    {% for service in manage_deployment_options.service_types | default([], true) %}
-                                    <option value="{{ service.value }}">{{ service.label }}</option>
-                                    {% endfor %}
-                                </select>
+                                <textarea id="editServiceTypes" class="form-control" rows="4" readonly></textarea>
                             </div>
                         </div>
                     </div>
@@ -342,8 +356,6 @@ window.pageData = {
     currentUser: {{ user.user_id | tojson }},
     userRole: {{ user.role | tojson }},
     environments: {{ environments | tojson }},
-    componentConfig: {{ manage_deployment_options.edit_component_packages | default({}, true) | tojson }},
-    deploymentTargets: {{ manage_deployment_options.targets | default([], true) | tojson }},
     serverTimezone: {{ (server_timezone or "UTC") | tojson }},
     reservationPolicy: {{ reservation_policy | default({}, true) | tojson }}
 };

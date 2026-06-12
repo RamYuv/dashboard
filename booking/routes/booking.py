@@ -8,9 +8,8 @@ from webapp.domain.workspace_options import (
     get_workspace_deployment_form_options,
     get_workspace_status_options,
 )
-from webapp.helpers import can_user_access_environment
-from webapp.models import Environment, User
-from webapp.services.deployment_request_service import DeploymentRequestService
+from webapp.helpers import can_user_access_environment, list_environment_operations
+from webapp.models import Environment, EnvironmentHostMapping, User
 
 booking_bp = Blueprint("booking", __name__)
 
@@ -96,6 +95,29 @@ def _get_booking_page_context(
             }
             for env in environments
         ],
+        "environment_server_mappings": [
+            {
+                "environment_host_mapping_id": mapping.environment_host_mapping_id,
+                "env_id": mapping.env_id,
+                "env_type": mapping.env_type,
+                "server_type_id": mapping.server_type_id,
+                "server_type_key": mapping.server_type.server_type_key if mapping.server_type else None,
+                "target_key": mapping.server_type.target_key if mapping.server_type else None,
+                "host_id": mapping.host_id,
+                "hostname": mapping.host.hostname if mapping.host else None,
+                "ip_address": mapping.host.ip_address if mapping.host else None,
+                "display_label": (
+                    mapping.server_type.server_type_key
+                    if mapping.server_type else
+                    (mapping.host.hostname if mapping.host else None)
+                ),
+            }
+            for mapping in EnvironmentHostMapping.query.order_by(
+                EnvironmentHostMapping.env_id,
+                EnvironmentHostMapping.environment_host_mapping_id,
+            ).all()
+            if any(environment.env_id == mapping.env_id for environment in environments)
+        ],
         "server_timezone": current_app.config.get("SERVER_TIMEZONE", "UTC"),
         "reservation_policy": {
             "mutual_env_reservation_enabled": current_app.config.get(
@@ -170,18 +192,22 @@ def manage_deployment_requests():
             "deployment_manage_workspace.html",
             **_get_booking_page_context(),
             env_dashboard_enabled=False,
-            deployment_requests=[],
+            operations=[],
+            operation_status_options=[],
         )
 
-    deployment_requests, _, _ = DeploymentRequestService.list_requests(
-        user,
-        scope="env",
+    operations, _, _ = list_environment_operations(user)
+    workspace_status_options = get_workspace_status_options()
+    operation_status_options = (
+        workspace_status_options.get("booking_statuses", []) +
+        workspace_status_options.get("deployment_queue_statuses", [])
     )
     return render_template(
         "deployment_manage_workspace.html",
         **_get_booking_page_context(),
         env_dashboard_enabled=True,
-        deployment_requests=deployment_requests,
+        operations=operations,
+        operation_status_options=operation_status_options,
     )
 
 

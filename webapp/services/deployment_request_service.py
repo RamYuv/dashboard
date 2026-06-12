@@ -8,14 +8,8 @@ from flask import current_app
 
 from ..auto_deployment_service import AutoDeploymentError, AutoDeploymentService
 from ..auth_service import can_access_env_team_screen
-from ..domain.deployment_targets import (
-    get_selected_package_keys,
-    get_target_definition,
-    packages_support_scope,
-    resolve_request_targets,
-    target_supports_multiple_packages,
-    target_supports_scope,
-)
+from ..component_build_catalog import canonical_build_name
+from ..domain.deployment_targets import get_target_definition
 from .email_service import EmailDeliveryError, SendmailEmailService
 from ..helpers import to_utc_naive
 from ..models import (
@@ -24,6 +18,7 @@ from ..models import (
     Deployment,
     DeploymentRequest,
     Environment,
+    EnvironmentHostMapping,
     Team,
     TeamMember,
     User,
@@ -59,29 +54,18 @@ class DeploymentRequestService:
         )
 
     @staticmethod
-    def _describe_missing_mappings(env_id, requested_env_type, resolved_targets):
-        missing_targets = [
-            target for target in resolved_targets
-            if not target.get("environment_host_mapping_id")
-        ]
-        if not missing_targets:
-            return None
-
-        scope_label = env_id or requested_env_type or "the selected scope"
-        missing_descriptions = []
-        for target in missing_targets:
-            resolution_error = target.get("resolution_error")
-            missing_descriptions.append(
-                    "{} ({}){}".format(
-                        target.get("package_name") or target.get("package_key") or "unknown package",
-                    target.get("server_type_key") or "unknown server type",
-                    ": {}".format(resolution_error) if resolution_error else "",
-                )
-            )
+    def _build_deployment_conflict_message(deployment_request):
+        planned_start, planned_end = ReservationConflictService.get_deployment_window(
+            deployment_request
+        )
         return (
-            "No deployment host mapping was found for {}. "
-            "Missing package/server-type mappings: {}."
-        ).format(scope_label, ", ".join(missing_descriptions))
+            "This environment already has a deployment reservation. "
+            "Conflict with deployment request {0} from {1} to {2} UTC."
+        ).format(
+            deployment_request.deployment_request_id,
+            planned_start.strftime("%d %b %Y %H:%M") if planned_start else "unknown",
+            planned_end.strftime("%d %b %Y %H:%M") if planned_end else "unknown",
+        )
 
     @staticmethod
     def _normalize_service_types(target_key, deployment_data):
@@ -97,35 +81,15 @@ class DeploymentRequestService:
             value = (service_type or "").strip()
             if value and value not in normalized:
                 normalized.append(value)
-        return normalized
+        return normalized[:1]
 
     @staticmethod
-    def _resolve_build_name(target_key, target_definition, deployment_data, selected_package_keys):
-        packages = target_definition.get("packages") or {}
-        if target_key == "TOOLS" and selected_package_keys:
-            selected_package = packages.get(selected_package_keys[0]) or {}
-            return (
-                deployment_data.get("artifact_name") or
-                selected_package.get("package_name") or
-                selected_package_keys[0]
-            )
-        if target_key == "TCS_APP" and len(selected_package_keys or []) == 1:
-            return (
-                deployment_data.get("artifact_name") or
-                selected_package_keys[0]
-            )
-        return (
-            deployment_data.get("artifact_name") or
-            target_key
-        )
-
-    @staticmethod
-    def _find_or_create_build(target_key, target_definition, deployment_data, selected_package_keys):
-        build_name = DeploymentRequestService._resolve_build_name(
+    def _find_or_create_build(target_key, deployment_data):
+        build_name = canonical_build_name(
             target_key,
-            target_definition,
-            deployment_data,
-            selected_package_keys,
+            selected_package_keys=deployment_data.get("package_keys") or [],
+            explicit_name=(target_key or "").strip().lower(),
+            target_definition=get_target_definition(target_key) or {},
         )
         requested_version = deployment_data.get("requested_version")
         build = ComponentBuild.query.filter_by(
@@ -140,11 +104,66 @@ class DeploymentRequestService:
             target_key=target_key,
             build_name=build_name,
             version=requested_version,
-            artifact_name=build_name,
         )
         db.session.add(build)
         db.session.flush()
         return build
+
+    @staticmethod
+    def _get_selected_tool_key(deployment_data):
+        package_keys = deployment_data.get("package_keys") or []
+        if isinstance(package_keys, str):
+            package_keys = [package_keys]
+        for package_key in package_keys:
+            value = (package_key or "").strip().lower()
+            if value:
+                return value
+        return ""
+
+    @staticmethod
+    def _parse_selected_server_mapping_ids(deployment_data):
+        mapping_ids = deployment_data.get("selected_server_mapping_ids") or []
+        if isinstance(mapping_ids, str):
+            mapping_ids = [mapping_ids]
+        normalized = []
+        for value in mapping_ids:
+            try:
+                mapping_id = int(value)
+            except (TypeError, ValueError):
+                continue
+            if mapping_id not in normalized:
+                normalized.append(mapping_id)
+        return normalized
+
+    @staticmethod
+    def _get_selected_server_mappings(env_id, target_key, mapping_ids):
+        if not mapping_ids:
+            return [], "Target server selection is required."
+        mappings = (
+            EnvironmentHostMapping.query
+            .filter(EnvironmentHostMapping.environment_host_mapping_id.in_(mapping_ids))
+            .all()
+        )
+        if len(mappings) != len(mapping_ids):
+            return [], "One or more selected deployment servers were not found."
+
+        mapping_by_id = {
+            mapping.environment_host_mapping_id: mapping
+            for mapping in mappings
+        }
+        ordered_mappings = [mapping_by_id[mapping_id] for mapping_id in mapping_ids if mapping_id in mapping_by_id]
+        invalid_mappings = []
+        for mapping in ordered_mappings:
+            mapping_target_key = (
+                mapping.server_type.target_key
+                if mapping.server_type is not None else
+                None
+            )
+            if mapping.env_id != env_id or mapping_target_key != target_key:
+                invalid_mappings.append(mapping.environment_host_mapping_id)
+        if invalid_mappings:
+            return [], "Selected servers must belong to the chosen environment and target."
+        return ordered_mappings, None
 
     @staticmethod
     def _available_actions(deployment_request, user):
@@ -230,24 +249,8 @@ class DeploymentRequestService:
         env_id = (data.get("env_id") or "").strip()
         requested_env_type = (data.get("requested_env_type") or "").strip().upper()
 
-        package_keys = get_selected_package_keys(target_key, deployment)
-        if not package_keys:
-            return "Target package is required."
-        if not target_supports_multiple_packages(target_key) and len(package_keys) > 1:
-            return "Deployment target '{}' allows only one package selection.".format(
-                target_key
-            )
-
-        if not target_supports_scope(target_key, "ENV"):
-            return "Deployment target '{}' does not support {} scope.".format(
-                target_key,
-                "ENV",
-            )
-
-        if not packages_support_scope(target_key, package_keys, "ENV"):
-            return "One or more selected packages do not support {} scope.".format(
-                "ENV"
-            )
+        if not get_target_definition(target_key):
+            return "Invalid deployment target."
 
         if not env_id:
             return "env_id is required."
@@ -260,7 +263,19 @@ class DeploymentRequestService:
             requested_env_type = (env.env_type or "").strip().upper()
 
         if not deployment.get("requested_version"):
-            return "Build/version is required."
+            return "Requested version is required."
+        if target_key == "TOOLS" and not DeploymentRequestService._get_selected_tool_key(deployment):
+            return "Tool name is required."
+        selected_mapping_ids = DeploymentRequestService._parse_selected_server_mapping_ids(deployment)
+        selected_mappings, mapping_error = DeploymentRequestService._get_selected_server_mappings(
+            env_id,
+            target_key,
+            selected_mapping_ids,
+        )
+        if mapping_error:
+            return mapping_error
+        if not selected_mappings:
+            return "Target server selection is required."
         if target_key == "TCS_APP" and not deployment.get("testing_mode"):
             return "Testing mode is required."
 
@@ -302,14 +317,22 @@ class DeploymentRequestService:
     @staticmethod
     def _notify_env_team(deployment_request):
         recipients = DeploymentRequestService._env_notification_recipients()
+        requester = deployment_request.requester
+        requester_email = (
+            requester.email_id.strip()
+            if requester and requester.email_id and requester.email_id.strip()
+            else ""
+        )
+        if requester_email and requester_email not in recipients:
+            recipients.append(requester_email)
+
         if not recipients:
             current_app.logger.warning(
-                "Skipping ENV team notification for deployment request %s because no recipients are configured.",
+                "Skipping deployment request notification for %s because no recipients are configured.",
                 deployment_request.deployment_request_id,
             )
             return
 
-        requester = deployment_request.requester
         planned_start = (
             deployment_request.planned_start_time.strftime("%Y-%m-%d %H:%M UTC")
             if deployment_request.planned_start_time else
@@ -331,8 +354,9 @@ class DeploymentRequestService:
                 requester.email_id if requester and requester.email_id else "Not available"
             ),
             "Target: {}".format(deployment_request.target_key),
-            "Build: {}".format(deployment_request.build_name or "Not provided"),
-            "Version: {}".format(deployment_request.requested_version or "Not provided"),
+            "App Name: {}".format(deployment_request.build_name or "Not provided"),
+            "Requested Version: {}".format(deployment_request.requested_version or "Not provided"),
+            "Selected Servers: {}".format(deployment_request.selected_servers_summary or "Not provided"),
             "Planned start: {}".format(planned_start),
             "Jira ID: {}".format(deployment_request.jira_id or "Not provided"),
             "Description: {}".format(deployment_request.description or "Not provided"),
@@ -346,17 +370,17 @@ class DeploymentRequestService:
                 subject=subject,
                 recipients=recipients,
                 body=body,
-                reply_to=requester.email_id if requester and requester.email_id else None,
+                reply_to=requester_email or None,
             )
             deployment_request.last_notified_at = datetime.utcnow()
             current_app.logger.info(
-                "ENV team notification sent for deployment request %s to %s",
+                "Deployment request notification sent for %s to %s",
                 deployment_request.deployment_request_id,
                 recipients,
             )
         except EmailDeliveryError as exc:
             current_app.logger.exception(
-                "Failed to send ENV team notification for deployment request %s: %s",
+                "Failed to send deployment request notification for %s: %s",
                 deployment_request.deployment_request_id,
                 exc,
             )
@@ -394,30 +418,35 @@ class DeploymentRequestService:
                     ),
                     409,
                 )
+            conflicting_deployment_request = (
+                ReservationConflictService.find_conflicting_deployment_request(
+                    env_id,
+                    planned_start_time,
+                    planned_end_time,
+                )
+            )
+            if conflicting_deployment_request is not None:
+                return (
+                    None,
+                    DeploymentRequestService._build_deployment_conflict_message(
+                        conflicting_deployment_request
+                    ),
+                    409,
+                )
 
-        target_definition = get_target_definition(target_key) or {}
-        selected_package_keys = get_selected_package_keys(target_key, deployment_data)
+        selected_server_mapping_ids = DeploymentRequestService._parse_selected_server_mapping_ids(
+            deployment_data
+        )
+        selected_server_mappings, mapping_error = DeploymentRequestService._get_selected_server_mappings(
+            env_id,
+            target_key,
+            selected_server_mapping_ids,
+        )
+        if mapping_error:
+            return None, mapping_error, 400
         build = DeploymentRequestService._find_or_create_build(
             target_key,
-            target_definition,
             deployment_data,
-            selected_package_keys,
-        )
-        resolved_targets = resolve_request_targets(env_id, deployment_data)
-        if not any(
-            target.get("environment_host_mapping_id")
-            for target in resolved_targets
-        ):
-            return None, DeploymentRequestService._describe_missing_mappings(
-                env_id,
-                requested_env_type,
-                resolved_targets,
-            ) or "No deployment host mapping was found for the selected scope and package(s).", 400
-        build_name = DeploymentRequestService._resolve_build_name(
-            target_key,
-            target_definition,
-            deployment_data,
-            selected_package_keys,
         )
         deployment_request = DeploymentRequest(
             env_id=env_id,
@@ -429,13 +458,17 @@ class DeploymentRequestService:
             target_key=target_key,
             requested_version=deployment_data.get("requested_version"),
             package_keys_raw="[]",
+            selected_server_mapping_ids_raw="[]",
             testing_mode=deployment_data.get("testing_mode") if target_key == "TCS_APP" else "",
             jira_id=deployment_data.get("jira_id"),
             description=data.get("description"),
             remarks=deployment_data.get("remarks") or data.get("description"),
             status=DEPLOYMENT_REQUEST_STATUSES["OPEN"],
         )
-        deployment_request.package_keys = selected_package_keys
+        selected_tool_key = DeploymentRequestService._get_selected_tool_key(deployment_data)
+        if target_key == "TOOLS" and selected_tool_key:
+            deployment_request.package_keys = [selected_tool_key]
+        deployment_request.selected_server_mapping_ids = selected_server_mapping_ids
         deployment_request.set_service_types(
             DeploymentRequestService._normalize_service_types(target_key, deployment_data)
         )
@@ -445,14 +478,19 @@ class DeploymentRequestService:
         deployment_request.deployments = [
             Deployment(
                 deployment_request_id=deployment_request.deployment_request_id,
-                environment_host_mapping_id=target.get("environment_host_mapping_id"),
-                package_key=target["package_key"],
-                package_name=target.get("package_name") or target["package_key"],
+                environment_host_mapping_id=mapping.environment_host_mapping_id,
+                package_key=(
+                    selected_tool_key if target_key == "TOOLS" and selected_tool_key else
+                    ((mapping.server_type.server_type_key if mapping.server_type else "server") or "server").strip().lower()
+                ),
+                package_name=(
+                    selected_tool_key.upper() if target_key == "TOOLS" and selected_tool_key else
+                    (mapping.server_type.server_type_key if mapping.server_type else "Server")
+                ),
                 deployed_version=deployment_data.get("requested_version"),
                 deployment_status="PENDING",
             )
-            for target in resolved_targets
-            if target.get("environment_host_mapping_id") is not None
+            for mapping in selected_server_mappings
         ]
 
         DeploymentRequestService._notify_env_team(deployment_request)
@@ -461,6 +499,16 @@ class DeploymentRequestService:
 
     @staticmethod
     def _update_current_deployment_state(deployment_request, user):
+        service_types = (
+            deployment_request.get_service_types()
+            if deployment_request.target_key == "TCS_APP" else
+            []
+        )
+        testing_mode = (
+            (deployment_request.testing_mode or "").strip()
+            if deployment_request.target_key == "TCS_APP" else
+            ""
+        )
         for deployment in deployment_request.deployments:
             if deployment.deployment_status != "SUCCESS":
                 continue
@@ -488,10 +536,13 @@ class DeploymentRequestService:
             state.target_key = deployment_request.target_key
             state.package_name = deployment.package_name
             state.current_version = deployment.deployed_version
+            state.testing_mode = testing_mode
+            state.set_service_types(service_types)
             state.source = "DEPLOYMENT"
             state.status = "CURRENT"
             state.updated_by = user.username if user else None
             state.deployment_request_id = deployment_request.deployment_request_id
+            state.deployment_id = deployment.deployment_id
             state.notes = None
 
     @staticmethod
@@ -547,13 +598,16 @@ class DeploymentRequestService:
 
         log_path = launch_result.get("log_path")
         pid = launch_result.get("pid")
+        engine = launch_result.get("engine") or "SCRIPT"
         for deployment in deployment_request.deployments:
-            deployment.log_excerpt = "Auto deployment launched (pid={}, log={})".format(
+            deployment.log_excerpt = "Auto deployment launched via {} (pid={}, log={})".format(
+                engine,
                 pid,
                 log_path,
             )
         current_app.logger.info(
-            "Launched auto deployment for request %s with pid=%s payload=%s",
+            "Launched %s deployment for request %s with pid=%s payload=%s",
+            engine,
             deployment_request.deployment_request_id,
             pid,
             launch_result.get("payload_path"),

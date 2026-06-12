@@ -2,6 +2,7 @@
     const common = window.WorkspaceCommon;
     const pageData = window.pageData || {};
     const environments = pageData.environments || [];
+    const environmentServerMappings = pageData.environmentServerMappings || [];
     const deploymentTargets = pageData.deploymentTargets || [];
     const deploymentMode = pageData.mode || "standard";
     const serverTimezone = pageData.serverTimezone || "UTC";
@@ -11,6 +12,7 @@
         1,
         parseInt(reservationPolicy.deployment_reservation_window_minutes || 60, 10)
     );
+    let deploymentSuccessToast = null;
 
     function showFormMessage(message, type) {
         common.setInlineMessage({
@@ -19,6 +21,33 @@
             message: message,
             type: type || "muted",
         });
+    }
+
+    function showDeploymentSuccessToast(message) {
+        const toastBody = document.getElementById("deploymentSuccessToastBody");
+        if (toastBody) {
+            toastBody.textContent = message;
+        }
+        if (deploymentSuccessToast) {
+            deploymentSuccessToast.show();
+        }
+    }
+
+    function applyDefaultStartTime(force) {
+        common.populateTimeSlotOptions({
+            selectId: "formStartTime",
+            placeholder: "Select time...",
+            selectedValue: document.getElementById("formStartTime") ? document.getElementById("formStartTime").value : "",
+            slotMinutes: 30,
+        });
+
+        const startInput = document.getElementById("formStartTime");
+        const startDateInput = document.getElementById("formStartDate");
+        if (startInput && startDateInput && (force || !startInput.value || !startDateInput.value)) {
+            const startSlot = common.buildLocalDateTimeParts({ slotMinutes: 30, roundUp: true });
+            startDateInput.value = startSlot.date;
+            startInput.value = startSlot.time;
+        }
     }
 
     function isEnvScopedReservation(payload) {
@@ -40,11 +69,8 @@
     }
 
     function updatePolicyHint() {
-        if (!mutualReservationEnabled) {
-            return;
-        }
         if (deploymentMode === "tools") {
-            showFormMessage("Tool deployments use dedicated logical environments such as DEV_TOOL_01 and resolve through their configured host mappings.", "muted");
+            showFormMessage("Tool deployments use a tool environment, tool name, requested version, and configured tool server.", "muted");
             return;
         }
         showFormMessage(
@@ -57,19 +83,15 @@
 
     function populateTargetOptions() {
         const targetSelect = document.getElementById("formTargetKey");
-        const targetDebug = document.getElementById("targetDebug");
+        if (!targetSelect) {
+            return;
+        }
         if (deploymentMode === "tools") {
             targetSelect.innerHTML = '<option value="TOOLS">Tools</option>';
             targetSelect.value = "TOOLS";
-            if (targetDebug) {
-                targetDebug.textContent = "Tools deployment target loaded.";
-            }
             return;
         }
         if (targetSelect.options.length > 1) {
-            if (targetDebug) {
-                targetDebug.textContent = "Loaded " + Math.max(targetSelect.options.length - 1, 0) + " targets.";
-            }
             return;
         }
 
@@ -87,14 +109,6 @@
             targetSelect.value = currentValue;
         }
 
-        if (targetDebug) {
-            const names = deploymentTargets.map(function (target) {
-                return target.display_name;
-            }).join(", ");
-            targetDebug.textContent = names
-                ? "Loaded " + deploymentTargets.length + " targets: " + names
-                : "Loaded 0 targets.";
-        }
     }
 
     function getTargetByKey(targetKey) {
@@ -103,15 +117,38 @@
         }) || null;
     }
 
-    function getSelectedPackageConfig() {
-        const target = getTargetByKey(document.getElementById("formTargetKey").value);
-        const selectedPackageKey = document.getElementById("formComponentNames").value;
-        if (!target || !selectedPackageKey) {
-            return null;
+    function getSelectedTargetKey() {
+        return deploymentMode === "tools"
+            ? "TOOLS"
+            : document.getElementById("formTargetKey").value;
+    }
+
+    function getSelectedToolKey() {
+        const toolField = document.getElementById("formToolKey");
+        return toolField ? toolField.value : "";
+    }
+
+    function populateToolOptions() {
+        const toolSelect = document.getElementById("formToolKey");
+        if (!toolSelect) {
+            return;
         }
-        return (target.packages || []).find(function (pkg) {
-            return pkg.package_key === selectedPackageKey;
-        }) || null;
+
+        const toolsTarget = getTargetByKey("TOOLS");
+        const packages = (toolsTarget && toolsTarget.packages) || [];
+        toolSelect.innerHTML = '<option value="">Select tool...</option>';
+        packages.forEach(function (tool) {
+            const toolKey = tool.package_key || "";
+            if (!toolKey) {
+                return;
+            }
+            toolSelect.insertAdjacentHTML(
+                "beforeend",
+                '<option value="' + common.escapeHtml(toolKey) + '">' +
+                common.escapeHtml((tool.build_name || tool.package_name || toolKey).toUpperCase()) +
+                "</option>"
+            );
+        });
     }
 
     function populateEnvOptions(envType) {
@@ -127,23 +164,62 @@
         if (!serviceTypes) {
             return;
         }
-        Array.from(serviceTypes.options).forEach(function (option) {
-            option.selected = false;
+        serviceTypes.value = "";
+    }
+
+    function getServerMappingsForSelection() {
+        const envId = document.getElementById("formEnvId").value;
+        const targetKey = getSelectedTargetKey();
+        if (!envId || !targetKey) {
+            return [];
+        }
+        return environmentServerMappings.filter(function (mapping) {
+            return mapping.env_id === envId && mapping.target_key === targetKey;
+        });
+    }
+
+    function populateServerMappingOptions() {
+        const serverSelect = document.getElementById("formServerMappings");
+        const mappings = getServerMappingsForSelection();
+        const targetKey = getSelectedTargetKey();
+        serverSelect.innerHTML = "";
+        if (!document.getElementById("formEnvId").value || !getSelectedTargetKey()) {
+            serverSelect.innerHTML = deploymentMode === "tools"
+                ? '<option value="">Select environment first...</option>'
+                : '<option value="">Select environment and target first...</option>';
+            return;
+        }
+        if (!mappings.length) {
+            serverSelect.innerHTML = '<option value="">No configured servers found for this environment and target...</option>';
+            return;
+        }
+        if (deploymentMode !== "tools" && mappings.length > 1) {
+            serverSelect.insertAdjacentHTML(
+                "beforeend",
+                '<option value="ALL">ALL</option>'
+            );
+        }
+        mappings.forEach(function (mapping) {
+            serverSelect.insertAdjacentHTML(
+                "beforeend",
+                '<option value="' + common.escapeHtml(String(mapping.environment_host_mapping_id)) + '">' +
+                common.escapeHtml(mapping.display_label || mapping.hostname || mapping.server_type_key || String(mapping.environment_host_mapping_id)) +
+                "</option>"
+            );
         });
     }
 
     function loadDeploymentOptions() {
-        const targetKey = document.getElementById("formTargetKey").value;
+        const targetKey = getSelectedTargetKey();
         const target = getTargetByKey(targetKey);
         const versionSelect = document.getElementById("formVersion");
-        const componentNames = document.getElementById("formComponentNames");
         const serviceTypesGroup = document.getElementById("formServiceTypesGroup");
         const testingMode = document.getElementById("formTestingMode");
 
         versionSelect.innerHTML = '<option value="">Select version...</option>';
-        componentNames.innerHTML = '<option value="">Select package...</option>';
+        populateServerMappingOptions();
         if (serviceTypesGroup) {
-            serviceTypesGroup.style.display = targetKey === "TCS_APP" ? "block" : "none";
+            serviceTypesGroup.style.display = targetKey === "TCS_APP" ? "grid" : "none";
         }
         if (testingMode) {
             testingMode.required = targetKey === "TCS_APP";
@@ -157,58 +233,35 @@
         }
 
         if (!target) {
-            versionSelect.innerHTML = '<option value="">Select deployment target first...</option>';
+            versionSelect.innerHTML = deploymentMode === "tools"
+                ? '<option value="">Select tool first...</option>'
+                : '<option value="">Select deployment target first...</option>';
             return;
         }
-
-        if (target.allow_multiple_packages && (target.packages || []).length > 1) {
-            componentNames.insertAdjacentHTML("beforeend", '<option value="all">all</option>');
-        }
-
-        (target.packages || []).forEach(function (pkg) {
-            const scopes = (pkg.supported_scopes || []).join("/");
-            const label = pkg.package_key +
-                " (" + (pkg.server_type_key || "-") + ")" +
-                (scopes ? " [" + scopes + "]" : "");
-            componentNames.insertAdjacentHTML(
-                "beforeend",
-                '<option value="' + common.escapeHtml(pkg.package_key) + '">' +
-                common.escapeHtml(label) +
-                "</option>"
-            );
-        });
-
-        if ((target.packages || []).length === 1 && !target.allow_multiple_packages) {
-            componentNames.value = target.packages[0].package_key;
-        }
-
-        if (componentNames.value) {
-            loadVersionOptions();
-        } else {
-            versionSelect.innerHTML = '<option value="">Select target package first...</option>';
-        }
+        loadVersionOptions();
     }
 
     function loadVersionOptions() {
-        const targetKey = document.getElementById("formTargetKey").value;
-        const selectedPackage = document.getElementById("formComponentNames").value;
+        const targetKey = getSelectedTargetKey();
         const versionSelect = document.getElementById("formVersion");
+        const selectedToolKey = getSelectedToolKey();
 
         versionSelect.innerHTML = '<option value="">Select version...</option>';
         if (!targetKey) {
-            versionSelect.innerHTML = '<option value="">Select deployment target first...</option>';
+            versionSelect.innerHTML = deploymentMode === "tools"
+                ? '<option value="">Select tool first...</option>'
+                : '<option value="">Select deployment target first...</option>';
             return;
         }
-
-        if (!selectedPackage) {
-            versionSelect.innerHTML = '<option value="">Select target package first...</option>';
+        if (deploymentMode === "tools" && !selectedToolKey) {
+            versionSelect.innerHTML = '<option value="">Select tool first...</option>';
             return;
         }
 
         versionSelect.innerHTML = '<option value="">Loading versions...</option>';
         const params = new URLSearchParams({ target_key: targetKey });
-        if (targetKey === "TOOLS" && selectedPackage) {
-            params.set("package_key", selectedPackage);
+        if (deploymentMode === "tools" && selectedToolKey) {
+            params.set("package_key", selectedToolKey);
         }
 
         common.fetchJson("/api/component-versions?" + params.toString(), { credentials: "include" })
@@ -233,9 +286,18 @@
     }
 
     function getDeploymentRequestPayload() {
-        const startValue = document.getElementById("formStartTime").value;
-        const targetKey = document.getElementById("formTargetKey").value;
-        const selectedPackage = document.getElementById("formComponentNames").value;
+        const startValue = common.combineLocalDateAndTime(
+            document.getElementById("formStartDate").value,
+            document.getElementById("formStartTime").value
+        );
+        const targetKey = getSelectedTargetKey();
+        const toolKey = getSelectedToolKey();
+        const selectedServerMappingId = document.getElementById("formServerMappings").value;
+        const selectedServerMappingIds = selectedServerMappingId === "ALL"
+            ? getServerMappingsForSelection().map(function (mapping) {
+                return String(mapping.environment_host_mapping_id);
+            })
+            : (selectedServerMappingId ? [selectedServerMappingId] : []);
         return {
             env_id: document.getElementById("formEnvId").value,
             requested_env_type: deploymentMode === "tools"
@@ -248,12 +310,11 @@
                 target_key: targetKey,
                 env_scope_type: "ENV",
                 requested_version: document.getElementById("formVersion").value.trim(),
+                package_keys: deploymentMode === "tools" && toolKey ? [toolKey] : [],
                 testing_mode: targetKey === "TCS_APP" ? document.getElementById("formTestingMode").value : "",
-                package_keys: selectedPackage ? [selectedPackage] : [],
+                selected_server_mapping_ids: selectedServerMappingIds,
                 service_types: targetKey === "TCS_APP"
-                    ? Array.from(document.getElementById("formServiceTypes").selectedOptions).map(function (opt) {
-                        return opt.value;
-                    })
+                    ? document.getElementById("formServiceTypes").value
                     : [],
             },
         };
@@ -278,11 +339,14 @@
         if (!deployment.target_key) {
             return "Deployment target is required.";
         }
-        if (!deployment.package_keys || !deployment.package_keys.length) {
-            return "Target package is required.";
+        if (deploymentMode === "tools" && (!deployment.package_keys || !deployment.package_keys.length)) {
+            return "Tool name is required.";
+        }
+        if (!deployment.selected_server_mapping_ids || !deployment.selected_server_mapping_ids.length) {
+            return "Target server selection is required.";
         }
         if (!deployment.requested_version) {
-            return "Build/version is required.";
+            return "Requested version is required.";
         }
         if (deployment.target_key === "TCS_APP" && !deployment.testing_mode) {
             return "Testing mode is required.";
@@ -333,11 +397,17 @@
             testingMode.required = false;
         }
         common.resetSelect("formVersion", "Select version...");
-        common.resetSelect("formComponentNames", "Select package...");
+        const serverSelect = document.getElementById("formServerMappings");
+        if (serverSelect) {
+            serverSelect.innerHTML = deploymentMode === "tools"
+                ? '<option value="">Select environment first...</option>'
+                : '<option value="">Select environment and target first...</option>';
+        }
         populateEnvOptions("");
         if (deploymentMode === "tools") {
-            document.getElementById("formTargetKey").value = "TOOLS";
+            populateToolOptions();
         }
+        applyDefaultStartTime(true);
     }
 
     function handleDeploymentSubmit(event) {
@@ -380,10 +450,10 @@
                     return;
                 }
                 const requestData = result.data.deployment_request || {};
-                showFormMessage(
-                    "Deployment request submitted successfully. Status: " + (requestData.status || "OPEN") + ".",
-                    "success"
-                );
+                const successMessage =
+                    "Deployment request submitted successfully. Status: " + (requestData.status || "OPEN") + ".";
+                showFormMessage(successMessage, "success");
+                showDeploymentSuccessToast(successMessage);
                 resetFormState();
             })
             .catch(function () {
@@ -392,20 +462,40 @@
     }
 
     document.addEventListener("DOMContentLoaded", function () {
+        const toastElement = document.getElementById("deploymentSuccessToast");
+        if (toastElement) {
+            deploymentSuccessToast = new bootstrap.Toast(toastElement, {
+                autohide: true,
+                delay: 3200,
+            });
+        }
+
+        applyDefaultStartTime(false);
         const envTypeField = document.getElementById("formEnvType");
         if (envTypeField) {
             envTypeField.addEventListener("change", function () {
                 populateEnvOptions(this.value);
+                populateServerMappingOptions();
             });
         }
-        document.getElementById("formTargetKey").addEventListener("change", loadDeploymentOptions);
-        document.getElementById("formComponentNames").addEventListener("change", function () {
-            loadVersionOptions();
+        document.getElementById("formEnvId").addEventListener("change", function () {
+            populateServerMappingOptions();
         });
+        if (deploymentMode === "tools") {
+            const toolField = document.getElementById("formToolKey");
+            if (toolField) {
+                toolField.addEventListener("change", loadVersionOptions);
+            }
+        } else {
+            document.getElementById("formTargetKey").addEventListener("change", loadDeploymentOptions);
+        }
         document.getElementById("deploymentRequestForm").addEventListener("submit", handleDeploymentSubmit);
 
         populateTargetOptions();
         populateEnvOptions("");
+        if (deploymentMode === "tools") {
+            populateToolOptions();
+        }
         const serviceTypesGroup = document.getElementById("formServiceTypesGroup");
         const testingMode = document.getElementById("formTestingMode");
         if (serviceTypesGroup) {
@@ -415,7 +505,8 @@
             testingMode.required = false;
         }
         if (deploymentMode === "tools") {
-            loadDeploymentOptions();
+            populateServerMappingOptions();
+            loadVersionOptions();
         }
         updatePolicyHint();
     });

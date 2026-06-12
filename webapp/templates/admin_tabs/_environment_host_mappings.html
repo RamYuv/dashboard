@@ -1,0 +1,111 @@
+<div class="row g-3">
+    <div class="col-12">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-2">
+            <h1 class="admin-section-heading mb-0">{{ tab_titles.get(active_tab, "Environment Mapping Management") }}</h1>
+            <button class="btn btn-success" type="button" data-bs-toggle="modal" data-bs-target="#addEnvironmentHostMappingModal" data-admin-modal-trigger data-admin-form="#addEnvironmentHostMappingForm" data-admin-action="create" data-admin-title="#addEnvironmentHostMappingModalLabel" data-admin-title-text="Add Environment Host Mapping" data-admin-submit="#addEnvironmentHostMappingSubmit" data-admin-submit-text="Save Mapping" data-admin-values='{"environment_host_mapping_id":"","env_id":"","server_type_id":"","host_id":"","deployment_user":"","deployment_password":""}'>
+                <i class="fas fa-plus me-2"></i>Add New
+            </button>
+        </div>
+    </div>
+
+    <div class="col-12">
+        <div class="card shadow-sm border-0 admin-panel">
+            <div class="card-body">
+                <div class="table-responsive admin-table-wrap">
+                    <table class="table align-middle">
+                        <thead><tr><th>Env</th><th>Type</th><th>Server Type</th><th>Host</th><th>Deploy User</th><th class="admin-action-cell">Actions</th></tr></thead>
+                        <tbody>
+                        {% for mapping in environment_host_mappings %}
+                            <tr>
+                                <td>{{ mapping.env_id }}</td>
+                                <td>{{ mapping.env_type or "-" }}</td>
+                                <td>{{ mapping.server_type.server_type_key if mapping.server_type else "-" }}</td>
+                                <td>{% if mapping.host %}{{ mapping.host.hostname }}{% if mapping.host.ip_address %} ({{ mapping.host.ip_address }}){% endif %}{% else %}-{% endif %}</td>
+                                <td>{{ mapping.deployment_user or "-" }}</td>
+                                <td class="admin-action-cell">
+                                    <div class="admin-row-actions">
+                                        <button class="btn btn-outline-primary admin-icon-btn" type="button" data-bs-toggle="modal" data-bs-target="#addEnvironmentHostMappingModal" data-admin-modal-trigger data-admin-form="#addEnvironmentHostMappingForm" data-admin-action="update_environment_host_mapping" data-admin-title="#addEnvironmentHostMappingModalLabel" data-admin-title-text="Edit Environment Host Mapping" data-admin-submit="#addEnvironmentHostMappingSubmit" data-admin-submit-text="Update Mapping" data-admin-values='{{ {"environment_host_mapping_id": mapping.environment_host_mapping_id, "env_id": mapping.env_id, "server_type_id": mapping.server_type_id, "host_id": mapping.host_id, "deployment_user": mapping.deployment_user or "", "deployment_password": mapping.deployment_password or ""}|tojson }}' aria-label="Edit mapping">
+                                            <i class="fas fa-pen"></i>
+                                        </button>
+                                        <form method="post" class="d-inline">
+                                            <input type="hidden" name="action" value="delete_environment_host_mapping">
+                                            <input type="hidden" name="entity" value="environment_host_mappings">
+                                            <input type="hidden" name="tab" value="environment_host_mappings">
+                                            <input type="hidden" name="environment_host_mapping_id" value="{{ mapping.environment_host_mapping_id }}">
+                                            <button class="btn btn-outline-danger admin-icon-btn" type="submit" aria-label="Delete mapping">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% else %}
+                            <tr><td colspan="6" class="text-muted">No mappings found.</td></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade admin-add-modal" id="addEnvironmentHostMappingModal" tabindex="-1" aria-labelledby="addEnvironmentHostMappingModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content admin-panel border-0">
+            <div class="modal-header">
+                <h3 class="modal-title h5 mb-0" id="addEnvironmentHostMappingModalLabel">Add Environment Host Mapping</h3>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form method="post" id="addEnvironmentHostMappingForm">
+                    <input type="hidden" name="action" value="create">
+                    <input type="hidden" name="entity" value="environment_host_mappings">
+                    <input type="hidden" name="tab" value="environment_host_mappings">
+                    <input type="hidden" name="environment_host_mapping_id" value="">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label" for="mapping_env_id">Environment</label>
+                            <select class="form-select" id="mapping_env_id" name="env_id" required>
+                                <option value="">Select environment</option>
+                                {% for environment in mapping_environment_options %}
+                                    <option value="{{ environment.env_id }}">{{ environment.env_id }} ({{ environment.env_type }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="mapping_server_type_id">Server Type</label>
+                            <select class="form-select" id="mapping_server_type_id" name="server_type_id" required>
+                                <option value="">Select server type</option>
+                                {% for server_type in mapping_server_type_options %}
+                                    <option value="{{ server_type.server_type_id }}">{{ server_type.server_type_key }} ({{ server_type.target_key }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="mapping_host_id">Host</label>
+                            <select class="form-select" id="mapping_host_id" name="host_id" required>
+                                <option value="">Select host</option>
+                                {% for host in mapping_host_options %}
+                                    <option value="{{ host.host_id }}">{{ host.hostname }}{% if host.ip_address %} ({{ host.ip_address }}){% endif %}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="deployment_user">Deployment User</label>
+                            <input class="form-control" id="deployment_user" name="deployment_user">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="deployment_password">Deployment Password</label>
+                            <input class="form-control" id="deployment_password" name="deployment_password">
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" form="addEnvironmentHostMappingForm" class="btn btn-primary" id="addEnvironmentHostMappingSubmit">Save Mapping</button>
+            </div>
+        </div>
+    </div>
+</div>

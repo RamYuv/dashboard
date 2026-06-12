@@ -6,6 +6,12 @@
     const userTimezone = common.getUserTimezone(pageData.serverTimezone || "UTC");
     let calendar = null;
     let allBookings = [];
+    let bookingDetailsModal = null;
+    let calendarResizeObserver = null;
+    let hoverCard = null;
+    let hoverTitle = null;
+    let hoverMeta = null;
+    let activeHoverEventId = null;
 
     function getStatusLabel(status) {
         return statusLabels[status] || status;
@@ -129,6 +135,74 @@
         return String(booking.requested_by_name || "").trim() || "-";
     }
 
+    function formatHoverRow(label, value) {
+        return '<div class="calendar-hover-row">' +
+            '<span class="calendar-hover-label">' + common.escapeHtml(label) + "</span>" +
+            '<span class="calendar-hover-value">' + common.escapeHtml(value || "-") + "</span>" +
+            "</div>";
+    }
+
+    function hoverPreviewHtml(event) {
+        const booking = event.extendedProps.booking;
+        const status = getStatusLabel(event.extendedProps.computed_status);
+        const localStart = moment.utc(booking.start_time).local().format("YYYY-MM-DD HH:mm");
+        const localEnd = moment.utc(booking.end_time || booking.start_time).local().format("YYYY-MM-DD HH:mm");
+        return [
+            formatHoverRow("Type", booking.booking_type || "-"),
+            formatHoverRow("Requester", String(booking.requested_by || "").trim() || String(booking.requested_by_name || "").trim() || "-"),
+            formatHoverRow("Status", status || "-"),
+            formatHoverRow("Window", booking.is_standalone_deployment_request ? localStart : localStart + " -> " + localEnd),
+        ].join("");
+    }
+
+    function positionHoverCard(jsEvent) {
+        if (!hoverCard || hoverCard.hidden) {
+            return;
+        }
+
+        const margin = 12;
+        const rect = hoverCard.getBoundingClientRect();
+        let left = jsEvent.clientX + 16;
+        let top = jsEvent.clientY + 16;
+
+        if (left + rect.width > window.innerWidth - margin) {
+            left = jsEvent.clientX - rect.width - 16;
+        }
+        if (left < margin) {
+            left = margin;
+        }
+
+        if (top + rect.height > window.innerHeight - margin) {
+            top = jsEvent.clientY - rect.height - 16;
+        }
+        if (top < margin) {
+            top = margin;
+        }
+
+        hoverCard.style.left = left + "px";
+        hoverCard.style.top = top + "px";
+    }
+
+    function showHoverCard(event, jsEvent) {
+        if (!hoverCard || !hoverTitle || !hoverMeta) {
+            return;
+        }
+
+        activeHoverEventId = event.id;
+        hoverTitle.textContent = event.title || "Booking";
+        hoverMeta.innerHTML = hoverPreviewHtml(event);
+        hoverCard.hidden = false;
+        positionHoverCard(jsEvent);
+    }
+
+    function hideHoverCard() {
+        activeHoverEventId = null;
+        if (!hoverCard) {
+            return;
+        }
+        hoverCard.hidden = true;
+    }
+
     function renderDetails(event) {
         const detailsHost = document.getElementById("bookingDetails");
         const booking = event.extendedProps.booking;
@@ -157,12 +231,15 @@
             detailRows.push(buildDetailRow("Target", deployment.target_key || "-"));
             detailRows.push(buildDetailRow("Requested Version", deployment.requested_version || "-"));
             detailRows.push(buildDetailRow("Testing Mode", deployment.testing_mode || "-"));
-            detailRows.push(buildDetailRow("Packages", (deployment.package_keys || []).join(", ") || "-"));
+            detailRows.push(buildDetailRow("Servers", deployment.selected_servers_summary || "-"));
             detailRows.push(buildDetailRow("Service Types", (deployment.service_types || []).join(", ") || "-"));
         }
 
         detailsHost.className = "detail-list";
         detailsHost.innerHTML = detailRows.join("");
+        if (bookingDetailsModal) {
+            bookingDetailsModal.show();
+        }
     }
 
     function showMessage(message, type) {
@@ -179,6 +256,23 @@
         }
     }
 
+    function updateCalendarLayout() {
+        if (!calendar) {
+            return;
+        }
+
+        window.requestAnimationFrame(function () {
+            calendar.updateSize();
+        });
+        window.setTimeout(function () {
+            calendar.updateSize();
+        }, 120);
+        window.setTimeout(function () {
+            calendar.updateSize();
+            calendar.render();
+        }, 360);
+    }
+
     function clearFilters() {
         document.getElementById("filterEnvType").value = "";
         document.getElementById("filterBookingType").value = "";
@@ -188,6 +282,10 @@
     }
 
     document.addEventListener("DOMContentLoaded", function () {
+        bookingDetailsModal = new bootstrap.Modal(document.getElementById("bookingDetailsModal"));
+        hoverCard = document.getElementById("calendarHoverCard");
+        hoverTitle = document.getElementById("calendarHoverTitle");
+        hoverMeta = document.getElementById("calendarHoverMeta");
         calendar = new FullCalendar.Calendar(document.getElementById("calendar"), {
             initialView: "dayGridMonth",
             height: "auto",
@@ -205,14 +303,43 @@
             eventClick: function (info) {
                 renderDetails(info.event);
             },
+            eventMouseEnter: function (info) {
+                if (window.matchMedia("(hover: hover)").matches) {
+                    showHoverCard(info.event, info.jsEvent);
+                }
+            },
+            eventMouseLeave: function () {
+                hideHoverCard();
+            },
         });
 
         calendar.render();
+        updateCalendarLayout();
 
         ["filterEnvType", "filterBookingType", "filterStatus"].forEach(function (id) {
             document.getElementById(id).addEventListener("change", refreshCalendar);
         });
         document.getElementById("filterRequestedBy").addEventListener("input", refreshCalendar);
         document.getElementById("clearFiltersButton").addEventListener("click", clearFilters);
+        window.addEventListener("resize", updateCalendarLayout);
+        document.addEventListener("mousemove", function (event) {
+            if (activeHoverEventId && hoverCard && !hoverCard.hidden) {
+                positionHoverCard(event);
+            }
+        });
+        document.addEventListener("scroll", function () {
+            if (activeHoverEventId) {
+                hideHoverCard();
+            }
+        }, true);
+        document.addEventListener("workspaceSidebarChange", updateCalendarLayout);
+
+        if (window.ResizeObserver) {
+            calendarResizeObserver = new ResizeObserver(function () {
+                updateCalendarLayout();
+            });
+            calendarResizeObserver.observe(document.querySelector(".main-content"));
+            calendarResizeObserver.observe(document.getElementById("calendar"));
+        }
     });
 }());

@@ -2,10 +2,11 @@
 Monitoring API endpoints and payload builders.
 """
 from datetime import datetime
+import re
 
 from flask import Blueprint, current_app, jsonify
 
-from webapp.models import EnvironmentBooking, EnvironmentHostMapping, ServerType
+from webapp.models import CurrentDeploymentState, EnvironmentBooking, EnvironmentHostMapping, ServerType
 from webapp.helpers import get_booking_lifecycle_status
 
 monitoring_bp = Blueprint("monitoring", __name__)
@@ -46,6 +47,38 @@ def _normalize_status(env_color):
     return color_map.get(color, "unknown")
 
 
+def _status_label(normalized_status):
+    label_map = {
+        "healthy": "Healthy",
+        "warning": "Idle",
+        "critical": "Critical",
+        "maintenance": "Unavailable",
+        "unknown": "Unavailable",
+    }
+    return label_map.get(normalized_status, "Unavailable")
+
+
+def _version_sort_key(version):
+    value = (version or "").strip()
+    if not value:
+        return ((), -1, "")
+
+    numeric_parts = tuple(
+        int(part)
+        for part in re.findall(r"\d+", value)
+    )
+    patch_match = re.search(r"_patch(\d+)", value, re.IGNORECASE)
+    patch_number = int(patch_match.group(1)) if patch_match else 0
+    return (numeric_parts, patch_number, value.lower())
+
+
+def _preferred_tcs_version(versions):
+    candidates = [value.strip() for value in (versions or []) if (value or "").strip()]
+    if not candidates:
+        return ""
+    return max(candidates, key=_version_sort_key)
+
+
 def _infer_env_type(env_id):
     if not env_id:
         return "Unknown"
@@ -82,6 +115,60 @@ def _build_server_type_map(env_ids):
     return env_server_types
 
 
+def _build_tcs_runtime_map(env_ids):
+    runtime_map = {
+        env_id: {
+            "versions": [],
+            "service_types": [],
+            "testing_modes": [],
+        }
+        for env_id in env_ids
+    }
+    if not env_ids:
+        return runtime_map
+
+    rows = (
+        CurrentDeploymentState.query
+        .filter(
+            CurrentDeploymentState.env_scope_type == "ENV",
+            CurrentDeploymentState.env_id.in_(env_ids),
+            CurrentDeploymentState.target_key == "TCS_APP",
+        )
+        .all()
+    )
+
+    for row in rows:
+        bucket = runtime_map.setdefault(
+            row.env_id,
+            {"versions": [], "service_types": [], "testing_modes": []},
+        )
+        version = (row.current_version or "").strip()
+        if version and version not in bucket["versions"]:
+            bucket["versions"].append(version)
+
+        testing_mode = (row.testing_mode or "").strip()
+        if testing_mode and testing_mode not in bucket["testing_modes"]:
+            bucket["testing_modes"].append(testing_mode)
+
+        for service_type in row.get_service_types():
+            value = (service_type or "").strip()
+            if value and value not in bucket["service_types"]:
+                bucket["service_types"].append(value)
+
+    return runtime_map
+
+
+def _collect_not_running_components(vm_details):
+    names = []
+    for vm_status in (vm_details or {}).values():
+        component_data = vm_status.get("component_data", {})
+        for component_name, component_info in component_data.items():
+            run_status = (component_info.get("run_status") or "").strip().lower()
+            if run_status == "notrunning" and component_name not in names:
+                names.append(component_name)
+    return names
+
+
 def _build_environment_health_payload(env_statuses, last_update, active_booking_envs):
     env_statuses = env_statuses or {}
     active_booking_envs = active_booking_envs or []
@@ -93,7 +180,7 @@ def _build_environment_health_payload(env_statuses, last_update, active_booking_
         }
     )
     env_server_types = _build_server_type_map(env_ids)
-
+    tcs_runtime = _build_tcs_runtime_map(env_ids)
     statuses = []
     summary = {
         "total": 0,
@@ -109,11 +196,15 @@ def _build_environment_health_payload(env_statuses, last_update, active_booking_
         normalized_status = _normalize_status(status_data.get("env_color"))
         component_summary = status_data.get("component_summary", {})
         env_type = status_data.get("env_type") or _infer_env_type(env_id)
+        vm_details = status_data.get("vm_details", {})
+        runtime_details = tcs_runtime.get(env_id, {})
+        not_running_components = _collect_not_running_components(vm_details)
 
         status_item = {
             "env_id": env_id,
             "env_type": env_type,
             "status": normalized_status,
+            "status_label": _status_label(normalized_status),
             "host": status_data.get("host", ""),
             "owner_team": status_data.get("owner_team", ""),
             "message": status_data.get("message", ""),
@@ -123,16 +214,33 @@ def _build_environment_health_payload(env_statuses, last_update, active_booking_
                 "unknown": int(component_summary.get("unknown", 0) or 0),
             },
             "server_types": env_server_types.get(env_id, []),
+            "tcs_runtime": {
+                "versions": runtime_details.get("versions", []),
+                "display_version": _preferred_tcs_version(runtime_details.get("versions", [])),
+                "has_mixed_versions": len(runtime_details.get("versions", [])) > 1,
+                "service_types": runtime_details.get("service_types", []),
+                "testing_modes": runtime_details.get("testing_modes", []),
+            },
+            "not_running_components": not_running_components,
         }
         statuses.append(status_item)
         summary["total"] += 1
 
         if normalized_status in summary:
             summary[normalized_status] += 1
+        elif normalized_status == "unknown":
+            # Surface the grey/no-light TCS status in the final summary card.
+            summary["maintenance"] += 1
 
     return {
         "statuses": statuses,
         "summary": summary,
+        "summary_labels": {
+            "healthy": "Healthy",
+            "warning": "Idle",
+            "critical": "Critical",
+            "maintenance": "Unavailable",
+        },
         "active_envs": [env_id for env_id in active_booking_envs if isinstance(env_id, str) and env_id.strip()],
     }
 

@@ -40,33 +40,12 @@ DEPLOYMENT_QUEUE_STATUS_OPTIONS = [
     {"value": "REJECTED", "label": "Rejected"},
 ]
 
-
-def _build_edit_target_options(targets):
-    return [
-        {"value": target["target_key"], "label": target["display_name"]}
-        for target in targets
-    ]
-
-
-def _build_edit_package_options(targets):
-    return {
-        target["target_key"]: [
-            package["package_key"]
-            for package in target.get("packages", [])
-        ]
-        for target in targets
-    }
-
-
 def get_workspace_deployment_form_options():
     """Return shared deployment-form choices for workspace templates."""
-    targets = get_deployment_target_options() or []
     return {
-        "targets": targets,
+        "targets": get_deployment_target_options() or [],
         "testing_modes": DEPLOYMENT_TESTING_MODES,
         "service_types": DEPLOYMENT_SERVICE_TYPES,
-        "edit_components": _build_edit_target_options(targets),
-        "edit_component_packages": _build_edit_package_options(targets),
     }
 
 

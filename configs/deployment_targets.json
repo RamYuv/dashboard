@@ -1,73 +1,38 @@
 {
   "TCS_APP": {
     "display_name": "TCS Application",
-    "allow_multiple_packages": true,
-    "supported_scopes": ["ENV"],
-    "packages": {
-      "core": {
-        "package_name": "tcs_service_core",
-        "server_type_key": "Core",
-        "deploy_order": 20
-      },
-      "gatway": {
-        "package_name": "tcs_service_gatway",
-        "server_type_key": "Getway",
-        "deploy_order": 30
-      }
-    }
+    "build_name": "tcs_service",
+    "server_types": ["Core", "Getway"]
   },
   "PAYAPP": {
     "display_name": "PayApp",
-    "supported_scopes": ["ENV"],
-    "packages": {
-      "payapp": {
-        "package_name": "payapp",
-        "server_type_key": "PAYApp",
-        "deploy_order": 40
-      }
-    }
+    "build_name": "payapp",
+    "server_types": ["PAYApp"]
   },
   "DB": {
     "display_name": "Database",
-    "allow_multiple_packages": true,
-    "supported_scopes": ["ENV"],
-    "packages": {
-      "coredb": {
-        "package_name": "tcs_db",
-        "server_type_key": "CoreDb",
-        "deploy_order": 10
-      },
-      "lgdb": {
-        "package_name": "tcs_db",
-        "server_type_key": "LGDB",
-        "deploy_order": 10
-      }
-    }
+    "build_name": "tcs_db",
+    "server_types": ["CoreDb", "LGDB"]
   },
   "TOOLS": {
     "display_name": "Tools",
-    "supported_scopes": ["ENV"],
-    "packages": {
-      "tool1": {
-        "package_name": "tool1",
-        "server_type_key": "Tool_server",
-        "deploy_order": 50
+    "tools": [
+      {
+        "build_name": "tool1",
+        "server_types": ["Tool_server"]
       },
-      "tool2": {
-        "package_name": "tool2",
-        "server_type_key": "Tool_server",
-        "deploy_order": 50
+      {
+        "build_name": "tool2",
+        "server_types": ["Tool_server"]
       },
-      "tool3": {
-        "package_name": "tool3",
-        "server_type_key": "Tool_server",
-        "deploy_order": 50
+      {
+        "build_name": "tool3",
+        "server_types": ["Tool_server"]
       },
-      "tool5": {
-        "package_name": "tool5",
-        "server_type_key": "Tool_server",
-        "deploy_order": 50
+      {
+        "build_name": "tool5",
+        "server_types": ["Tool_server"]
       }
-    }
+    ]
   }
 }

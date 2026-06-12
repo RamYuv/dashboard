@@ -127,7 +127,10 @@ class VmStatusFetcher:
             comp_data[comp_name] = {"run_status": run_status, "pid": pid}
 
         if not comp_data:
-            vm_status["vm_color"] = "Yellow"
+            # If tcsexecute/tcsexec status did not clearly report either
+            # "no apps running" or per-component states, treat it as an
+            # unavailable/missing TCS service signal rather than idle.
+            vm_status["vm_color"] = "Black"
             vm_status["component_data"] = comp_data
             return vm_status
         if not_running_count == len(comp_data):

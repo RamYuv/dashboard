@@ -1,0 +1,177 @@
+.compact-deployment-card,
+.compact-deployment-card .form-section,
+.compact-deployment-card .section-title,
+.compact-deployment-card .form-group label,
+.compact-deployment-card .form-label,
+.compact-deployment-card .form-control,
+.compact-deployment-card .form-select,
+.compact-deployment-card .form-text,
+.compact-deployment-card .alert,
+.compact-deployment-card .form-message {
+    color: #000000 !important;
+}
+
+.compact-deployment-card .form-control::placeholder,
+.compact-deployment-card textarea.form-control::placeholder {
+    color: #000000;
+    opacity: 1;
+}
+
+.compact-deployment-card .workspace-card-body {
+    padding: 0.85rem 0.95rem 0.95rem;
+}
+
+.compact-deployment-card .form-section {
+    margin-bottom: 0.3rem;
+    padding: 0.72rem 0.82rem;
+    border-radius: 10px;
+}
+
+.compact-deployment-card .section-title {
+    margin-bottom: 0.7rem;
+    font-size: 1rem;
+}
+
+.compact-deployment-card .form-group label,
+.compact-deployment-card .form-label {
+    margin-bottom: 0.35rem;
+    font-size: 0.9rem;
+}
+
+.compact-deployment-card .form-control,
+.compact-deployment-card .form-select {
+    min-height: 2.7rem;
+    padding: 0.55rem 0.8rem;
+    font-size: 0.94rem;
+}
+
+.compact-deployment-card textarea.form-control {
+    min-height: 3.5rem;
+}
+
+.compact-deployment-card .row {
+    --bs-gutter-x: 0.8rem;
+    --bs-gutter-y: 0.4rem;
+}
+
+.compact-policy-note {
+    margin-bottom: 0.65rem !important;
+    padding: 0.5rem 0.7rem;
+}
+
+.deployment-form-shell {
+    display: grid;
+    gap: 0.3rem;
+}
+
+.deployment-remarks-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.6rem;
+    align-items: end;
+}
+
+.deployment-remarks-row .form-group {
+    margin-bottom: 0;
+}
+
+.deployment-remarks-row .btn {
+    min-height: 2.7rem;
+    white-space: nowrap;
+}
+
+.deployment-details-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.8rem;
+    align-items: start;
+}
+
+.deployment-details-grid .form-group {
+    margin-bottom: 0;
+}
+
+.target-debug {
+    margin-top: 0.35rem;
+    color: #64748b;
+    font-size: 0.78rem;
+}
+
+.component-badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    background: #e3f2fd;
+    color: #1565c0;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin: 0.125rem;
+}
+
+#formTargetKey,
+#formVersion,
+#formComponentNames,
+#formEnvType,
+#formEnvId,
+#formTestingMode,
+#formServiceTypes {
+    color: #000000;
+    background-color: #ffffff;
+}
+
+#formEnvType option,
+#formEnvId option,
+#formTargetKey option,
+#formComponentNames option,
+#formTestingMode option,
+#formServiceTypes option {
+    color: #000000;
+    background-color: #ffffff;
+}
+
+.deployment-success-toast {
+    position: fixed;
+    top: calc(var(--app-shell-header-height) + 1rem);
+    right: 1rem;
+    z-index: 1080;
+    min-width: 320px;
+    max-width: 440px;
+    border: 0;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    box-shadow: 0 20px 40px rgba(15, 23, 42, 0.18);
+}
+
+.deployment-success-toast .toast-header {
+    background: transparent;
+    border-bottom: 1px solid rgba(59, 130, 246, 0.18);
+    padding: 0.8rem 0.95rem 0.65rem;
+}
+
+.deployment-success-toast .toast-body {
+    padding: 0.9rem 0.95rem 1rem;
+    color: #1e3a8a;
+    font-weight: 600;
+}
+
+.deployment-success-toast-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    color: #1d4ed8;
+    font-weight: 700;
+}
+
+@media (max-width: 900px) {
+    .deployment-remarks-row,
+    .deployment-details-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .deployment-success-toast {
+        left: 0.75rem;
+        right: 0.75rem;
+        min-width: 0;
+        max-width: none;
+    }
+}

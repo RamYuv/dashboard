@@ -1,0 +1,101 @@
+<div class="row g-3">
+    <div class="col-12">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-2">
+            <h1 class="admin-section-heading mb-0">{{ tab_titles.get(active_tab, "Version Catalog Management") }}</h1>
+            <button class="btn btn-success" type="button" data-bs-toggle="modal" data-bs-target="#addVersionModal" data-admin-modal-trigger data-admin-form="#addVersionForm" data-admin-action="create" data-admin-title="#addVersionModalLabel" data-admin-title-text="Add Version" data-admin-submit="#addVersionSubmit" data-admin-submit-text="Save Version" data-admin-values='{"build_id":"","target_key":"","tool_build_name":"","version":""}'>
+                <i class="fas fa-plus me-2"></i>Add New
+            </button>
+        </div>
+    </div>
+
+    <div class="col-12">
+        <div class="card shadow-sm border-0 admin-panel">
+            <div class="card-body">
+                <div class="table-responsive admin-table-wrap">
+                    <table class="table align-middle">
+                        <thead><tr><th>Target</th><th>App Name</th><th>Requested Version</th><th>Coverage</th><th class="admin-action-cell">Actions</th></tr></thead>
+                        <tbody>
+                        {% for build in component_builds %}
+                            <tr>
+                                <td>{{ build.target_display_name }} <span class="text-muted">({{ build.target_key }})</span></td>
+                                <td>{{ build.app_name }}</td>
+                                <td>{{ build.version }}</td>
+                                <td>{{ build.coverage_summary or "-" }}</td>
+                                <td class="admin-action-cell">
+                                    <div class="admin-row-actions">
+                                        <button class="btn btn-outline-primary admin-icon-btn" type="button" data-bs-toggle="modal" data-bs-target="#addVersionModal" data-admin-modal-trigger data-admin-form="#addVersionForm" data-admin-action="update_component_build" data-admin-title="#addVersionModalLabel" data-admin-title-text="Edit Version" data-admin-submit="#addVersionSubmit" data-admin-submit-text="Update Version" data-admin-values='{{ {"build_id": build.build_id, "target_key": build.target_key, "tool_build_name": build.build_name if build.target_key == "TOOLS" else "", "version": build.version}|tojson }}' aria-label="Edit version">
+                                            <i class="fas fa-pen"></i>
+                                        </button>
+                                        <form method="post" class="d-inline">
+                                            <input type="hidden" name="action" value="delete_component_build">
+                                            <input type="hidden" name="entity" value="component_builds">
+                                            <input type="hidden" name="tab" value="component_builds">
+                                            <input type="hidden" name="build_id" value="{{ build.build_id }}">
+                                            <button class="btn btn-outline-danger admin-icon-btn" type="submit" aria-label="Delete version">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% else %}
+                            <tr><td colspan="5" class="text-muted">No versions found.</td></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade admin-add-modal" id="addVersionModal" tabindex="-1" aria-labelledby="addVersionModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content admin-panel border-0">
+            <div class="modal-header">
+                <h3 class="modal-title h5 mb-0" id="addVersionModalLabel">Add Version</h3>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form method="post" id="addVersionForm">
+                    <input type="hidden" name="action" value="create">
+                    <input type="hidden" name="entity" value="component_builds">
+                    <input type="hidden" name="tab" value="component_builds">
+                    <input type="hidden" name="build_id" value="">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label" for="build_target_key">Target</label>
+                            <select class="form-select" id="build_target_key" name="target_key" required>
+                                <option value="">Select target</option>
+                                {% for target in component_build_target_options %}
+                                    <option value="{{ target.target_key }}">
+                                        {{ target.display_name }} ({{ target.target_key }})
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-12" id="buildNamePreviewRow">
+                            <label class="form-label" for="build_name_preview">App Name</label>
+                            <input class="form-control" id="build_name_preview" value="" readonly>
+                        </div>
+                        <div class="col-12" id="toolBuildNameRow" style="display: none;">
+                            <label class="form-label" for="tool_build_name">App Name</label>
+                            <select class="form-select" id="tool_build_name" name="tool_build_name">
+                                <option value="">Select tool</option>
+                            </select>
+                            <div class="form-text">For TOOLS, the selected tool name itself is stored in <code>build_name</code>.</div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="build_version">Requested Version</label>
+                            <input class="form-control" id="build_version" name="version" placeholder="TCS-1.1.2.3 or TCS-1.1.2.3_Patch1" required>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" form="addVersionForm" class="btn btn-primary" id="addVersionSubmit">Save Version</button>
+            </div>
+        </div>
+    </div>
+</div>

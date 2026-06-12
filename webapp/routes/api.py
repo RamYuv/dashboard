@@ -5,6 +5,7 @@ from ..auth_service import can_access_env_team_screen, current_user, login_requi
 from ..helpers import (
     get_environment_types,
     get_environments,
+    list_environment_operations,
     get_list_bookings,
     get_target_versions,
     json_error,
@@ -108,6 +109,16 @@ def api_list_deployment_requests():
     return jsonify({"deployment_requests": requests_data})
 
 
+@main_bp.route("/api/environment-operations", methods=["GET"])
+@login_required
+def api_environment_operations():
+    user = current_user()
+    operations, error, status_code = list_environment_operations(user)
+    if error:
+        return json_error(error, status_code)
+    return jsonify({"operations": operations})
+
+
 @main_bp.route("/api/deployment-requests", methods=["POST"])
 @login_required
 def api_create_deployment_request():
@@ -195,4 +206,18 @@ def api_deployment_request_logs(deployment_request_id):
     )
     if deployment_request is None:
         return json_error("Deployment request not found.", 404)
-    return jsonify({"deployments": deployment_request.get("resolved_targets", [])})
+    return jsonify({"deployments": deployment_request.get("deployments", [])})
+
+
+@main_bp.route("/api/environment-health/<env_id>/logs", methods=["GET"])
+@login_required
+def api_environment_health_logs(env_id):
+    _ = env_id
+    return json_error("Feature is not available yet.", 501)
+
+
+@main_bp.route("/api/environment-health/<env_id>/auto-remediate", methods=["POST"])
+@login_required
+def api_environment_health_auto_remediate(env_id):
+    _ = env_id
+    return json_error("Feature is not available yet.", 501)

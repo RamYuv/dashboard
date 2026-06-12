@@ -28,27 +28,47 @@ class SimpleExecutor:
 class VersionFetcherTests(unittest.TestCase):
     def test_parse_output_json_mapping(self):
         fetcher = VersionFetcher(executor=SimpleExecutor('{}'))
-        parsed, raw = fetcher.parse_output('{"core": "1.2.3", "gateway": "4.5.6"}')
-        self.assertEqual(parsed, {"core": "1.2.3", "gateway": "4.5.6"})
-        self.assertEqual(raw, '{"core": "1.2.3", "gateway": "4.5.6"}')
+        parsed = fetcher.parse_output('{"core": "1.2.3", "gateway": "4.5.6"}')
+        self.assertEqual(parsed["versions"], {"core": "1.2.3", "gateway": "4.5.6"})
+        self.assertEqual(parsed["deployment_details"], {"mode": "", "service_types": []})
+        self.assertEqual(parsed["raw_output"], '{"core": "1.2.3", "gateway": "4.5.6"}')
 
     def test_parse_output_plain_lines(self):
         fetcher = VersionFetcher(executor=SimpleExecutor('core: 1.2.3\ngateway: 4.5.6'))
-        parsed, raw = fetcher.parse_output('core: 1.2.3\ngateway: 4.5.6')
-        self.assertEqual(parsed, {"core": "1.2.3", "gateway": "4.5.6"})
-        self.assertEqual(raw, 'core: 1.2.3\ngateway: 4.5.6')
+        parsed = fetcher.parse_output('core: 1.2.3\ngateway: 4.5.6')
+        self.assertEqual(parsed["versions"], {"core": "1.2.3", "gateway": "4.5.6"})
+        self.assertEqual(parsed["deployment_details"], {"mode": "", "service_types": []})
+        self.assertEqual(parsed["raw_output"], 'core: 1.2.3\ngateway: 4.5.6')
 
     def test_parse_output_empty_string(self):
         fetcher = VersionFetcher(executor=SimpleExecutor(''))
-        parsed, raw = fetcher.parse_output('')
-        self.assertEqual(parsed, {})
-        self.assertEqual(raw, "")
+        parsed = fetcher.parse_output('')
+        self.assertEqual(parsed["versions"], {})
+        self.assertEqual(parsed["deployment_details"], {"mode": "", "service_types": []})
+        self.assertEqual(parsed["raw_output"], "")
 
     def test_parse_output_invalid_json_falls_back_to_lines(self):
         fetcher = VersionFetcher(executor=SimpleExecutor('core: 1.2.3\nnotjson'))
-        parsed, raw = fetcher.parse_output('core: 1.2.3\nnotjson')
-        self.assertEqual(parsed, {"core": "1.2.3"})
-        self.assertEqual(raw, 'core: 1.2.3\nnotjson')
+        parsed = fetcher.parse_output('core: 1.2.3\nnotjson')
+        self.assertEqual(parsed["versions"], {"core": "1.2.3"})
+        self.assertEqual(parsed["deployment_details"], {"mode": "", "service_types": []})
+        self.assertEqual(parsed["raw_output"], 'core: 1.2.3\nnotjson')
+
+    def test_parse_output_extracts_deployment_details_from_deploy_info(self):
+        fetcher = VersionFetcher(executor=SimpleExecutor(''))
+        parsed = fetcher.parse_output(
+            """
+[Deploy Info]
+env_name = DEV01
+server = gateway
+install_user = pali
+deploy_service = DOM CONV
+mode = RT
+versions = tcs_service-1.1.2.3_20260604
+""".strip()
+        )
+        self.assertEqual(parsed["versions"], {"gateway": "tcs_service-1.1.2.3_20260604"})
+        self.assertEqual(parsed["deployment_details"], {"mode": "RT", "service_types": ["DOM", "CONV"]})
 
     def test_fetch_versions_returns_mapping_and_raw_output(self):
         executor = SimpleExecutor('core: 1.2.3')

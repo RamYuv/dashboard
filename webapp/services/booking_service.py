@@ -4,6 +4,9 @@ Booking service for managing environment reservations.
 
 import logging
 from datetime import datetime
+from zoneinfo import ZoneInfo
+
+from flask import current_app
 
 from ..models import (
     EnvironmentBooking,
@@ -13,6 +16,7 @@ from ..models import (
 from ..constants import VALID_BOOKING_TYPES, BOOKING_STATUS
 from ..helpers import can_user_access_environment, to_utc_naive
 from ..domain.reservation_conflict_service import ReservationConflictService
+from .email_service import EmailDeliveryError, SendmailEmailService
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +76,72 @@ class BookingConflictChecker:
 
 class BookingService:
     """Service for managing booking operations."""
+
+    @staticmethod
+    def _resolve_display_timezone(booking):
+        timezone_name = (booking.user_timezone or "").strip() or "UTC"
+        try:
+            return ZoneInfo(timezone_name), timezone_name
+        except Exception:
+            return ZoneInfo("UTC"), "UTC"
+
+    @staticmethod
+    def _format_booking_time(booking_time, booking):
+        timezone_info, timezone_name = BookingService._resolve_display_timezone(booking)
+        utc_value = booking_time.replace(tzinfo=ZoneInfo("UTC"))
+        local_value = utc_value.astimezone(timezone_info)
+        return "{} ({})".format(local_value.strftime("%Y-%m-%d %H:%M"), timezone_name)
+
+    @staticmethod
+    def _send_booking_confirmation(booking):
+        requester = booking.requester
+        recipient = (requester.email_id or "").strip() if requester and requester.email_id else ""
+        if not recipient:
+            current_app.logger.warning(
+                "Skipping booking confirmation for %s because requester email is unavailable.",
+                booking.booking_id,
+            )
+            return
+
+        subject = "[EnvBooking] Booking confirmed {}".format(booking.booking_id)
+        body = "\n".join([
+            "Your environment booking has been created successfully.",
+            "",
+            "Booking ID: {}".format(booking.booking_id),
+            "Environment: {}".format(booking.env_id),
+            "Requested by: {}".format(
+                requester.full_name if requester and requester.full_name else booking.requested_by
+            ),
+            "User ID: {}".format(booking.requested_by),
+            "Booking Type: {}".format(booking.booking_type),
+            "Status: {}".format(booking.status),
+            "Start: {}".format(BookingService._format_booking_time(booking.start_time, booking)),
+            "End: {}".format(BookingService._format_booking_time(booking.end_time, booking)),
+            "Description: {}".format(booking.description or "Not provided"),
+            "",
+            "Timezone used for display: {}".format(
+                BookingService._resolve_display_timezone(booking)[1]
+            ),
+        ])
+
+        try:
+            SendmailEmailService.send_message(
+                subject=subject,
+                recipients=[recipient],
+                body=body,
+                reply_to=recipient,
+            )
+            current_app.logger.info(
+                "Booking confirmation sent for %s to %s",
+                booking.booking_id,
+                recipient,
+            )
+        except EmailDeliveryError as exc:
+            current_app.logger.exception(
+                "Failed to send booking confirmation for %s: %s",
+                booking.booking_id,
+                exc,
+            )
 
     @staticmethod
     def _build_conflict_message(booking):
@@ -163,6 +233,7 @@ class BookingService:
         db.session.flush()
 
         db.session.commit()
+        BookingService._send_booking_confirmation(booking)
         logger.info(
             "Booking %s created by user %s for env %s",
             booking.booking_id,

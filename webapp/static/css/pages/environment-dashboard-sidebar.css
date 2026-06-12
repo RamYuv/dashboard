@@ -1,0 +1,182 @@
+:root {
+    --env-dashboard-sidebar-width: 240px;
+    --env-sidebar-panel: #3e5163;
+    --env-sidebar-submenu: rgba(28, 40, 60, 0.74);
+    --env-sidebar-active: linear-gradient(135deg, #16244f 0%, #1d2f66 100%);
+    --env-sidebar-hover: #f0f2f5;
+    --env-sidebar-active-text: #ffffff;
+    --env-sidebar-hover-text: #16243a;
+    --env-sidebar-text: #f8fbff;
+}
+
+.sidebar {
+    width: var(--env-dashboard-sidebar-width);
+    background: var(--env-sidebar-panel);
+    border-right: 1px solid rgba(21, 32, 51, 0.18);
+    padding: 20px 0 28px;
+    position: fixed;
+    left: 0;
+    top: var(--app-shell-header-height);
+    bottom: 0;
+    height: calc(100vh - var(--app-shell-header-height));
+    z-index: 35;
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.sidebar-menu-title {
+    color: var(--env-sidebar-text);
+    font-size: 2rem;
+    font-weight: 700;
+    padding: 0 22px 18px;
+    letter-spacing: 0.01em;
+}
+
+.sidebar-nav {
+    padding-top: 6px;
+}
+
+.menu-item {
+    display: block;
+    color: var(--env-sidebar-text);
+    padding: 16px 22px;
+    text-decoration: none;
+    font-size: 1rem;
+    font-weight: 700;
+    background: var(--env-sidebar-panel);
+    transition: background 0.2s ease, color 0.2s ease, padding-left 0.2s ease;
+}
+
+.menu-item.menu-item-light {
+    background: var(--env-sidebar-panel);
+    color: var(--env-sidebar-text);
+}
+
+.menu-item.active,
+.menu-group[open] .menu-group-header,
+.submenu-item.active {
+    background: var(--env-sidebar-active);
+    color: var(--env-sidebar-active-text);
+}
+
+.menu-item:hover {
+    background: var(--env-sidebar-hover);
+    color: var(--env-sidebar-hover-text);
+    padding-left: 26px;
+    text-decoration: none;
+}
+
+.menu-item.active:hover {
+    color: var(--env-sidebar-active-text);
+}
+
+.menu-group {
+    border-bottom: 0;
+}
+
+.menu-group-header {
+    list-style: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: var(--env-sidebar-text);
+    padding: 16px 22px;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    background: var(--env-sidebar-panel);
+    border-left: 4px solid transparent;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.menu-group-header:hover {
+    background: var(--env-sidebar-hover);
+    color: var(--env-sidebar-hover-text);
+}
+
+.menu-group[open] .menu-group-header:hover {
+    color: var(--env-sidebar-active-text);
+}
+
+.menu-group-header::-webkit-details-marker {
+    display: none;
+}
+
+.menu-group-header i {
+    transition: transform 0.2s ease;
+}
+
+.menu-group[open] .menu-group-header i {
+    transform: rotate(180deg);
+}
+
+.menu-group-body {
+    background: var(--env-sidebar-submenu);
+    padding: 10px 0 12px;
+}
+
+.submenu-item {
+    display: block;
+    color: var(--env-sidebar-text);
+    text-decoration: none;
+    padding: 14px 22px 14px 44px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    transition: background 0.2s ease, color 0.2s ease, padding-left 0.2s ease;
+}
+
+.submenu-item:hover {
+    background: var(--env-sidebar-hover);
+    color: var(--env-sidebar-hover-text);
+    padding-left: 48px;
+    text-decoration: none;
+}
+
+.submenu-item.active:hover {
+    color: var(--env-sidebar-active-text);
+}
+
+.main-content {
+    margin-left: var(--env-dashboard-sidebar-width);
+    width: calc(100% - var(--env-dashboard-sidebar-width));
+    min-height: calc(100vh - var(--app-shell-header-height));
+    background: linear-gradient(180deg, #fbfdff 0%, #eef3f9 100%);
+    position: relative;
+    transition: margin-left 0.25s ease, width 0.25s ease;
+}
+
+.sidebar-backdrop {
+    position: fixed;
+    inset: var(--app-shell-header-height) 0 0 0;
+    background: rgba(15, 23, 42, 0.32);
+    z-index: 30;
+}
+
+.app-layout.sidebar-collapsed .sidebar {
+    transform: translateX(calc(-1 * var(--env-dashboard-sidebar-width)));
+    box-shadow: none;
+}
+
+.app-layout.sidebar-collapsed .main-content {
+    margin-left: 0;
+    width: 100%;
+}
+
+@media (max-width: 768px) {
+    .sidebar {
+        transform: translateX(calc(-1 * var(--env-dashboard-sidebar-width)));
+        box-shadow: 0 16px 30px rgba(15, 23, 42, 0.22);
+    }
+
+    .main-content {
+        margin-left: 0;
+        width: 100%;
+    }
+
+    .app-layout.sidebar-open .sidebar {
+        transform: translateX(0);
+    }
+
+    .app-layout.sidebar-open .sidebar-backdrop {
+        display: block;
+    }
+}

@@ -23,6 +23,7 @@ class Config:
 
     # Other settings
     SERVER_TIMEZONE = os.environ.get('SERVER_TIMEZONE', 'UTC')
+    APP_VERSION = os.environ.get('APP_VERSION', '1.0')
 
     # Monitoring scheduler/cache
     MONITOR_REFRESH_SECONDS = int(os.environ.get('MONITOR_REFRESH_SECONDS', 60))
@@ -58,8 +59,13 @@ class Config:
         'AUTO_DEPLOY_PAYLOAD_DIR',
         os.path.join(LOG_DIR, 'deployments')
     )
+    DEPLOYMENT_ENGINE = (os.environ.get('DEPLOYMENT_ENGINE', 'SCRIPT') or 'SCRIPT').strip().upper()
+    DEPLOYMENT_LAUNCHER = os.environ.get('DEPLOYMENT_LAUNCHER', AUTO_DEPLOY_SCRIPT)
+    DEPLOYMENT_LAUNCHER_WORKDIR = os.environ.get('DEPLOYMENT_LAUNCHER_WORKDIR', AUTO_DEPLOY_WORKDIR)
+    DEPLOYMENT_PAYLOAD_DIR = os.environ.get('DEPLOYMENT_PAYLOAD_DIR', AUTO_DEPLOY_PAYLOAD_DIR)
 
     RESET_DB_ON_INIT = _read_bool(os.environ.get('RESET_DB_ON_INIT', 'false'))
+    SEED_BOOTSTRAP_ONLY = _read_bool(os.environ.get('SEED_BOOTSTRAP_ONLY', 'true'), default=True)
     MUTUAL_ENV_RESERVATION_ENABLED = _read_bool(
         os.environ.get('MUTUAL_ENV_RESERVATION_ENABLED', 'false')
     )

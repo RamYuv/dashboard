@@ -19,7 +19,7 @@
         --um-chip-violet-bg: #efe9ff;
         --um-chip-violet-text: #6d41d8;
         --um-shadow: 0 18px 40px rgba(27, 44, 94, 0.08);
-        --um-sidebar-width: 248px;
+        --um-sidebar-width: 164px;
         --um-layout-gap: 14px;
         --um-sticky-top: var(--app-shell-header-height);
     }
@@ -29,7 +29,9 @@
             radial-gradient(circle at top right, rgba(37, 99, 235, 0.08), transparent 28%),
             linear-gradient(180deg, #f9fbff 0%, var(--um-bg) 100%);
         color: var(--um-text);
-        font-family: "Segoe UI", "Trebuchet MS", sans-serif;
+        font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+        font-size: 14px;
+        line-height: 1.5;
     }
 
     .user-mgmt-wrap {
@@ -325,14 +327,17 @@
     }
 
     .edit-btn {
-        min-height: 38px;
+        width: 38px;
+        height: 38px;
         border-radius: 10px;
         border: 1px solid var(--um-line);
         background: #ffffff;
         color: var(--um-text);
         box-shadow: 0 6px 14px rgba(27, 44, 94, 0.04);
-        padding: 0 12px;
-        font-weight: 700;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
     }
 
     .action-cell {
@@ -347,10 +352,13 @@
     }
 
     .delete-btn {
-        min-height: 38px;
+        width: 38px;
+        height: 38px;
         border-radius: 10px;
-        padding: 0 12px;
-        font-weight: 700;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
     }
 
     .table-footer {
@@ -509,6 +517,39 @@
         background: #ffffff;
     }
 
+    .delete-confirm-modal .modal-dialog {
+        max-width: 430px;
+    }
+
+    .delete-confirm-modal .modal-content {
+        border-radius: 22px;
+    }
+
+    .delete-confirm-header {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+    }
+
+    .delete-confirm-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 16px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(239, 68, 68, 0.12);
+        color: #dc2626;
+        font-size: 1.2rem;
+        flex: 0 0 auto;
+    }
+
+    .delete-confirm-copy {
+        color: #243548;
+        margin: 6px 0 0;
+        line-height: 1.5;
+    }
+
     .empty-state {
         padding: 42px 18px;
         text-align: center;
@@ -604,23 +645,15 @@
 
             <nav class="side-nav">
                 <a class="side-link" href="{{ url_for('main.environment_health') }}">
-                    <i class="fas fa-home"></i> Dashboard
+                    <i class="fas fa-home"></i> Monitoring Dashboard
                 </a>
                 <a class="side-link active" href="{{ url_for('main.user_management_screen') }}">
                     <i class="fas fa-users"></i> Users
                 </a>
-                <a class="side-link" href="{{ url_for('main.admin_screen', tab='teams') }}">
-                    <i class="fas fa-user-friends"></i> Teams / Groups
-                </a>
-                <a class="side-link" href="{{ url_for('main.admin_screen', tab='roles') }}">
-                    <i class="fas fa-user-shield"></i> Roles & Permissions
+                <a class="side-link" href="{{ url_for('main.admin_screen') }}">
+                    <i class="fas fa-box-archive"></i> Inventory
                 </a>
             </nav>
-
-            <div class="sidebar-footer">
-                Signed in as<br>
-                <strong>{{ current_user.user_id if current_user else "admin" }}</strong>
-            </div>
         </aside>
 
         <section class="content-area">
@@ -742,14 +775,14 @@
                                                 data-bs-target="#editUserModal{{ loop.index }}"
                                                 aria-label="Edit {{ user.user_id }}"
                                             >
-                                                <i class="fas fa-pen me-2"></i>Edit
+                                                <i class="fas fa-pen"></i>
                                             </button>
-                                            <form class="delete-inline-form" method="post" onsubmit="return confirm('Delete user {{ user.user_id }}? This cannot be undone.');">
+                                            <form class="delete-inline-form" method="post" data-delete-user-form data-user-id="{{ user.user_id }}">
                                                 <input type="hidden" name="action" value="delete_user">
                                                 <input type="hidden" name="entity" value="users">
                                                 <input type="hidden" name="user_id" value="{{ user.user_id }}">
                                                 <button class="btn btn-outline-danger delete-btn" type="submit" aria-label="Delete {{ user.user_id }}">
-                                                    <i class="fas fa-trash-alt me-2"></i>Delete
+                                                    <i class="fas fa-trash-alt"></i>
                                                 </button>
                                             </form>
                                         </div>
@@ -788,6 +821,29 @@
                 </div>
             </div>
         </section>
+    </div>
+</div>
+
+<div class="modal fade delete-confirm-modal" id="deleteUserConfirmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="delete-confirm-header">
+                    <span class="delete-confirm-icon">
+                        <i class="fas fa-trash-alt"></i>
+                    </span>
+                    <div>
+                        <h5 class="modal-title mb-0">Delete User</h5>
+                        <p class="delete-confirm-copy" id="deleteUserConfirmMessage">This action cannot be undone.</p>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteUserButton">Delete User</button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -1011,7 +1067,49 @@ document.addEventListener("DOMContentLoaded", function () {
     const prevPageButton = document.getElementById("prevPageButton");
     const nextPageButton = document.getElementById("nextPageButton");
     const pageStatus = document.getElementById("pageStatus");
+    const deleteForms = Array.from(document.querySelectorAll("[data-delete-user-form]"));
+    const deleteConfirmModalElement = document.getElementById("deleteUserConfirmModal");
+    const deleteConfirmMessage = document.getElementById("deleteUserConfirmMessage");
+    const confirmDeleteUserButton = document.getElementById("confirmDeleteUserButton");
+    const deleteConfirmModal = deleteConfirmModalElement
+        ? bootstrap.Modal.getOrCreateInstance(deleteConfirmModalElement)
+        : null;
+    let pendingDeleteForm = null;
     let currentPage = 1;
+
+    deleteForms.forEach(function (form) {
+        form.addEventListener("submit", function (event) {
+            event.preventDefault();
+            pendingDeleteForm = form;
+            if (deleteConfirmMessage) {
+                const userId = form.getAttribute("data-user-id") || "this user";
+                deleteConfirmMessage.textContent = "Delete user " + userId + "? This action cannot be undone.";
+            }
+            if (deleteConfirmModal) {
+                deleteConfirmModal.show();
+            }
+        });
+    });
+
+    if (confirmDeleteUserButton) {
+        confirmDeleteUserButton.addEventListener("click", function () {
+            if (!pendingDeleteForm) {
+                return;
+            }
+            const formToSubmit = pendingDeleteForm;
+            pendingDeleteForm = null;
+            if (deleteConfirmModal) {
+                deleteConfirmModal.hide();
+            }
+            formToSubmit.submit();
+        });
+    }
+
+    if (deleteConfirmModalElement) {
+        deleteConfirmModalElement.addEventListener("hidden.bs.modal", function () {
+            pendingDeleteForm = null;
+        });
+    }
 
     function applyFilters(resetPage) {
         const query = (searchInput.value || "").trim().toLowerCase();

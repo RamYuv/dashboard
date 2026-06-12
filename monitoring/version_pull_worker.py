@@ -34,9 +34,11 @@ class VersionPullWorker:
         # map package_key and package_name aliases directly
         for package_key, pkg in packages.items():
             lookup[package_key] = package_key
+            lookup[package_key.lower()] = package_key
             name = pkg.get("package_name")
             if name:
                 lookup[name] = package_key
+                lookup[name.lower()] = package_key
 
         # build server_type -> package list map; only map server_type alias
         # if it uniquely identifies a single package to avoid collisions
@@ -50,6 +52,7 @@ class VersionPullWorker:
         for server_type, pk_list in server_type_map.items():
             if len(pk_list) == 1:
                 lookup[server_type] = pk_list[0]
+                lookup[server_type.lower()] = pk_list[0]
 
         return lookup, packages
 
@@ -79,7 +82,7 @@ class VersionPullWorker:
             password = mapping.deployment_password or ""
 
             server_type_key = mapping.server_type.server_type_key if mapping.server_type else None
-            target_key = mapping.server_type.target_type if mapping.server_type else None
+            target_key = mapping.server_type.target_key if mapping.server_type else None
             target_def = get_target_definition(target_key)
             if not target_def:
                 skipped += 1
@@ -90,10 +93,17 @@ class VersionPullWorker:
             versions_map, raw = self.version_fetcher.fetch_versions(
                 hostname, username, password, server_type=server_type_key, host_label=host.hostname
             )
+            parsed_output = self.version_fetcher.parse_output(raw)
+            deployment_details = parsed_output.get("deployment_details") or {}
+            testing_mode = (deployment_details.get("mode") or "").strip()
+            service_types = deployment_details.get("service_types") or []
 
             # For each component found, try to resolve to a package_key
             for comp_name, comp_version in (versions_map or {}).items():
-                package_key = lookup.get(comp_name)
+                normalized_name = (comp_name or "").strip()
+                package_key = lookup.get(normalized_name) or lookup.get(normalized_name.lower())
+                if package_key is None and server_type_key:
+                    package_key = lookup.get(server_type_key) or lookup.get(server_type_key.lower())
                 # If not found, and target only has one package, use it
                 if package_key is None and len(packages) == 1:
                     package_key = next(iter(packages.keys()))
@@ -122,16 +132,31 @@ class VersionPullWorker:
                         package_key=package_key,
                         package_name=package_name,
                         current_version=comp_version,
+                        testing_mode=testing_mode if target_key == "TCS_APP" else "",
                         source="PULL",
                         status="CURRENT",
                         notes=(raw or "")[:4000],
                     )
+                    state.set_service_types(service_types if target_key == "TCS_APP" else [])
                     db.session.add(state)
                     created += 1
                 else:
                     # Update only if version differs or source isn't PULL.
-                    if (state.current_version or "") != (comp_version or "") or (state.source or "") != "PULL":
+                    mode_changed = (state.testing_mode or "") != (
+                        testing_mode if target_key == "TCS_APP" else ""
+                    )
+                    service_types_changed = state.get_service_types() != (
+                        service_types if target_key == "TCS_APP" else []
+                    )
+                    if (
+                        (state.current_version or "") != (comp_version or "") or
+                        (state.source or "") != "PULL" or
+                        mode_changed or
+                        service_types_changed
+                    ):
                         state.current_version = comp_version
+                        state.testing_mode = testing_mode if target_key == "TCS_APP" else ""
+                        state.set_service_types(service_types if target_key == "TCS_APP" else [])
                         state.source = "PULL"
                         state.package_name = package_name
                         # Clear provenance fields since this value now reflects

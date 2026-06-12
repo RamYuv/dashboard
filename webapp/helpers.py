@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from flask import current_app, has_app_context, jsonify
 
 from .models import ComponentBuild, DeploymentRequest, Environment, EnvironmentBooking, Role, format_datetime
+from .domain.deployment_targets import get_target_definition
 from .constants import (
     BOOKING_LIFECYCLE_STATUS,
     BOOKING_STATUS,
@@ -283,6 +284,108 @@ def get_list_bookings(user=None):
     return sorted(items, key=lambda item: item.get("start_time") or "")
 
 
+def _serialize_booking_operation_item(booking):
+    booking_data = serialize_booking(booking)
+    return {
+        "request_type": "BOOKING",
+        "request_type_label": "Booking",
+        "request_id": booking_data.get("booking_id"),
+        "booking_id": booking_data.get("booking_id"),
+        "deployment_request_id": None,
+        "env_id": booking_data.get("env_id"),
+        "env_type": booking.environment.env_type if booking.environment else None,
+        "environment_display": booking_data.get("env_id"),
+        "window_start": booking_data.get("start_time"),
+        "window_end": booking_data.get("end_time"),
+        "requested_by": booking_data.get("requested_by"),
+        "requested_by_name": booking_data.get("requested_by_name"),
+        "requested_by_team": booking_data.get("requested_by_team"),
+        "requested_by_display": booking_data.get("requested_by_display"),
+        "status": booking_data.get("lifecycle_status"),
+        "status_label": booking_data.get("status_label"),
+        "description": booking_data.get("description"),
+        "target_key": "",
+        "requested_version": "",
+        "testing_mode": "",
+        "service_types": [],
+        "package_keys": [],
+        "resolved_hosts_summary": "",
+        "available_actions": [],
+        "created_at": booking_data.get("created_at"),
+        "updated_at": booking_data.get("updated_at"),
+        "sort_time": booking_data.get("start_time") or "",
+    }
+
+
+def _serialize_deployment_operation_item(deployment_request_data):
+    return {
+        "request_type": "DEPLOYMENT",
+        "request_type_label": "Deployment",
+        "request_id": deployment_request_data.get("deployment_request_id"),
+        "booking_id": None,
+        "deployment_request_id": deployment_request_data.get("deployment_request_id"),
+        "env_id": deployment_request_data.get("env_id"),
+        "env_type": deployment_request_data.get("requested_env_type"),
+        "environment_display": deployment_request_data.get("environment_display"),
+        "window_start": deployment_request_data.get("planned_start_time"),
+        "window_end": None,
+        "requested_by": deployment_request_data.get("requested_by"),
+        "requested_by_name": deployment_request_data.get("requested_by_name"),
+        "requested_by_team": deployment_request_data.get("requested_by_team"),
+        "requested_by_display": deployment_request_data.get("requested_by_display"),
+        "status": deployment_request_data.get("status"),
+        "status_label": deployment_request_data.get("status_label"),
+        "description": deployment_request_data.get("description") or deployment_request_data.get("remarks"),
+        "target_key": deployment_request_data.get("target_key"),
+        "requested_version": deployment_request_data.get("requested_version"),
+        "testing_mode": deployment_request_data.get("testing_mode") or "",
+        "service_types": deployment_request_data.get("service_types") or [],
+        "package_keys": deployment_request_data.get("package_keys") or [],
+        "selected_server_mapping_ids": deployment_request_data.get("selected_server_mapping_ids") or [],
+        "selected_servers": deployment_request_data.get("selected_servers") or [],
+        "selected_servers_summary": deployment_request_data.get("selected_servers_summary") or "",
+        "resolved_hosts_summary": deployment_request_data.get("resolved_hosts_summary") or "",
+        "available_actions": deployment_request_data.get("available_actions") or [],
+        "created_at": deployment_request_data.get("created_at"),
+        "updated_at": deployment_request_data.get("updated_at"),
+        "sort_time": deployment_request_data.get("planned_start_time") or "",
+    }
+
+
+def list_environment_operations(user):
+    """Return a combined env-team operational view of bookings and deployments."""
+    bookings = EnvironmentBooking.query.order_by(
+        EnvironmentBooking.start_time.desc(),
+        EnvironmentBooking.created_at.desc(),
+    ).all()
+    bookings = [
+        booking
+        for booking in bookings
+        if can_user_access_environment(user, booking.environment)
+    ]
+
+    operations = [
+        _serialize_booking_operation_item(booking)
+        for booking in bookings
+    ]
+
+    from .services.deployment_request_service import DeploymentRequestService
+
+    deployment_requests, error, status_code = DeploymentRequestService.list_requests(
+        user,
+        scope="env",
+    )
+    if error:
+        return [], error, status_code
+
+    operations.extend(
+        _serialize_deployment_operation_item(item)
+        for item in deployment_requests
+    )
+    operations.sort(key=lambda item: item.get("sort_time") or "", reverse=True)
+    return operations, None, 200
+
+
 def get_environments(user=None):
     """Retrieve environments, optionally filtered to those accessible by the user."""
     environments = Environment.query.order_by(
@@ -326,26 +429,23 @@ def get_target_versions(target_key, package_key=None):
         return []
 
     if requested_target_key == "TOOLS" and package_key:
-        versions = [
-            row.version
-            for row in ComponentBuild.query.filter(
-                (ComponentBuild.target_key == "TOOLS") &
-                (
-                    (ComponentBuild.build_name == package_key) |
-                    (ComponentBuild.artifact_name == package_key)
-                )
-            ).order_by(ComponentBuild.version).all()
-        ]
+        versions = []
+        for row in ComponentBuild.query.filter_by(
+            target_key="TOOLS",
+            build_name=package_key,
+        ).order_by(ComponentBuild.version).all():
+            if row.version not in versions:
+                versions.append(row.version)
         if versions:
             return versions
         return PACKAGE_VERSIONS.get(package_key, COMPONENT_VERSIONS.get("TOOLS", []))
 
     query = ComponentBuild.query.filter(ComponentBuild.target_key == requested_target_key)
 
-    versions = [
-        row.version
-        for row in query.order_by(ComponentBuild.version).all()
-    ]
+    versions = []
+    for row in query.order_by(ComponentBuild.version).all():
+        if row.version not in versions:
+            versions.append(row.version)
     if versions:
         return versions
 

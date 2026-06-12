@@ -1,88 +1,104 @@
 {% extends "booking_workspace_base.html" %}
+{% from "components/_datetime_fields.html" import datetime_input_group %}
 {% set workspace_nav = "grid" %}
 {% block workspace_title %}Environment Booking{% endblock %}
+{% block workspace_shell_title %}Environment Booking Form{% endblock %}
+{% block workspace_shell_subtitle %}Create a reservation and review the current TCS runtime before submitting.{% endblock %}
+{% block workspace_extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/booking-grid.css') }}">
+{% endblock %}
 {% block workspace_content %}
 <div class="container-fluid px-0">
-    <div class="workspace-card">
-        <div class="workspace-card-header">
-            <i class="fas fa-plus-circle"></i>
-            <h5>Environment Booking Form</h5>
-        </div>
+    <div class="workspace-card compact-workspace-card">
         <div class="workspace-card-body">
             {% if reservation_policy.mutual_env_reservation_enabled %}
-            <div class="alert alert-light border mb-4" id="reservationPolicyNote">
+            <div class="alert alert-light border mb-3 py-2 px-3" id="reservationPolicyNote">
                 <i class="fas fa-shield-alt me-2"></i>
                 Environment bookings and deployment requests now reserve the same environment window. A deployment request can block a booking, and a booking can block a deployment request.
             </div>
             {% endif %}
             <form id="quickBookingForm">
-                <div class="form-section">
-                    <div class="section-title">
-                        <i class="fas fa-clock"></i>
-                        Booking Period
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="form-group">
-                                <label for="formStartTime">
-                                    <i class="fas fa-play"></i> Start Date & Time
-                                </label>
-                                <input type="datetime-local" id="formStartTime" class="form-control" required>
+                <div class="booking-form-shell">
+                    <div class="form-section">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">{{ datetime_input_group("Booking Start", "formStartDate", "formStartTime", "Start Date", "Start Time", "fas fa-play", time_aria_label="Booking start time", timezone_fallback=(server_timezone or "UTC"), show_timezone_note=true) }}</div>
                             </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="form-group">
-                                <label for="formEndTime">
-                                    <i class="fas fa-stop"></i> End Date & Time
-                                </label>
-                                <input type="datetime-local" id="formEndTime" class="form-control" required>
+                            <div class="col-md-6">
+                                <div class="form-group">{{ datetime_input_group("Booking End", "formEndDate", "formEndTime", "End Date", "End Time", "fas fa-stop", time_aria_label="Booking end time", timezone_fallback=(server_timezone or "UTC"), show_timezone_note=false) }}</div>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <div class="form-section">
-                    <div class="section-title">
-                        <i class="fas fa-server"></i>
-                        Environment Selection
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="form-group">
-                                <label for="formEnvType">
-                                    <i class="fas fa-layer-group"></i> Environment Type
-                                </label>
-                                <select id="formEnvType" class="form-control">
-                                    <option value="">Select type...</option>
-                                    {% for env_type in environment_types %}
-                                    <option value="{{ env_type }}">{{ env_type }}</option>
-                                    {% endfor %}
-                                </select>
+                    <div class="form-section">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="formEnvType">
+                                        <i class="fas fa-layer-group"></i> Environment Type
+                                    </label>
+                                    <select id="formEnvType" class="form-control">
+                                        <option value="">Select type...</option>
+                                        {% for env_type in environment_types %}
+                                        <option value="{{ env_type }}">{{ env_type }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
                             </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="form-group">
-                                <label for="formEnvId">
-                                    <i class="fas fa-server"></i> Environment
-                                </label>
-                                <select id="formEnvId" class="form-control" required>
-                                    <option value="">Select environment...</option>
-                                </select>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="formEnvId">
+                                        <i class="fas fa-server"></i> Environment
+                                    </label>
+                                    <select id="formEnvId" class="form-control" required>
+                                        <option value="">Select environment...</option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <div class="form-section">
-                    <div class="section-title">
-                        <i class="fas fa-sticky-note"></i>
-                        Additional Information
+                    <div class="form-section">
+                        <div class="section-title">
+                            <i class="fas fa-info-circle"></i>
+                            Current TCS Runtime
+                        </div>
+                        <div id="currentTcsRuntimeEmpty" class="runtime-placeholder">
+                            Select an environment to view the currently deployed TCS version, service, and mode.
+                        </div>
+                        <div id="currentTcsRuntimeDetails" class="runtime-details" hidden>
+                            <div class="runtime-item">
+                                <div class="runtime-label">Version</div>
+                                <div id="currentTcsRuntimeVersion" class="runtime-value">-</div>
+                            </div>
+                            <div class="runtime-item">
+                                <div class="runtime-label">Service</div>
+                                <div id="currentTcsRuntimeService" class="runtime-value">-</div>
+                            </div>
+                            <div class="runtime-item">
+                                <div class="runtime-label">Mode</div>
+                                <div id="currentTcsRuntimeMode" class="runtime-value">-</div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="formDescription">
-                            <i class="fas fa-comment"></i> Purpose / Remarks
-                        </label>
-                        <textarea id="formDescription" class="form-control" rows="3" placeholder="Please describe the purpose of this booking..."></textarea>
+
+                    <div class="form-section">
+                        <div class="remarks-action-row">
+                            <div class="remarks-field">
+                                <div class="form-group">
+                                    <label for="formDescription">
+                                        <i class="fas fa-comment"></i> Purpose / Remarks
+                                    </label>
+                                    <textarea id="formDescription" class="form-control" rows="2" placeholder="Please describe the purpose of this booking..."></textarea>
+                                </div>
+                            </div>
+                            <button type="button" id="checkAvailabilityBtn" class="btn btn-outline-secondary-custom">
+                                <i class="fas fa-search"></i> Check Availability
+                            </button>
+                            <button type="submit" class="btn btn-custom btn-primary-custom">
+                                <i class="fas fa-paper-plane"></i> Submit Reservation
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -91,16 +107,20 @@
                     <span id="formMessageText">Check availability before submitting if needed.</span>
                 </div>
 
-                <div class="d-flex justify-content-end gap-3 flex-wrap">
-                    <button type="button" id="checkAvailabilityBtn" class="btn btn-outline-secondary-custom">
-                        <i class="fas fa-search"></i> Check Availability
-                    </button>
-                    <button type="submit" class="btn btn-custom btn-primary-custom">
-                        <i class="fas fa-paper-plane"></i> Submit Reservation
-                    </button>
-                </div>
             </form>
         </div>
+    </div>
+</div>
+<div class="toast availability-toast" id="availabilityToast" role="status" aria-live="polite" aria-atomic="true">
+    <div class="toast-header">
+        <span class="availability-toast-title">
+            <i class="fas fa-circle-check"></i>
+            Available
+        </span>
+        <button type="button" class="btn-close ms-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
+    <div class="toast-body" id="availabilityToastBody">
+        This environment appears available for the selected window.
     </div>
 </div>
 {% endblock %}
@@ -109,7 +129,8 @@
 window.pageData = {
     environments: {{ environments|tojson }},
     serverTimezone: {{ (server_timezone or "UTC")|tojson }},
-    reservationPolicy: {{ reservation_policy | default({}, true) | tojson }}
+    reservationPolicy: {{ reservation_policy | default({}, true) | tojson }},
+    currentDeploymentsApiUrl: {{ url_for('main.api_list_current_deployments')|tojson }}
 };
 </script>
 <script src="{{ url_for('static', filename='js/pages/booking-grid.js') }}"></script>

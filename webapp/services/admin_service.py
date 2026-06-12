@@ -1,11 +1,18 @@
 """Service layer for admin configuration and user-management flows."""
 
-import json
+from datetime import datetime
 
+from flask import current_app
 from werkzeug.security import generate_password_hash
 
 from ..auth_service import get_allowed_screens
+from ..component_build_catalog import (
+    build_package_entries,
+    canonical_build_name,
+)
+from ..domain.deployment_targets import get_deployment_target_options, get_target_definition
 from ..helpers import DEFAULT_ROLE_NAMES, get_valid_roles, normalize_role
+from ..db_init import get_seed_runtime_summary
 from ..models import (
     ComponentBuild,
     CurrentDeploymentState,
@@ -42,7 +49,7 @@ def build_admin_page_context(active_tab=None):
     selected_tab = active_tab if active_tab in ADMIN_TABS else ADMIN_TABS[0]
     environments = Environment.query.order_by(Environment.env_type, Environment.env_id).all()
     hosts = Host.query.order_by(Host.hostname).all()
-    server_types = ServerType.query.order_by(ServerType.target_type, ServerType.server_type_key).all()
+    server_types = ServerType.query.order_by(ServerType.target_key, ServerType.server_type_key).all()
     valid_roles = get_valid_roles()
     users = User.query.order_by(User.user_id).all()
     return {
@@ -65,14 +72,27 @@ def build_admin_page_context(active_tab=None):
             EnvironmentHostMapping.env_id,
             EnvironmentHostMapping.environment_host_mapping_id,
         ).all(),
-        "component_builds": ComponentBuild.query.order_by(
-            ComponentBuild.target_key,
-            ComponentBuild.build_name,
-            ComponentBuild.version,
-        ).all(),
+        "component_builds": build_component_build_rows(
+            ComponentBuild.query.order_by(
+                ComponentBuild.target_key,
+                ComponentBuild.version,
+                ComponentBuild.build_name,
+            ).all()
+        ),
         "mapping_environment_options": environments,
         "mapping_host_options": hosts,
         "mapping_server_type_options": server_types,
+        "component_build_target_options": get_deployment_target_options(),
+        "seed_runtime": get_seed_runtime_summary(),
+        "deployment_runtime": {
+            "engine": (current_app.config.get("DEPLOYMENT_ENGINE") or "SCRIPT").strip().upper(),
+            "launcher": (
+                current_app.config.get("DEPLOYMENT_LAUNCHER")
+                or current_app.config.get("AUTO_DEPLOY_SCRIPT")
+                or ""
+            ).strip() or None,
+            "auto_enabled": bool(current_app.config.get("AUTO_DEPLOY_ENABLED", False)),
+        },
     }
 
 
@@ -84,6 +104,51 @@ def create_team(form):
     if Team.query.filter_by(team_name=team_name).first() is not None:
         return "Team already exists."
     db.session.add(Team(team_name=team_name, description=description))
+    return None
+
+
+def update_team(form):
+    team_id = form.get("team_id") or ""
+    try:
+        team_id = int(team_id)
+    except (TypeError, ValueError):
+        return "Team was not found."
+
+    team = Team.query.get(team_id)
+    if team is None:
+        return "Team was not found."
+
+    team_name = (form.get("team_name") or "").strip().lower()
+    description = (form.get("description") or "").strip() or None
+    if not team_name:
+        return "Team name is required."
+
+    duplicate = Team.query.filter(
+        Team.team_name == team_name,
+        Team.team_id != team.team_id,
+    ).first()
+    if duplicate is not None:
+        return "Team already exists."
+
+    team.team_name = team_name
+    team.description = description
+    return None
+
+
+def delete_team(form):
+    team_id = form.get("team_id") or ""
+    try:
+        team_id = int(team_id)
+    except (TypeError, ValueError):
+        return "Team was not found."
+
+    team = Team.query.get(team_id)
+    if team is None:
+        return "Team was not found."
+    if TeamMember.query.filter_by(team_id=team.team_id).first() is not None:
+        return "Cannot delete a team that still has assigned users."
+
+    db.session.delete(team)
     return None
 
 
@@ -99,6 +164,37 @@ def create_role(form):
     if Role.query.filter_by(role_name=role_name).first() is not None:
         return "Role already exists."
     db.session.add(Role(role_name=role_name, description=description, is_active=is_active))
+    return None
+
+
+def update_role_record(form):
+    role_name = (form.get("original_role_name") or form.get("role_name") or "").strip().lower()
+    if not role_name:
+        return "Role name is required."
+
+    role = Role.query.filter_by(role_name=role_name).first()
+    if role is None:
+        return "Role was not found."
+
+    role.description = (form.get("description") or "").strip() or None
+    role.is_active = normalize_checkbox(form.get("is_active"))
+    return None
+
+
+def delete_role_record(form):
+    role_name = (form.get("original_role_name") or form.get("role_name") or "").strip().lower()
+    if not role_name:
+        return "Role name is required."
+    if role_name in set(DEFAULT_ROLE_NAMES):
+        return "Default roles cannot be deleted."
+
+    role = Role.query.filter_by(role_name=role_name).first()
+    if role is None:
+        return "Role was not found."
+    if User.query.filter_by(role=role_name).first() is not None:
+        return "Cannot delete a role that is assigned to users."
+
+    db.session.delete(role)
     return None
 
 
@@ -124,6 +220,50 @@ def create_environment(form):
     return None
 
 
+def update_environment(form):
+    env_id = (form.get("original_env_id") or form.get("env_id") or "").strip().upper()
+    if not env_id:
+        return "Environment ID is required."
+
+    environment = Environment.query.filter_by(env_id=env_id).first()
+    if environment is None:
+        return "Environment was not found."
+
+    env_type = (form.get("env_type") or "").strip().upper()
+    if not env_type:
+        return "Environment type is required."
+
+    environment.env_type = env_type
+    environment.domain = (form.get("domain") or "").strip().lower() or None
+    environment.description = (form.get("description") or "").strip() or None
+    environment.is_active = normalize_checkbox(form.get("is_active"))
+
+    for mapping in EnvironmentHostMapping.query.filter_by(env_id=env_id).all():
+        mapping.env_type = env_type
+    return None
+
+
+def delete_environment(form):
+    env_id = (form.get("original_env_id") or form.get("env_id") or "").strip().upper()
+    if not env_id:
+        return "Environment ID is required."
+
+    environment = Environment.query.filter_by(env_id=env_id).first()
+    if environment is None:
+        return "Environment was not found."
+    if EnvironmentHostMapping.query.filter_by(env_id=env_id).first() is not None:
+        return "Cannot delete an environment that still has host mappings."
+    if EnvironmentBooking.query.filter_by(env_id=env_id).first() is not None:
+        return "Cannot delete an environment that has booking history."
+    if DeploymentRequest.query.filter_by(env_id=env_id).first() is not None:
+        return "Cannot delete an environment that has deployment request history."
+    if CurrentDeploymentState.query.filter_by(env_id=env_id).first() is not None:
+        return "Cannot delete an environment that has current deployment state."
+
+    db.session.delete(environment)
+    return None
+
+
 def create_host(form):
     hostname = (form.get("hostname") or "").strip()
     ip_address = (form.get("ip_address") or "").strip() or None
@@ -146,24 +286,120 @@ def create_host(form):
     return None
 
 
+def update_host(form):
+    host_id = form.get("host_id") or ""
+    try:
+        host_id = int(host_id)
+    except (TypeError, ValueError):
+        return "Host was not found."
+
+    host = Host.query.get(host_id)
+    if host is None:
+        return "Host was not found."
+
+    hostname = (form.get("hostname") or "").strip()
+    ip_address = (form.get("ip_address") or "").strip() or None
+    if not hostname:
+        return "Host name is required."
+
+    duplicate = Host.query.filter(
+        Host.hostname == hostname,
+        Host.ip_address == ip_address,
+        Host.host_id != host.host_id,
+    ).first()
+    if duplicate is not None:
+        return "Host already exists for that host name and IP address."
+
+    host.hostname = hostname
+    host.ip_address = ip_address
+    host.domain = (form.get("domain") or "").strip().upper() or None
+    host.description = (form.get("description") or "").strip() or None
+    host.is_active = normalize_checkbox(form.get("is_active"))
+    return None
+
+
+def delete_host(form):
+    host_id = form.get("host_id") or ""
+    try:
+        host_id = int(host_id)
+    except (TypeError, ValueError):
+        return "Host was not found."
+
+    host = Host.query.get(host_id)
+    if host is None:
+        return "Host was not found."
+    if EnvironmentHostMapping.query.filter_by(host_id=host.host_id).first() is not None:
+        return "Cannot delete a host that is still used by environment mappings."
+
+    db.session.delete(host)
+    return None
+
+
 def create_server_type(form):
     server_type_key = (form.get("server_type_key") or "").strip()
-    target_type = (form.get("target_type") or "").strip().upper()
+    target_key = (form.get("target_key") or "").strip().upper()
     description = (form.get("description") or "").strip() or None
-    if not server_type_key or not target_type:
-        return "Server type key and target type are required."
+    if not server_type_key or not target_key:
+        return "Server type key and target key are required."
     if ServerType.query.filter_by(
         server_type_key=server_type_key,
-        target_type=target_type,
+        target_key=target_key,
     ).first() is not None:
         return "Server type already exists for that target."
     db.session.add(
         ServerType(
             server_type_key=server_type_key,
-            target_type=target_type,
+            target_key=target_key,
             description=description,
         )
     )
+    return None
+
+
+def update_server_type(form):
+    server_type_id = form.get("server_type_id") or ""
+    try:
+        server_type_id = int(server_type_id)
+    except (TypeError, ValueError):
+        return "Server type was not found."
+
+    server_type = ServerType.query.get(server_type_id)
+    if server_type is None:
+        return "Server type was not found."
+
+    server_type_key = (form.get("server_type_key") or "").strip()
+    target_key = (form.get("target_key") or "").strip().upper()
+    if not server_type_key or not target_key:
+        return "Server type key and target key are required."
+
+    duplicate = ServerType.query.filter(
+        ServerType.server_type_key == server_type_key,
+        ServerType.target_type == target_key,
+        ServerType.server_type_id != server_type.server_type_id,
+    ).first()
+    if duplicate is not None:
+        return "Server type already exists for that target."
+
+    server_type.server_type_key = server_type_key
+    server_type.target_key = target_key
+    server_type.description = (form.get("description") or "").strip() or None
+    return None
+
+
+def delete_server_type(form):
+    server_type_id = form.get("server_type_id") or ""
+    try:
+        server_type_id = int(server_type_id)
+    except (TypeError, ValueError):
+        return "Server type was not found."
+
+    server_type = ServerType.query.get(server_type_id)
+    if server_type is None:
+        return "Server type was not found."
+    if EnvironmentHostMapping.query.filter_by(server_type_id=server_type.server_type_id).first() is not None:
+        return "Cannot delete a server type that is still used by environment mappings."
+
+    db.session.delete(server_type)
     return None
 
 
@@ -196,7 +432,10 @@ def create_environment_host_mapping(form):
         server_type_id=server_type_id,
     ).first()
     if existing is not None:
-        return "Environment host mapping already exists."
+        existing.host_id = host_id
+        existing.deployment_user = deployment_user
+        existing.deployment_password = deployment_password
+        return None
 
     db.session.add(
         EnvironmentHostMapping(
@@ -211,51 +450,332 @@ def create_environment_host_mapping(form):
     return None
 
 
-def create_component_build(form):
-    target_key = (form.get("target_key") or "").strip().upper()
-    build_name = (form.get("build_name") or "").strip()
-    version = (form.get("version") or "").strip()
-    artifact_name = (form.get("artifact_name") or "").strip() or None
-    artifact_path = (form.get("artifact_path") or "").strip() or None
-    artifact_size_bytes = None
-    checksum = (form.get("checksum") or "").strip() or None
-    build_metadata = None
-    build_metadata_raw = (form.get("build_metadata") or "").strip()
+def update_environment_host_mapping(form):
+    mapping_id = form.get("environment_host_mapping_id") or ""
+    try:
+        mapping_id = int(mapping_id)
+    except (TypeError, ValueError):
+        return "Mapping was not found."
 
-    if build_metadata_raw:
-        try:
-            build_metadata = json.loads(build_metadata_raw)
-        except ValueError:
-            return "Build metadata must be valid JSON."
+    mapping = EnvironmentHostMapping.query.get(mapping_id)
+    if mapping is None:
+        return "Mapping was not found."
 
-    if not target_key or not build_name or not version:
-        return "Target key, build name, and version are required."
+    env_id = (form.get("env_id") or "").strip().upper()
+    deployment_user = (form.get("deployment_user") or "").strip() or None
+    deployment_password = (form.get("deployment_password") or "").strip() or None
 
-    if form.get("artifact_size_bytes"):
-        try:
-            artifact_size_bytes = int(form.get("artifact_size_bytes"))
-        except (TypeError, ValueError):
-            return "Artifact size must be a number."
+    try:
+        server_type_id = int(form.get("server_type_id") or "")
+        host_id = int(form.get("host_id") or "")
+    except ValueError:
+        return "Host and server type selections are required."
 
-    if ComponentBuild.query.filter_by(
+    server_type = ServerType.query.get(server_type_id)
+    host = Host.query.get(host_id)
+    environment = Environment.query.filter_by(env_id=env_id).first() if env_id else None
+    if environment is None or server_type is None or host is None:
+        return "Selected environment, host, or server type was not found."
+
+    duplicate = EnvironmentHostMapping.query.filter(
+        EnvironmentHostMapping.env_id == env_id,
+        EnvironmentHostMapping.server_type_id == server_type_id,
+        EnvironmentHostMapping.environment_host_mapping_id != mapping.environment_host_mapping_id,
+    ).first()
+    if duplicate is not None:
+        return "A mapping already exists for that environment and server type."
+
+    mapping.env_id = env_id
+    mapping.env_type = environment.env_type
+    mapping.server_type_id = server_type_id
+    mapping.host_id = host_id
+    mapping.deployment_user = deployment_user
+    mapping.deployment_password = deployment_password
+    return None
+
+
+def delete_environment_host_mapping(form):
+    mapping_id = form.get("environment_host_mapping_id") or ""
+    try:
+        mapping_id = int(mapping_id)
+    except (TypeError, ValueError):
+        return "Mapping was not found."
+
+    mapping = EnvironmentHostMapping.query.get(mapping_id)
+    if mapping is None:
+        return "Mapping was not found."
+    if DeploymentRequest.query.filter(
+        DeploymentRequest.selected_server_mapping_ids_raw.like("%{}%".format(mapping.environment_host_mapping_id))
+    ).first() is not None:
+        return "Cannot delete a mapping that is referenced by deployment requests."
+    if CurrentDeploymentState.query.filter_by(environment_host_mapping_id=mapping.environment_host_mapping_id).first() is not None:
+        return "Cannot delete a mapping that is referenced by current deployment state."
+
+    db.session.delete(mapping)
+    return None
+
+
+def _upsert_component_build_row(target_key, version, target_definition, selected_package_keys):
+    package_entries = build_package_entries(
+        target_key,
+        target_definition=target_definition,
+        selected_package_keys=selected_package_keys,
+    )
+    if not package_entries:
+        return "No package mapping is configured for target '{}'.".format(target_key)
+
+    build_name = canonical_build_name(
+        target_key,
+        selected_package_keys=[entry.get("package_key") for entry in package_entries],
+        explicit_name=None,
+        target_definition=target_definition,
+    )
+    existing = ComponentBuild.query.filter_by(
         target_key=target_key,
         build_name=build_name,
         version=version,
-    ).first() is not None:
-        return "Component build already exists."
+    ).first()
+    if existing is None:
+        db.session.add(
+            ComponentBuild(
+                target_key=target_key,
+                build_name=build_name,
+                version=version,
+            )
+        )
+        return None
+
+    return None
+
+
+def _resolve_component_build_values(form):
+    target_key = (form.get("target_key") or "").strip().upper()
+    version = (form.get("version") or "").strip()
+    tool_build_name = (form.get("tool_build_name") or "").strip().lower()
+
+    if not target_key or not version:
+        return None, None, None, "Target and version are required."
+
+    target_definition = get_target_definition(target_key) or {}
+    packages = target_definition.get("packages") or {}
+    if not packages:
+        return None, None, None, "Selected target was not found in deployment target configuration."
+
+    all_package_keys = list(packages.keys())
+    if target_key == "TOOLS":
+        if not tool_build_name:
+            return None, None, None, "Tool name is required for TOOLS version entries."
+        if tool_build_name not in packages:
+            return None, None, None, "Selected tool was not found in deployment target configuration."
+        selected_package_keys = [tool_build_name]
+    else:
+        selected_package_keys = all_package_keys
+
+    build_name = canonical_build_name(
+        target_key,
+        selected_package_keys=selected_package_keys,
+        explicit_name=None,
+        target_definition=target_definition,
+    )
+    return target_key, version, build_name, None
+
+
+def create_component_build(form):
+    target_key, version, build_name, error = _resolve_component_build_values(form)
+    if error:
+        return error
+    if ComponentBuild.query.filter_by(target_key=target_key, build_name=build_name, version=version).first() is not None:
+        return None
+
     db.session.add(
         ComponentBuild(
             target_key=target_key,
             build_name=build_name,
             version=version,
-            artifact_name=artifact_name,
-            artifact_path=artifact_path,
-            artifact_size_bytes=artifact_size_bytes,
-            checksum=checksum,
-            build_metadata=build_metadata,
         )
     )
     return None
+
+
+def update_component_build(form):
+    build_id = form.get("build_id") or ""
+    try:
+        build_id = int(build_id)
+    except (TypeError, ValueError):
+        return "Version record was not found."
+
+    build = ComponentBuild.query.get(build_id)
+    if build is None:
+        return "Version record was not found."
+
+    target_key, version, build_name, error = _resolve_component_build_values(form)
+    if error:
+        return error
+
+    duplicate = ComponentBuild.query.filter(
+        ComponentBuild.target_key == target_key,
+        ComponentBuild.build_name == build_name,
+        ComponentBuild.version == version,
+        ComponentBuild.build_id != build.build_id,
+    ).first()
+    if duplicate is not None:
+        return "That requested version already exists."
+
+    build.target_key = target_key
+    build.build_name = build_name
+    build.version = version
+    return None
+
+
+def delete_component_build(form):
+    build_id = form.get("build_id") or ""
+    try:
+        build_id = int(build_id)
+    except (TypeError, ValueError):
+        return "Version record was not found."
+
+    build = ComponentBuild.query.get(build_id)
+    if build is None:
+        return "Version record was not found."
+    if DeploymentRequest.query.filter_by(build_id=build.build_id).first() is not None:
+        return "Cannot delete a version that is referenced by deployment requests."
+
+    db.session.delete(build)
+    return None
+
+
+def build_component_build_rows(component_builds):
+    rows = []
+    for build in component_builds:
+        row = build.to_dict()
+        target_definition = get_target_definition(build.target_key) or {}
+        row["target_display_name"] = target_definition.get("display_name") or build.target_key
+        row["app_name"] = build.build_name or "-"
+        row["coverage_summary"] = "Selected tool" if build.target_key == "TOOLS" else "All configured servers"
+        rows.append(row)
+    return rows
+
+
+def export_operational_config():
+    """Build an export of live operational config managed from the database."""
+    environments = Environment.query.order_by(Environment.env_type, Environment.env_id).all()
+    hosts = Host.query.order_by(Host.hostname, Host.ip_address).all()
+    server_types = ServerType.query.order_by(ServerType.target_key, ServerType.server_type_key).all()
+    component_builds = ComponentBuild.query.order_by(
+        ComponentBuild.target_key,
+        ComponentBuild.build_name,
+        ComponentBuild.version,
+    ).all()
+    mappings = EnvironmentHostMapping.query.order_by(
+        EnvironmentHostMapping.env_type,
+        EnvironmentHostMapping.env_id,
+        EnvironmentHostMapping.environment_host_mapping_id,
+    ).all()
+
+    mappings_by_env = {}
+    mapped_host_keys = set()
+    for mapping in mappings:
+        mappings_by_env.setdefault(mapping.env_id, []).append(mapping)
+        if mapping.host:
+            mapped_host_keys.add((mapping.host.hostname, mapping.host.ip_address))
+
+    environment_host_inventory = []
+    for environment in environments:
+        env_mappings = mappings_by_env.get(environment.env_id) or []
+        if not env_mappings:
+            continue
+
+        credentials = {
+            (
+                (mapping.deployment_user or "").strip() or None,
+                (mapping.deployment_password or "").strip() or None,
+            )
+            for mapping in env_mappings
+        }
+        shared_credentials = credentials.pop() if len(credentials) == 1 else None
+        environment_entry = {"env_id": environment.env_id}
+        if shared_credentials:
+            if shared_credentials[0]:
+                environment_entry["deployment_user"] = shared_credentials[0]
+            if shared_credentials[1]:
+                environment_entry["deployment_password"] = shared_credentials[1]
+
+        group = {
+            "environments": [environment_entry],
+            "env_type": environment.env_type,
+            "mappings": [],
+        }
+
+        for mapping in env_mappings:
+            host = mapping.host
+            server_type = mapping.server_type
+            mapping_row = {
+                "server_type_key": server_type.server_type_key if server_type else None,
+                "hostname": host.hostname if host else None,
+                "ip_address": host.ip_address if host else None,
+                "domain": host.domain if host else None,
+                "description": host.description if host else None,
+            }
+            if not shared_credentials:
+                if mapping.deployment_user:
+                    mapping_row["deployment_user"] = mapping.deployment_user
+                if mapping.deployment_password:
+                    mapping_row["deployment_password"] = mapping.deployment_password
+            group["mappings"].append(mapping_row)
+
+        environment_host_inventory.append(group)
+
+    unmapped_hosts = [
+        {
+            "hostname": host.hostname,
+            "ip_address": host.ip_address,
+            "domain": host.domain,
+            "description": host.description,
+        }
+        for host in hosts
+        if (host.hostname, host.ip_address) not in mapped_host_keys
+    ]
+
+    return {
+        "metadata": {
+            "generated_at": datetime.utcnow().isoformat() + "Z",
+            "source": "database_export",
+            "seed_bootstrap_only": bool(current_app.config.get("SEED_BOOTSTRAP_ONLY", True)),
+            "deployment_engine": (current_app.config.get("DEPLOYMENT_ENGINE") or "SCRIPT").strip().upper(),
+            "notes": [
+                "This export reflects live database-managed operational configuration.",
+                "default_seed_hosts.json is treated as bootstrap-only after first setup.",
+            ],
+        },
+        "teams": [team.team_name for team in Team.query.order_by(Team.team_name).all()],
+        "environments": [
+            {
+                "env_id": environment.env_id,
+                "env_type": environment.env_type,
+                "domain": environment.domain,
+            }
+            for environment in environments
+        ],
+        "server_types": [
+            {
+                "server_type_key": server_type.server_type_key,
+                "target_key": server_type.target_key,
+                "description": server_type.description,
+            }
+            for server_type in server_types
+        ],
+        "component_builds": [
+            {
+                "target_key": build.target_key,
+                "build_name": build.build_name,
+                "version": build.version,
+            }
+            for build in component_builds
+        ],
+        "hosts": unmapped_hosts,
+        "environment_host_inventory": environment_host_inventory,
+        "deployment_targets": get_deployment_target_options(),
+    }
 
 
 def create_user(form):
@@ -463,6 +983,34 @@ def handle_admin_form(form):
         return update_user_role(form)
     if action == "update_teams":
         return update_user_teams(form)
+    if action == "update_role_record":
+        return update_role_record(form)
+    if action == "delete_role_record":
+        return delete_role_record(form)
+    if action == "update_team":
+        return update_team(form)
+    if action == "delete_team":
+        return delete_team(form)
+    if action == "update_environment":
+        return update_environment(form)
+    if action == "delete_environment":
+        return delete_environment(form)
+    if action == "update_host":
+        return update_host(form)
+    if action == "delete_host":
+        return delete_host(form)
+    if action == "update_server_type":
+        return update_server_type(form)
+    if action == "delete_server_type":
+        return delete_server_type(form)
+    if action == "update_environment_host_mapping":
+        return update_environment_host_mapping(form)
+    if action == "delete_environment_host_mapping":
+        return delete_environment_host_mapping(form)
+    if action == "update_component_build":
+        return update_component_build(form)
+    if action == "delete_component_build":
+        return delete_component_build(form)
 
     handlers = {
         "roles": create_role,

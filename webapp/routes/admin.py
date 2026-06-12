@@ -1,18 +1,41 @@
 import logging
+import json
+from datetime import datetime
 
-from flask import flash, redirect, render_template, request, url_for
+from flask import Response, flash, redirect, render_template, request, url_for
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from .blueprint import main_bp
 from ..auth_service import current_user, screen_required
 from ..models import db
-from ..services.admin_service import ADMIN_TABS, build_admin_page_context, handle_admin_form
+from ..services.admin_service import (
+    ADMIN_TABS,
+    build_admin_page_context,
+    export_operational_config,
+    handle_admin_form,
+)
 
 
 logger = logging.getLogger(__name__)
 
 def _admin_redirect(tab_name):
     return redirect(url_for("main.admin_screen", tab=tab_name))
+
+
+def _flash_message_for_action(action):
+    if action == "update_role":
+        return "User role updated successfully."
+    if action == "update_teams":
+        return "User teams updated successfully."
+    if action == "create_user":
+        return "User created successfully."
+    if action == "delete_user":
+        return "User deleted successfully."
+    if action.startswith("delete_"):
+        return "Record deleted successfully."
+    if action.startswith("update_"):
+        return "Record updated successfully."
+    return "Record created successfully."
 
 
 def _user_management_redirect():
@@ -42,12 +65,7 @@ def admin_screen():
         else:
             try:
                 db.session.commit()
-                flash(
-                    "User role updated successfully." if action == "update_role" else
-                    "User teams updated successfully." if action == "update_teams" else
-                    "Record created successfully.",
-                    "success",
-                )
+                flash(_flash_message_for_action(action), "success")
             except IntegrityError as exc:
                 db.session.rollback()
                 logger.warning("Admin create failed for tab %s: %s", active_tab, exc)
@@ -55,9 +73,24 @@ def admin_screen():
         return _admin_redirect(active_tab)
 
     return render_template(
-        "admin_screen.html",
+        "admin_screen_screenshot.html",
         title="Admin Screen",
         **build_admin_page_context(active_tab=active_tab),
+    )
+
+
+@main_bp.route("/screen/admin/export/config", methods=["GET"])
+@screen_required("admin_screen")
+def admin_export_config():
+    export_payload = export_operational_config()
+    timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    filename = "envbooking-operational-config-{}.json".format(timestamp)
+    return Response(
+        json.dumps(export_payload, indent=2),
+        mimetype="application/json",
+        headers={
+            "Content-Disposition": 'attachment; filename="{}"'.format(filename),
+        },
     )
 
 

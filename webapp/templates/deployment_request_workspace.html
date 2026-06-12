@@ -1,51 +1,20 @@
 {% extends "booking_workspace_base.html" %}
+{% from "components/_datetime_fields.html" import datetime_input_group %}
 {% set workspace_nav = "tool_deployment" if deployment_mode == "tools" else "deployment" %}
 {% block workspace_title %}{{ "Tool Deployment" if deployment_mode == "tools" else "Deployment Request" }}{% endblock %}
-{% block workspace_styles %}
-.target-debug {
-    margin-top: 0.35rem;
-    color: #64748b;
-    font-size: 0.78rem;
-}
-
-.component-badge {
-    display: inline-block;
-    padding: 0.25rem 0.5rem;
-    background: #e3f2fd;
-    color: #1565c0;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    margin: 0.125rem;
-}
-
-#formTargetKey,
-#formVersion,
-#formComponentNames,
-#formTestingMode,
-#formServiceTypes {
-    color: #1f2937;
-    background-color: #ffffff;
-}
-
-#formTargetKey option,
-#formComponentNames option,
-#formTestingMode option,
-#formServiceTypes option {
-    color: #1f2937;
-    background-color: #ffffff;
-}
+{% block workspace_shell_title %}{{ "Tool Deployment Form" if deployment_mode == "tools" else "Deployment Request Form" }}{% endblock %}
+{% block workspace_shell_subtitle %}
+{{ "Submit a tools deployment request against a logical tools environment." if deployment_mode == "tools" else "Create an environment deployment request with target, requested version, server selection, mode, and service details." }}
+{% endblock %}
+{% block workspace_extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/deployment-request.css') }}">
 {% endblock %}
 {% block workspace_content %}
 <div class="container-fluid px-0">
-    <div class="workspace-card">
-        <div class="workspace-card-header">
-            <i class="fas fa-cogs"></i>
-            <h5>{{ "Tool Deployment Form" if deployment_mode == "tools" else "Deployment Request Form" }}</h5>
-        </div>
+    <div class="workspace-card compact-deployment-card">
         <div class="workspace-card-body">
             {% if reservation_policy.mutual_env_reservation_enabled %}
-            <div class="alert alert-light border mb-4" id="reservationPolicyNote">
+            <div class="alert alert-light border compact-policy-note" id="reservationPolicyNote">
                 <i class="fas fa-shield-alt me-2"></i>
                 {% if deployment_mode == "tools" %}
                 Tool deployments use concrete logical environments such as DEV_TOOL_01 or ST_TOOL_01 and follow the same deployment-request workflow.
@@ -55,105 +24,106 @@
             </div>
             {% endif %}
             <form id="deploymentRequestForm">
-                <div class="form-section">
-                    <div class="section-title">
-                        <i class="fas fa-clock"></i>
-                        Planned Deployment Window
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="form-group">
-                                <label for="formStartTime"><i class="fas fa-play"></i> Planned Start Date & Time</label>
-                                <input type="datetime-local" id="formStartTime" class="form-control" required>
+                <div class="deployment-form-shell">
+                    <div class="form-section">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">{{ datetime_input_group("Planned Start", "formStartDate", "formStartTime", "Start Date", "Start Time", "fas fa-play", time_aria_label="Planned start time", timezone_fallback=(server_timezone or "UTC")) }}</div>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <div class="form-section">
-                <div class="section-title">
-                    <i class="fas fa-server"></i>
-                    {{ "Tool Environment" if deployment_mode == "tools" else "Environment Selection" }}
-                </div>
-                    {% if deployment_mode == "tools" %}
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="form-group">
-                                <label for="formEnvId"><i class="fas fa-server"></i> Tool Environment</label>
-                                <select id="formEnvId" class="form-control">
-                                    <option value="">Select environment...</option>
-                                </select>
-                                <small class="form-text text-muted">Pick the logical tools endpoint, for example DEV_TOOL_01 or ST_TOOL_01.</small>
+                    <div class="form-section">
+                        {% if deployment_mode == "tools" %}
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="formEnvId"><i class="fas fa-server"></i> Tool Environment</label>
+                                    <select id="formEnvId" class="form-control">
+                                        <option value="">Select environment...</option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
+                        {% else %}
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="formEnvType"><i class="fas fa-layer-group"></i> Environment Type</label>
+                                    <select id="formEnvType" class="form-control">
+                                        <option value="">Select type...</option>
+                                        {% for env_type in environment_types %}
+                                        <option value="{{ env_type }}">{{ env_type }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="formEnvId"><i class="fas fa-server"></i> Environment</label>
+                                    <select id="formEnvId" class="form-control" required>
+                                        <option value="">Select environment...</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
                     </div>
-                    {% else %}
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="form-group">
-                                <label for="formEnvType"><i class="fas fa-layer-group"></i> Environment Type</label>
-                                <select id="formEnvType" class="form-control">
-                                    <option value="">Select type...</option>
-                                    {% for env_type in environment_types %}
-                                    <option value="{{ env_type }}">{{ env_type }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="form-group">
-                                <label for="formEnvId"><i class="fas fa-server"></i> Environment</label>
-                                <select id="formEnvId" class="form-control" required>
-                                    <option value="">Select environment...</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                    {% endif %}
-                </div>
 
-                <div class="form-section">
-                    <div class="section-title">
-                        <i class="fas fa-cubes"></i>
-                        Deployment Configuration
-                    </div>
                     <div class="row">
+                        {% if deployment_mode == "tools" %}
                         <div class="col-lg-4">
-                            <div class="form-group">
-                                <label for="formTargetKey"><i class="fas fa-cube"></i> Deployment Target</label>
-                                <select id="formTargetKey" class="form-select" required {% if deployment_mode == "tools" %}disabled{% endif %}>
-                                    <option value="">Select deployment target...</option>
-                                    {% for target in deployment_targets | default([], true) %}
-                                    <option value="{{ target.target_key }}">{{ target.display_name }}</option>
-                                    {% endfor %}
-                                </select>
-                                <div id="targetDebug" class="target-debug"></div>
+                            <div class="form-section h-100">
+                                <div class="form-group">
+                                    <label for="formToolKey"><i class="fas fa-screwdriver-wrench"></i> Tool Name</label>
+                                    <select id="formToolKey" class="form-select" required>
+                                        <option value="">Select tool...</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        {% else %}
+                        <div class="col-lg-4">
+                            <div class="form-section h-100">
+                                <div class="form-group">
+                                    <label for="formTargetKey"><i class="fas fa-cube"></i> Deployment Target</label>
+                                    <select id="formTargetKey" class="form-select" required>
+                                        <option value="">Select deployment target...</option>
+                                        {% for target in deployment_targets | default([], true) %}
+                                        <option value="{{ target.target_key }}">{{ target.display_name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        <div class="col-lg-4">
+                            <div class="form-section h-100">
+                                <div class="form-group">
+                                    <label for="formServerMappings"><i class="fas fa-server"></i> Target Server</label>
+                                    <select id="formServerMappings" class="form-select">
+                                        <option value="">{% if deployment_mode == "tools" %}Select environment first...{% else %}Select environment and target first...{% endif %}</option>
+                                    </select>
+                                    <small class="form-text text-muted">Select the configured environment server for this deployment.</small>
+                                </div>
                             </div>
                         </div>
                         <div class="col-lg-4">
-                            <div class="form-group">
-                                <label for="formComponentNames"><i class="fas fa-tasks"></i> Target Package</label>
-                                <select id="formComponentNames" class="form-select">
-                                    <option value="">Select package...</option>
-                                </select>
-                                <small class="form-text text-muted">Choose a package, or use "all" where available.</small>
-                            </div>
-                        </div>
-                        <div class="col-lg-4">
-                            <div class="form-group">
-                                <label for="formVersion"><i class="fas fa-code-branch"></i> Build / Version</label>
-                                <select id="formVersion" class="form-select" required>
-                                    <option value="">Select target package first...</option>
-                                </select>
+                            <div class="form-section h-100">
+                                <div class="form-group">
+                                    <label for="formVersion"><i class="fas fa-code-branch"></i> Requested Version</label>
+                                    <select id="formVersion" class="form-select" required>
+                                        <option value="">{% if deployment_mode == "tools" %}Select tool first...{% else %}Select deployment target first...{% endif %}</option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
 
                 <div class="form-section" id="resolvedScopeNote" {% if deployment_mode != "tools" %}style="display: none;"{% endif %}>
-                    <div class="alert alert-light border mb-0">
+                    <div class="alert alert-light border mb-0 py-2 px-3">
                         <i class="fas fa-info-circle me-2"></i>
-                        Tool deployments now target a dedicated logical environment, and each selected package resolves through that environment's configured host mapping.
+                        Tool deployments now target a dedicated logical environment, selected tool, and configured tool server.
                     </div>
                 </div>
 
@@ -163,10 +133,10 @@
                         <i class="fas fa-list-check"></i>
                         Deployment Details
                     </div>
-                    <div class="row">
-                        <div class="col-md-6" id="formServiceTypesGroup">
+                    <div class="deployment-details-grid" id="formServiceTypesGroup">
+                        <div>
                             <div class="form-group">
-                                <label for="formTestingMode"><i class="fas fa-flask"></i> Testing Mode</label>
+                                <label for="formTestingMode"><i class="fas fa-flask"></i> Deployment Mode</label>
                                 <select id="formTestingMode" class="form-select" required>
                                     <option value="">Select mode...</option>
                                     {% for mode in deployment_form_options.testing_modes | default([], true) %}
@@ -174,9 +144,12 @@
                                     {% endfor %}
                                 </select>
                             </div>
-                            <div class="form-group mt-3">
-                                <label for="formServiceTypes"><i class="fas fa-network-wired"></i> Service Types</label>
-                                <select id="formServiceTypes" class="form-select" multiple size="4">
+                        </div>
+                        <div>
+                            <div class="form-group">
+                                <label for="formServiceTypes"><i class="fas fa-network-wired"></i> Service Type</label>
+                                <select id="formServiceTypes" class="form-select">
+                                    <option value="">Select service type...</option>
                                     {% for service in deployment_form_options.service_types | default([], true) %}
                                     <option value="{{ service.value }}">{{ service.label }}</option>
                                     {% endfor %}
@@ -189,28 +162,36 @@
                 {% endif %}
 
                 <div class="form-section">
-                    <div class="section-title">
-                        <i class="fas fa-sticky-note"></i>
-                        Additional Information
+                    <div class="deployment-remarks-row">
+                        <div class="form-group">
+                            <label for="formDescription"><i class="fas fa-comment"></i> Purpose / Remarks</label>
+                            <textarea id="formDescription" class="form-control" rows="2" placeholder="Please describe the purpose of this deployment request..."></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-custom btn-primary-custom">
+                            <i class="fas fa-paper-plane"></i> Submit Deployment Request
+                        </button>
                     </div>
-                    <div class="form-group">
-                        <label for="formDescription"><i class="fas fa-comment"></i> Purpose / Remarks</label>
-                        <textarea id="formDescription" class="form-control" rows="3" placeholder="Please describe the purpose of this deployment request..."></textarea>
-                    </div>
+                </div>
                 </div>
 
                 <div id="formMessage" class="form-message muted" style="display: none;" aria-live="polite">
                     <i class="fas fa-info-circle"></i>
                     <span id="formMessageText">Submit the request to create an OPEN deployment request for the ENV team.</span>
                 </div>
-
-                <div class="d-flex justify-content-end gap-3 flex-wrap">
-                    <button type="submit" class="btn btn-custom btn-primary-custom">
-                        <i class="fas fa-paper-plane"></i> Submit Deployment Request
-                    </button>
-                </div>
             </form>
         </div>
+    </div>
+</div>
+<div class="toast deployment-success-toast" id="deploymentSuccessToast" role="status" aria-live="polite" aria-atomic="true">
+    <div class="toast-header">
+        <span class="deployment-success-toast-title">
+            <i class="fas fa-circle-check"></i>
+            Request Submitted
+        </span>
+        <button type="button" class="btn-close ms-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
+    <div class="toast-body" id="deploymentSuccessToastBody">
+        Deployment request submitted successfully.
     </div>
 </div>
 {% endblock %}
@@ -218,6 +199,7 @@
 <script>
 window.pageData = {
     environments: {{ environments|default([], true)|tojson }},
+    environmentServerMappings: {{ environment_server_mappings|default([], true)|tojson }},
     deploymentTargets: {{ deployment_targets|default([], true)|tojson }},
     deploymentFormOptions: {{ deployment_form_options|default({}, true)|tojson }},
     mode: {{ deployment_mode|default("standard")|tojson }},

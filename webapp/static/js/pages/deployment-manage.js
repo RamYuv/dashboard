@@ -1,8 +1,8 @@
 (function () {
     const common = window.WorkspaceCommon;
     const pageData = window.pageData || {};
-    let deploymentRequests = pageData.deploymentRequests || [];
-    const statusLabels = pageData.statusLabels || {};
+    const environmentOperationsApiUrl = pageData.environmentOperationsApiUrl || "/api/environment-operations";
+    let operations = pageData.operations || [];
 
     function showPageMessage(message, type) {
         common.setInlineMessage({
@@ -17,10 +17,6 @@
         return "status-" + String(status || "").toLowerCase().replaceAll("_", "-");
     }
 
-    function getStatusLabel(status) {
-        return statusLabels[status] || status;
-    }
-
     function actionLabel(action) {
         return String(action || "")
             .replaceAll("_", " ")
@@ -31,29 +27,57 @@
 
     function requesterDisplay(item) {
         const userId = String(item.requested_by || "").trim();
-        const explicitDisplay = String(item.requested_by_display || "").trim();
-        const username = String(item.requested_by_name || "").trim();
-        const teamName = String(item.requested_by_team || "").trim();
-        if (explicitDisplay) {
-            return '<div class="fw-semibold">' + common.escapeHtml(explicitDisplay) + "</div>";
-        }
-        if (username && teamName) {
-            return '<div class="fw-semibold">' + common.escapeHtml(username + " (" + teamName + ")") + "</div>";
-        }
-        if (!userId && !teamName) {
-            return common.escapeHtml(userId || "-");
-        }
-        if (userId && teamName) {
-            return '<div class="fw-semibold">' + common.escapeHtml(userId + " (" + teamName + ")") + "</div>";
-        }
-        return '<div class="fw-semibold">' + common.escapeHtml(userId || username || teamName || "-") + "</div>";
+        const fallbackName = String(item.requested_by_name || "").trim();
+        return '<div class="fw-semibold">' + common.escapeHtml(userId || fallbackName || "-") + "</div>";
     }
 
-    function filteredRequests() {
+    function typePill(requestType) {
+        const className = requestType === "DEPLOYMENT" ? "type-deployment" : "type-reservation";
+        return '<span class="type-pill ' + className + '">' + common.escapeHtml(requestType === "DEPLOYMENT" ? "Deployment" : "Booking") + "</span>";
+    }
+
+    function formatWindow(item) {
+        if (item.request_type === "DEPLOYMENT") {
+            return common.formatDisplayDate(item.window_start) || "-";
+        }
+
+        if (!item.window_start || !item.window_end) {
+            return "-";
+        }
+
+        return common.formatDisplayDate(item.window_start) + " -> " + common.formatDisplayDate(item.window_end);
+    }
+
+    function targetDetails(item) {
+        if (item.request_type !== "DEPLOYMENT") {
+            return '<span class="text-muted small">-</span>';
+        }
+
+        const target = item.target_key || "-";
+        const details = [];
+        if (item.testing_mode) {
+            details.push("Mode: " + item.testing_mode);
+        }
+        if ((item.service_types || []).length) {
+            details.push("Service: " + item.service_types.join(", "));
+        }
+        if (item.selected_servers_summary) {
+            details.push("Servers: " + item.selected_servers_summary);
+        }
+
+        return '<div class="fw-semibold">' + common.escapeHtml(target) + "</div>" +
+            '<div class="text-muted small">' + common.escapeHtml(details.join(" | ") || "-") + "</div>";
+    }
+
+    function filteredOperations() {
         const status = document.getElementById("statusFilter").value;
+        const type = document.getElementById("typeFilter").value;
         const query = document.getElementById("searchFilter").value.trim().toLowerCase();
-        return deploymentRequests.filter(function (item) {
+        return operations.filter(function (item) {
             if (status && item.status !== status) {
+                return false;
+            }
+            if (type && item.request_type !== type) {
                 return false;
             }
             if (!query) {
@@ -61,25 +85,30 @@
             }
 
             const haystack = [
-                item.deployment_request_id,
+                item.request_id,
+                item.request_type,
                 item.env_id,
                 item.environment_display,
-                item.requested_env_type,
+                item.env_type,
                 item.requested_by,
                 item.requested_by_name,
                 item.requested_by_team,
                 item.requested_by_display,
                 item.target_key,
                 item.requested_version,
+                item.selected_servers_summary,
                 item.status,
+                item.testing_mode,
+                (item.service_types || []).join(" "),
                 item.resolved_hosts_summary,
+                item.description,
             ].join(" ").toLowerCase();
             return haystack.includes(query);
         });
     }
 
     function renderQueue() {
-        const rows = filteredRequests();
+        const rows = filteredOperations();
         const body = document.getElementById("queueTableBody");
         const empty = document.getElementById("queueEmpty");
 
@@ -91,50 +120,49 @@
 
         empty.style.display = "none";
         body.innerHTML = rows.map(function (item) {
-            const packages = (item.package_keys || []).join(", ") || "-";
             const environmentLabel = item.environment_display || item.env_id || "-";
-            const resolvedHosts = item.resolved_hosts_summary || "";
-            const actions = (item.available_actions || [])
-                .filter(function (action) {
-                    return action !== "view";
-                })
-                .map(function (action) {
-                    return '<button type="button" class="btn btn-sm btn-outline-primary" data-action="' +
-                        common.escapeHtml(action) +
-                        '" data-id="' +
-                        common.escapeHtml(item.deployment_request_id) +
-                        '">' +
-                        common.escapeHtml(actionLabel(action)) +
-                        "</button>";
-                })
-                .join("");
+            const environmentNote = item.resolved_hosts_summary || item.env_type || "";
+            const actions = item.request_type === "DEPLOYMENT"
+                ? (item.available_actions || [])
+                    .filter(function (action) {
+                        return action !== "view";
+                    })
+                    .map(function (action) {
+                        return '<button type="button" class="btn btn-sm btn-outline-primary" data-action="' +
+                            common.escapeHtml(action) +
+                            '" data-id="' +
+                            common.escapeHtml(item.deployment_request_id) +
+                            '">' +
+                            common.escapeHtml(actionLabel(action)) +
+                            "</button>";
+                    })
+                    .join("")
+                : "";
+            const descriptionNote = item.description
+                ? '<div class="text-muted small">' + common.escapeHtml(item.description) + "</div>"
+                : "";
 
             return '<tr>' +
-                '<td><div class="fw-semibold">' + common.escapeHtml(item.deployment_request_id) + '</div><div class="text-muted small">' + common.escapeHtml(packages) + "</div></td>" +
-                '<td><div class="fw-semibold">' + common.escapeHtml(environmentLabel) + '</div><div class="text-muted small">' + common.escapeHtml(resolvedHosts || "Host not resolved") + "</div></td>" +
-                "<td>" + common.escapeHtml(common.formatDisplayDate(item.planned_start_time)) + "</td>" +
+                '<td><div class="fw-semibold">' + common.escapeHtml(item.request_id) + "</div>" + descriptionNote + "</td>" +
+                "<td>" + typePill(item.request_type) + "</td>" +
+                '<td><div class="fw-semibold">' + common.escapeHtml(environmentLabel) + '</div><div class="text-muted small">' + common.escapeHtml(environmentNote || "-") + "</div></td>" +
+                "<td>" + common.escapeHtml(formatWindow(item)) + "</td>" +
                 "<td>" + requesterDisplay(item) + "</td>" +
-                "<td>" + common.escapeHtml(item.target_key) + "</td>" +
-                "<td>" + common.escapeHtml(item.requested_version) + '</td>' +
-                '<td><span class="status-pill ' + common.escapeHtml(statusClass(item.status)) + '">' + common.escapeHtml(getStatusLabel(item.status)) + "</span></td>" +
-                '<td><div class="table-actions">' + (actions || '<span class="text-muted small">No actions</span>') + "</div></td>" +
+                "<td>" + targetDetails(item) + "</td>" +
+                "<td>" + common.escapeHtml(item.requested_version || "-") + '</td>' +
+                '<td><span class="status-pill ' + common.escapeHtml(statusClass(item.status)) + '">' + common.escapeHtml(item.status_label || item.status || "-") + "</span></td>" +
+                '<td><div class="table-actions">' + (actions || '<span class="text-muted small">View only</span>') + "</div></td>" +
                 "</tr>";
         }).join("");
     }
 
     function fetchQueue() {
-        const status = document.getElementById("statusFilter").value;
-        const params = new URLSearchParams({ scope: "env" });
-        if (status) {
-            params.set("status", status);
-        }
-
-        return common.fetchJson("/api/deployment-requests?" + params.toString(), { credentials: "include" })
+        return common.fetchJson(environmentOperationsApiUrl, { credentials: "include" })
             .then(function (result) {
                 if (!result.ok) {
-                    throw new Error(result.data.error || "Unable to load deployment requests.");
+                    throw new Error(result.data.error || "Unable to load environment operations.");
                 }
-                deploymentRequests = result.data.deployment_requests || [];
+                operations = result.data.operations || [];
                 renderQueue();
             })
             .catch(function (error) {
@@ -181,7 +209,8 @@
     }
 
     document.addEventListener("DOMContentLoaded", function () {
-        document.getElementById("statusFilter").addEventListener("change", fetchQueue);
+        document.getElementById("statusFilter").addEventListener("change", renderQueue);
+        document.getElementById("typeFilter").addEventListener("change", renderQueue);
         document.getElementById("searchFilter").addEventListener("input", renderQueue);
         document.getElementById("refreshQueueBtn").addEventListener("click", fetchQueue);
         document.getElementById("queueTableBody").addEventListener("click", function (event) {

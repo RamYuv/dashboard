@@ -4,14 +4,27 @@
     const currentUser = pageData.currentUser;
     const userRole = pageData.userRole;
     const environments = pageData.environments || [];
-    const componentConfig = pageData.componentConfig || {};
-    const deploymentTargets = pageData.deploymentTargets || [];
     const serverTimezone = pageData.serverTimezone || "UTC";
 
     let allBookings = [];
     let visibleBookings = [];
     let activeBooking = null;
     let editModal = null;
+
+    function populateTimeSlotFields() {
+        common.populateTimeSlotOptions({
+            selectId: "editStartTime",
+            placeholder: "Select time...",
+            selectedValue: document.getElementById("editStartTime").value,
+            slotMinutes: 30,
+        });
+        common.populateTimeSlotOptions({
+            selectId: "editEndTime",
+            placeholder: "Select time...",
+            selectedValue: document.getElementById("editEndTime").value,
+            slotMinutes: 30,
+        });
+    }
 
     function formatWindowDisplay(startValue, endValue, lifecycleStatus) {
         const start = moment.utc(startValue).local();
@@ -106,6 +119,8 @@
                 booking.requested_by_team,
                 booking.requested_by_display,
                 booking.description,
+                bookingResolvedHostsLabel(booking),
+                (booking.deployment_request && booking.deployment_request.selected_servers_summary) || "",
             ].join(" ").toLowerCase();
             return haystack.includes(search);
         });
@@ -224,114 +239,6 @@
         });
     }
 
-    function populateComponentNames(componentType, selectedValues) {
-        const select = document.getElementById("editComponentNames");
-        select.innerHTML = "";
-        (componentConfig[componentType] || []).forEach(function (name) {
-            select.insertAdjacentHTML(
-                "beforeend",
-                '<option value="' + common.escapeHtml(name) + '">' + common.escapeHtml(name) + "</option>"
-            );
-        });
-        if (selectedValues && selectedValues.length) {
-            Array.from(select.options).forEach(function (option) {
-                option.selected = selectedValues.includes(option.value);
-            });
-        }
-    }
-
-    function getTargetByKey(targetKey) {
-        return deploymentTargets.find(function (target) {
-            return target.target_key === targetKey;
-        }) || null;
-    }
-
-    function populateVersionOptionsForRequest(targetKey, selectedPackages, selectedVersion) {
-        const packageKey = (selectedPackages || [])[0] || "";
-        const select = document.getElementById("editVersion");
-        select.innerHTML = '<option value="">Loading...</option>';
-
-        if (!targetKey || !packageKey) {
-            common.resetSelect("editVersion", "Select version...");
-            return Promise.resolve();
-        }
-
-        let url = "/api/component-versions?target_key=" + encodeURIComponent(targetKey);
-        if (targetKey === "TOOLS") {
-            url += "&package_key=" + encodeURIComponent(packageKey);
-        }
-
-        return common.fetchJson(url, {
-            credentials: "include",
-        })
-            .then(function (result) {
-                if (!result.ok) {
-                    throw new Error(result.data.error || "Failed to load versions");
-                }
-                common.resetSelect("editVersion", "Select version...");
-                (result.data.versions || []).forEach(function (version) {
-                    select.insertAdjacentHTML(
-                        "beforeend",
-                        '<option value="' + common.escapeHtml(version) + '">' + common.escapeHtml(version) + "</option>"
-                    );
-                });
-                if (selectedVersion) {
-                    select.value = selectedVersion;
-                }
-            })
-            .catch(function () {
-                common.resetSelect("editVersion", "Select version...");
-            });
-    }
-
-    function loadVersions(componentType, selectedVersion) {
-        const select = document.getElementById("editVersion");
-        select.innerHTML = '<option value="">Loading...</option>';
-
-        if (!componentType) {
-            common.resetSelect("editVersion", "Select version...");
-            return Promise.resolve();
-        }
-
-        return common.fetchJson("/api/component-versions?target_key=" + encodeURIComponent(componentType), {
-            credentials: "include",
-        })
-            .then(function (result) {
-                if (!result.ok) {
-                    throw new Error(result.data.error || "Failed to load versions");
-                }
-                common.resetSelect("editVersion", "Select version...");
-                (result.data.versions || []).forEach(function (version) {
-                    select.insertAdjacentHTML(
-                        "beforeend",
-                        '<option value="' + common.escapeHtml(version) + '">' + common.escapeHtml(version) + "</option>"
-                    );
-                });
-                if (selectedVersion) {
-                    select.value = selectedVersion;
-                }
-            })
-            .catch(function () {
-                common.resetSelect("editVersion", "Select version...");
-            });
-    }
-
-    function resetServiceTypes() {
-        Array.from(document.getElementById("editServiceTypes").options).forEach(function (option) {
-            option.selected = false;
-        });
-    }
-
-    function handleEditComponentTypeChange() {
-        const componentType = document.getElementById("editComponentType").value;
-        populateComponentNames(componentType, []);
-        loadVersions(componentType, null);
-        document.getElementById("editServiceTypesGroup").style.display = componentType === "TCS_APP" ? "block" : "none";
-        if (componentType !== "TCS_APP") {
-            resetServiceTypes();
-        }
-    }
-
     function openEditBooking(bookingId) {
         const booking = allBookings.find(function (item) {
             return item.booking_id === bookingId;
@@ -346,10 +253,15 @@
 
         activeBooking = booking;
         clearModalMessage();
+        const localStart = moment.utc(booking.start_time).local();
+        const localEnd = moment.utc(booking.end_time).local();
 
         document.getElementById("editModalTitle").textContent = "Edit " + booking.booking_id;
-        document.getElementById("editStartTime").value = common.formatLocalInput(booking.start_time);
-        document.getElementById("editEndTime").value = common.formatLocalInput(booking.end_time);
+        document.getElementById("editStartDate").value = localStart.format("YYYY-MM-DD");
+        document.getElementById("editStartTime").value = localStart.format("HH:mm");
+        document.getElementById("editEndDate").value = localEnd.format("YYYY-MM-DD");
+        document.getElementById("editEndTime").value = localEnd.format("HH:mm");
+        populateTimeSlotFields();
         document.getElementById("editEnvType").value = inferEnvType(booking.env_id);
         populateEnvironmentOptions("editEnvId", document.getElementById("editEnvType").value, booking.env_id);
         document.getElementById("editBookingTypeDisplay").value = booking.booking_type === "DEPLOYMENT" ? "Deployment" : "Reservation";
@@ -359,25 +271,19 @@
         if (booking.booking_type === "DEPLOYMENT" && deployment) {
             document.getElementById("deploymentSection").style.display = "block";
             document.getElementById("editComponentType").value = deployment.target_key || "";
-            populateComponentNames(deployment.target_key || "", deployment.package_keys || []);
-            populateVersionOptionsForRequest(
-                deployment.target_key || "",
-                deployment.package_keys || [],
-                deployment.requested_version || ""
-            );
+            document.getElementById("editVersion").value = deployment.requested_version || "";
             document.getElementById("editTestingMode").value = deployment.testing_mode || "";
+            document.getElementById("editComponentNames").value = deployment.selected_servers_summary || "";
             document.getElementById("editServiceTypesGroup").style.display = deployment.target_key === "TCS_APP" ? "block" : "none";
-            Array.from(document.getElementById("editServiceTypes").options).forEach(function (option) {
-                option.selected = (deployment.service_types || []).includes(option.value);
-            });
+            document.getElementById("editServiceTypes").value = (deployment.service_types || []).join(", ");
         } else {
             document.getElementById("deploymentSection").style.display = "none";
             document.getElementById("editComponentType").value = "";
-            common.resetSelect("editVersion", "Select version...");
-            document.getElementById("editComponentNames").innerHTML = "";
+            document.getElementById("editVersion").value = "";
+            document.getElementById("editComponentNames").value = "";
             document.getElementById("editTestingMode").value = "";
             document.getElementById("editServiceTypesGroup").style.display = "none";
-            resetServiceTypes();
+            document.getElementById("editServiceTypes").value = "";
         }
 
         setModalMode("edit");
@@ -399,8 +305,11 @@
             const envType = deployment.requested_env_type || inferEnvType(booking.env_id);
             const environmentLabel = bookingEnvironmentLabel(booking);
             document.getElementById("editModalTitle").textContent = "View " + booking.booking_id;
-            document.getElementById("editStartTime").value = common.formatLocalInput(booking.start_time);
-            document.getElementById("editEndTime").value = booking.end_time ? common.formatLocalInput(booking.end_time) : "";
+            document.getElementById("editStartDate").value = moment.utc(booking.start_time).local().format("YYYY-MM-DD");
+            document.getElementById("editStartTime").value = moment.utc(booking.start_time).local().format("HH:mm");
+            document.getElementById("editEndDate").value = booking.end_time ? moment.utc(booking.end_time).local().format("YYYY-MM-DD") : "";
+            document.getElementById("editEndTime").value = booking.end_time ? moment.utc(booking.end_time).local().format("HH:mm") : "";
+            populateTimeSlotFields();
             document.getElementById("editEnvType").value = envType || "";
             populateEnvironmentOptions("editEnvId", envType, booking.env_id);
             document.getElementById("editBookingTypeDisplay").value = "Deployment";
@@ -408,16 +317,11 @@
 
             document.getElementById("deploymentSection").style.display = "block";
             document.getElementById("editComponentType").value = deployment.target_key || "";
-            document.getElementById("editVersion").innerHTML = '<option value="' + common.escapeHtml(deployment.requested_version || "") + '" selected>' + common.escapeHtml(deployment.requested_version || "N/A") + "</option>";
+            document.getElementById("editVersion").value = deployment.requested_version || "";
             document.getElementById("editTestingMode").value = deployment.testing_mode || "";
-            document.getElementById("editComponentNames").innerHTML = (deployment.package_keys || []).map(function (name) {
-                return '<option value="' + common.escapeHtml(name) + '" selected>' + common.escapeHtml(name) + "</option>";
-            }).join("");
+            document.getElementById("editComponentNames").value = deployment.selected_servers_summary || "";
             document.getElementById("editServiceTypesGroup").style.display = deployment.target_key === "TCS_APP" ? "block" : "none";
-            resetServiceTypes();
-            Array.from(document.getElementById("editServiceTypes").options).forEach(function (option) {
-                option.selected = (deployment.service_types || []).includes(option.value);
-            });
+            document.getElementById("editServiceTypes").value = (deployment.service_types || []).join(", ");
 
             setModalMode("view");
             editModal.show();
@@ -430,34 +334,47 @@
     }
 
     function buildBookingPayload() {
+        const startTime = common.combineLocalDateAndTime(
+            document.getElementById("editStartDate").value,
+            document.getElementById("editStartTime").value
+        );
+        const endTime = common.combineLocalDateAndTime(
+            document.getElementById("editEndDate").value,
+            document.getElementById("editEndTime").value
+        );
         const payload = {
             env_id: document.getElementById("editEnvId").value,
-            start_time: moment(document.getElementById("editStartTime").value).utc().toISOString(),
-            end_time: moment(document.getElementById("editEndTime").value).utc().toISOString(),
+            start_time: moment(startTime).utc().toISOString(),
+            end_time: moment(endTime).utc().toISOString(),
             booking_type: activeBooking ? activeBooking.booking_type : "RESERVATION",
             description: document.getElementById("editDescription").value.trim(),
             user_timezone: common.getUserTimezone(serverTimezone),
         };
-
-        if (payload.booking_type === "DEPLOYMENT") {
-            payload.deployment_request = {
-                target_key: document.getElementById("editComponentType").value,
-                requested_version: document.getElementById("editVersion").value,
-                testing_mode: document.getElementById("editTestingMode").value,
-                package_keys: Array.from(document.getElementById("editComponentNames").selectedOptions).map(function (opt) {
-                    return opt.value;
-                }),
-                service_types: Array.from(document.getElementById("editServiceTypes").selectedOptions).map(function (opt) {
-                    return opt.value;
-                }),
-            };
-        }
 
         return payload;
     }
 
     function saveBookingChanges() {
         if (!activeBooking) {
+            return;
+        }
+
+        const startTime = common.combineLocalDateAndTime(
+            document.getElementById("editStartDate").value,
+            document.getElementById("editStartTime").value
+        );
+        const endTime = common.combineLocalDateAndTime(
+            document.getElementById("editEndDate").value,
+            document.getElementById("editEndTime").value
+        );
+
+        if (!startTime || !endTime) {
+            showModalMessage("Please select both start and end date/time.", "danger");
+            return;
+        }
+
+        if (new Date(startTime) >= new Date(endTime)) {
+            showModalMessage("End time must be after start time.", "danger");
             return;
         }
 
@@ -535,6 +452,7 @@
 
     document.addEventListener("DOMContentLoaded", function () {
         editModal = new bootstrap.Modal(document.getElementById("editBookingModal"));
+        populateTimeSlotFields();
 
         ["filterEnvType", "filterBookingType", "filterStatus"].forEach(function (id) {
             document.getElementById(id).addEventListener("change", renderTable);
@@ -544,7 +462,6 @@
         document.getElementById("editEnvType").addEventListener("change", function () {
             populateEnvironmentOptions("editEnvId", this.value, "");
         });
-        document.getElementById("editComponentType").addEventListener("change", handleEditComponentTypeChange);
         document.getElementById("saveBookingButton").addEventListener("click", saveBookingChanges);
         document.getElementById("deleteBookingButton").addEventListener("click", function () {
             if (activeBooking) {

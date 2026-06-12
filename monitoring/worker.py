@@ -93,13 +93,14 @@ class EnvMonitorWorker:
             password = mapping.deployment_password or ""
             fetch_key = (host, username, password, server_type)
             if fetch_key not in host_status_cache:
-                host_status_cache[fetch_key] = self.status_fetcher.fetch_vm_status(
+                fetched_status = self.status_fetcher.fetch_vm_status(
                     host,
                     username,
                     password,
                     server_type=server_type,
                     host_label=host_label,
                 )
+                host_status_cache[fetch_key] = fetched_status
             vm_statuses[vm_id] = host_status_cache[fetch_key]
 
         return list(env_index.values()), vm_statuses

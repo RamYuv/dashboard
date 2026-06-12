@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
+from monitoring.services.version_fetcher import VersionFetcher
 from monitoring.version_pull_worker import VersionPullWorker
 
 
@@ -45,6 +46,62 @@ class VersionPullWorkerLookupTests(unittest.TestCase):
         self.assertEqual(lookup["db"], "db")
         self.assertEqual(lookup["Database"], "db")
         self.assertEqual(lookup["db"], "db")
+
+    def test_build_package_lookup_adds_case_insensitive_server_type_aliases(self):
+        target_def = {
+            "packages": {
+                "gatway": {"package_name": "tcs_service_gatway", "server_type_key": "Getway"},
+            }
+        }
+        lookup, _ = self.worker._build_package_lookup(target_def)
+        self.assertEqual(lookup["Getway"], "gatway")
+        self.assertEqual(lookup["getway"], "gatway")
+
+
+class VersionFetcherTests(unittest.TestCase):
+    def setUp(self):
+        self.fetcher = VersionFetcher(executor=MagicMock())
+
+    def test_parse_output_prefers_patch_version_from_deploy_info(self):
+        output = """
+[Deploy Info]
+env_name = DEV01
+server = gateway
+install_user = pali
+deploy_service = DOM
+mode = RT
+versions = tcs_service-1.1.2.3_Patch1_20260604 tcs_service-1.1.2.3_20260604
+"""
+        parsed = self.fetcher.parse_output(output)
+        self.assertEqual(
+            parsed["versions"],
+            {"gateway": "tcs_service-1.1.2.3_Patch1_20260604"},
+        )
+        self.assertEqual(
+            parsed["deployment_details"],
+            {"mode": "RT", "service_types": ["DOM"]},
+        )
+        self.assertIn("versions =", parsed["raw_output"])
+
+    def test_parse_output_uses_single_version_from_deploy_info(self):
+        output = """
+[Deploy Info]
+env_name = DEV01
+server = gateway
+install_user = pali
+deploy_service = DOM
+mode = RT
+versions = tcs_service-1.1.2.3_20260604
+"""
+        parsed = self.fetcher.parse_output(output)
+        self.assertEqual(
+            parsed["versions"],
+            {"gateway": "tcs_service-1.1.2.3_20260604"},
+        )
+        self.assertEqual(
+            parsed["deployment_details"],
+            {"mode": "RT", "service_types": ["DOM"]},
+        )
 
 
 class RunVersionPullTests(unittest.TestCase):

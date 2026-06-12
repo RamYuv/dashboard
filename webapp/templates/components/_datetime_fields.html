@@ -1,0 +1,27 @@
+{% macro datetime_input_group(heading, date_id, time_id, date_label, time_label, icon_class="", note="24-hour format with 30-minute slots", time_aria_label="Time", timezone_fallback="UTC", show_timezone_note=true) -%}
+<div class="shared-datetime-group">
+    <label class="form-label">
+        {% if icon_class %}<i class="{{ icon_class }}"></i> {% endif %}{{ heading }}
+    </label>
+    <div class="row g-0 shared-datetime-row">
+        <div class="col-sm-auto">
+            <label for="{{ date_id }}" class="shared-time-field-label">{{ date_label }}</label>
+            <input type="date" id="{{ date_id }}" class="form-control shared-datetime-date-input" required>
+        </div>
+        <div class="col-sm-auto">
+            <label for="{{ time_id }}" class="shared-time-field-label">{{ time_label }}</label>
+            <select id="{{ time_id }}" class="form-select shared-datetime-time-input" required aria-label="{{ time_aria_label }}">
+                <option value="">Select time...</option>
+            </select>
+        </div>
+    </div>
+    {% if note %}
+    <div class="shared-time-slot-note">
+        {{ note }}
+        {% if show_timezone_note %}
+        <span class="shared-timezone-note js-datetime-timezone" data-fallback-timezone="{{ timezone_fallback | e }}"></span>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{%- endmacro %}

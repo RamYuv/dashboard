@@ -4,16 +4,17 @@ import json
 from pathlib import Path
 
 from flask import current_app, has_app_context
-from sqlalchemy import inspect
 from werkzeug.security import generate_password_hash
 
+from .component_build_catalog import (
+    build_package_entries,
+    canonical_build_name,
+)
+from .domain.deployment_targets import get_target_definition
 from .models import (
     ComponentBuild,
     CurrentDeploymentState,
-    Deployment,
-    DeploymentRequest,
     Environment,
-    EnvironmentBooking,
     EnvironmentHostMapping,
     Host,
     Role,
@@ -24,21 +25,15 @@ from .models import (
     db,
 )
 
-RESET_DELETE_ORDER = [
-    CurrentDeploymentState,
-    Deployment,
-    DeploymentRequest,
-    EnvironmentBooking,
-    ComponentBuild,
-    EnvironmentHostMapping,
-    ServerType,
-    Host,
-    TeamMember,
-    User,
-    Role,
+BOOTSTRAP_SEED_MODELS = (
     Team,
+    User,
     Environment,
-]
+    Host,
+    ServerType,
+    EnvironmentHostMapping,
+    ComponentBuild,
+)
 
 DEFAULT_ROLES = [
     {"role_name": "user", "description": "Standard user access"},
@@ -70,6 +65,119 @@ def _create_if_missing(model, defaults=None, **filters):
     return record
 
 
+def _normalize_environment_host_inventory(data):
+    """Expand grouped environment-host inventory into flat hosts and mappings."""
+    inventory_groups = data.get("environment_host_inventory") or []
+    if not inventory_groups:
+        return (
+            data.get("hosts") or [],
+            data.get("environment_host_mappings") or [],
+        )
+
+    hosts = list(data.get("hosts") or [])
+    mappings = []
+    seen_hosts = {
+        (
+            (host.get("hostname") or "").strip(),
+            (host.get("ip_address") or "").strip(),
+        )
+        for host in hosts
+    }
+
+    for group_index, group in enumerate(inventory_groups, start=1):
+        raw_environments = group.get("environments") or []
+        environment_entries = []
+        for env in raw_environments:
+            env_id = (env.get("env_id") or "").strip()
+            if not env_id:
+                raise ValueError(
+                    "Inventory group #{} has an environment entry without env_id.".format(
+                        group_index
+                    )
+                )
+            environment_entries.append(
+                {
+                    "env_id": env_id,
+                    "deployment_user": (env.get("deployment_user") or "").strip() or None,
+                    "deployment_password": (env.get("deployment_password") or "").strip() or None,
+                }
+            )
+
+        env_ids = group.get("env_ids") or []
+        single_env_id = (group.get("env_id") or "").strip()
+        if single_env_id:
+            env_ids = env_ids + [single_env_id]
+        env_ids = [env_id for env_id in env_ids if (env_id or "").strip()]
+        env_type = (group.get("env_type") or "").strip().upper()
+        default_user = (group.get("deployment_user") or "").strip() or None
+        default_password = (group.get("deployment_password") or "").strip() or None
+        group_mappings = group.get("mappings") or []
+
+        if not environment_entries:
+            environment_entries = [
+                {
+                    "env_id": env_id,
+                    "deployment_user": default_user,
+                    "deployment_password": default_password,
+                }
+                for env_id in env_ids
+            ]
+
+        if not environment_entries:
+            raise ValueError(
+                "Inventory group #{} must include environments, env_id, or env_ids.".format(group_index)
+            )
+        if not env_type:
+            raise ValueError(
+                "Inventory group #{} must include env_type.".format(group_index)
+            )
+
+        for mapping_index, mapping in enumerate(group_mappings, start=1):
+            hostname = (mapping.get("hostname") or "").strip()
+            ip_address = (mapping.get("ip_address") or "").strip()
+            server_type_key = (mapping.get("server_type_key") or "").strip()
+            host_domain = (mapping.get("domain") or "").strip() or None
+            host_description = (mapping.get("description") or "").strip() or None
+
+            if not hostname or not ip_address or not server_type_key:
+                raise ValueError(
+                    "Inventory group #{} mapping #{} must include server_type_key, hostname, and ip_address.".format(
+                        group_index,
+                        mapping_index,
+                    )
+                )
+
+            host_key = (hostname, ip_address)
+            if host_key not in seen_hosts:
+                hosts.append(
+                    {
+                        "hostname": hostname,
+                        "ip_address": ip_address,
+                        "domain": host_domain,
+                        "description": host_description,
+                    }
+                )
+                seen_hosts.add(host_key)
+
+            mapping_user = (mapping.get("deployment_user") or "").strip() or None
+            mapping_password = (mapping.get("deployment_password") or "").strip() or None
+
+            for environment_entry in environment_entries:
+                mappings.append(
+                    {
+                        "env_id": environment_entry["env_id"],
+                        "env_type": env_type,
+                        "server_type_key": server_type_key,
+                        "hostname": hostname,
+                        "ip_address": ip_address,
+                        "deployment_user": mapping_user or environment_entry["deployment_user"],
+                        "deployment_password": mapping_password or environment_entry["deployment_password"],
+                    }
+                )
+
+    return hosts, mappings
+
+
 def load_host_seed_data():
     """Load default seed data from JSON config."""
     if not SEED_HOSTS_CONFIG_PATH.exists():
@@ -80,12 +188,15 @@ def load_host_seed_data():
             "server_types": [],
             "hosts": [],
             "environment_host_mappings": [],
+            "component_builds": [],
         }
 
     with SEED_HOSTS_CONFIG_PATH.open("r", encoding="utf-8-sig") as seed_file:
         data = json.load(seed_file)
 
-    for index, mapping in enumerate(data.get("environment_host_mappings") or [], start=1):
+    normalized_hosts, normalized_mappings = _normalize_environment_host_inventory(data)
+
+    for index, mapping in enumerate(normalized_mappings, start=1):
         if not (mapping.get("ip_address") or "").strip():
             raise ValueError(
                 "Seed mapping #{} for hostname '{}' must include ip_address.".format(
@@ -99,8 +210,9 @@ def load_host_seed_data():
         "environments": data.get("environments") or [],
         "users": data.get("users") or [],
         "server_types": data.get("server_types") or [],
-        "hosts": data.get("hosts") or [],
-        "environment_host_mappings": data.get("environment_host_mappings") or [],
+        "hosts": normalized_hosts,
+        "environment_host_mappings": normalized_mappings,
+        "component_builds": data.get("component_builds") or [],
     }
 
 
@@ -115,6 +227,7 @@ def _seeders():
         seed_default_hosts,
         seed_default_server_types,
         seed_default_environment_host_mappings,
+        seed_default_component_builds,
     )
 
 
@@ -150,119 +263,46 @@ def _seed_access_admin_memberships():
 
 
 def init_db():
-    """Create the current schema and load default seed data."""
+    """Create the schema and seed bootstrap data for a fresh initial version."""
     db.create_all()
-    upgrade_compatible_schema()
-    validate_required_schema()
-    if should_reset_seed_data():
-        reset_all_table_data()
+    if should_seed_default_data():
+        seed_all_default_data()
         return
-    seed_all_default_data()
+    seed_default_roles()
 
 
-def upgrade_compatible_schema():
-    """Apply safe additive schema upgrades for supported databases."""
-    inspector = inspect(db.engine)
-    table_names = set(inspector.get_table_names())
-    if "component_builds" not in table_names:
-        return
-
-    if db.engine.dialect.name != "sqlite":
-        return
-
-    component_build_columns = {
-        column["name"]
-        for column in inspector.get_columns("component_builds")
-    }
-    add_column_statements = []
-    if "artifact_size_bytes" not in component_build_columns:
-        add_column_statements.append(
-            "ALTER TABLE component_builds ADD COLUMN artifact_size_bytes BIGINT"
-        )
-    if "checksum" not in component_build_columns:
-        add_column_statements.append(
-            "ALTER TABLE component_builds ADD COLUMN checksum VARCHAR(100)"
-        )
-    if "build_metadata" not in component_build_columns:
-        add_column_statements.append(
-            "ALTER TABLE component_builds ADD COLUMN build_metadata JSON"
-        )
-
-    if not add_column_statements:
-        return
-
-    for statement in add_column_statements:
-        db.session.execute(statement)
-    db.session.commit()
+def has_bootstrap_seed_data():
+    """Return whether bootstrap-managed operational records already exist."""
+    return any(model.query.first() is not None for model in BOOTSTRAP_SEED_MODELS)
 
 
-def validate_required_schema():
-    """Fail fast when an existing database uses an older incompatible schema."""
-    inspector = inspect(db.engine)
-    table_names = set(inspector.get_table_names())
-    database_uri = current_app.config.get("SQLALCHEMY_DATABASE_URI", "")
-
-    if "team_members" in table_names:
-        team_member_columns = {
-            column["name"]
-            for column in inspector.get_columns("team_members")
-        }
-        if "team_lead" not in team_member_columns:
-            raise RuntimeError(
-                "Existing database schema is incompatible: table 'team_members' is missing "
-                "column 'team_lead'. This app now expects a fresh database. Delete the old "
-                "SQLite file or point DATABASE_URL to a new database, then start the app again. "
-                "Current database: {}".format(database_uri)
-            )
-
-    if "component_builds" not in table_names:
-        return
-
-    component_build_columns = {
-        column["name"]
-        for column in inspector.get_columns("component_builds")
-    }
-    required_component_build_columns = {
-        "artifact_size_bytes",
-        "checksum",
-        "build_metadata",
-    }
-    missing_component_build_columns = sorted(
-        required_component_build_columns - component_build_columns
-    )
-    if not missing_component_build_columns:
-        return
-
-    raise RuntimeError(
-        "Existing database schema is incompatible: table 'component_builds' is missing "
-        "column(s) {}. This app now expects the Jira-aligned ComponentBuild schema. "
-        "Delete the old SQLite file or point DATABASE_URL to a new database, then start "
-        "the app again. Current database: {}".format(
-            ", ".join(missing_component_build_columns),
-            database_uri,
-        )
-    )
-
-
-def should_reset_seed_data():
-    """Return whether startup should rebuild a fresh default dataset."""
+def should_seed_default_data():
+    """Return whether JSON seed data should be applied during startup."""
     if not has_app_context():
         return False
-    return bool(current_app.config.get("RESET_DB_ON_INIT", False))
+    if not current_app.config.get("SEED_BOOTSTRAP_ONLY", True):
+        return True
+    return not has_bootstrap_seed_data()
+
+
+def get_seed_runtime_summary():
+    """Describe how bootstrap seed data is being treated at runtime."""
+    bootstrap_only = bool(
+        current_app.config.get("SEED_BOOTSTRAP_ONLY", True)
+    ) if has_app_context() else True
+    has_data = has_bootstrap_seed_data() if has_app_context() else False
+    return {
+        "config_path": str(SEED_HOSTS_CONFIG_PATH),
+        "bootstrap_only": bootstrap_only,
+        "has_operational_data": has_data,
+        "seed_applied_on_startup": (not bootstrap_only or not has_data),
+    }
 
 
 def seed_all_default_data():
     """Seed all default application data."""
     for seeder in _seeders():
         seeder()
-
-
-def reset_all_table_data():
-    """Delete all application data and rebuild the default seed set."""
-    for model in RESET_DELETE_ORDER:
-        db.session.query(model).delete()
-    db.session.commit()
-    seed_all_default_data()
 
 
 def seed_default_environments():
@@ -363,7 +403,7 @@ def seed_default_server_types():
         _create_if_missing(
             ServerType,
             server_type_key=server_data["server_type_key"],
-            target_type=server_data["target_type"],
+            target_key=server_data["target_key"],
         )
     db.session.commit()
 
@@ -398,3 +438,52 @@ def seed_default_environment_host_mappings():
                 )
             )
     db.session.commit()
+
+
+def seed_default_component_builds():
+    """Seed default component build catalog entries."""
+    seed_data = load_host_seed_data()
+    for build_data in seed_data["component_builds"]:
+        target_key = (build_data.get("target_key") or "").strip().upper()
+        version = (build_data.get("version") or "").strip()
+        if not target_key or not version:
+            continue
+
+        raw_build_name = (build_data.get("build_name") or "").strip()
+        target_definition = get_target_definition(target_key) or {}
+        packages = target_definition.get("packages") or {}
+        if not packages:
+            continue
+
+        if target_key == "TOOLS":
+            selected_package_sets = (
+                [[raw_build_name]]
+                if raw_build_name else
+                [[package_key] for package_key in packages.keys()]
+            )
+        else:
+            selected_package_sets = [list(packages.keys())]
+
+        for selected_package_keys in selected_package_sets:
+            package_entries = build_package_entries(
+                target_key,
+                target_definition=target_definition,
+                selected_package_keys=selected_package_keys,
+                build_name=raw_build_name,
+                build_metadata=build_data.get("build_metadata"),
+            )
+            build_name = canonical_build_name(
+                target_key,
+                selected_package_keys=[entry.get("package_key") for entry in package_entries],
+                explicit_name=raw_build_name,
+                target_definition=target_definition,
+            )
+
+            _create_if_missing(
+                ComponentBuild,
+                target_key=target_key,
+                build_name=build_name,
+                version=version,
+            )
+    db.session.commit()
+

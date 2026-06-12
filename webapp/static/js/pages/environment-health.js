@@ -7,14 +7,30 @@
 
     const config = JSON.parse(configElement.textContent);
     const API_URL = config.apiUrl;
+    const BOOKING_GRID_URL = config.bookingGridUrl;
     const REFRESH_SECONDS = Number(config.refreshSeconds || 30);
+    const SIDEBAR_STATE_KEY = "envDashboardSidebarCollapsed";
+    const USER_ROLE = (config.userRole || "").toString().toLowerCase();
+    const BOOKABLE_ENV_IDS = (config.bookableEnvIds || []).map(function (envId) {
+        return (envId || "").toString().toUpperCase();
+    });
 
     let latestStatuses = config.statuses || [];
     let activeEnvIds = config.activeEnvs || [];
     let currentSummary = config.summary || {};
+    let activeContextEnv = null;
 
     function safeLower(value) {
         return (value || "unknown").toString().toLowerCase();
+    }
+
+    function escapeAttribute(value) {
+        return String(value || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
     }
 
     function calculatePercent(value, total) {
@@ -25,6 +41,38 @@
         return ((value / total) * 100).toFixed(1) + "%";
     }
 
+    function formatBrowserTimestamp(value) {
+        if (!value || value === "-" || value === "Never") {
+            return value || "-";
+        }
+
+        if (window.moment) {
+            const parsed = moment.utc(value);
+            if (parsed.isValid()) {
+                return parsed.local().format("YYYY-MM-DD HH:mm:ss");
+            }
+        }
+
+        const fallbackDate = new Date(value);
+        if (Number.isNaN(fallbackDate.getTime())) {
+            return value;
+        }
+
+        const pad = function (part) {
+            return String(part).padStart(2, "0");
+        };
+
+        return [
+            fallbackDate.getFullYear(),
+            pad(fallbackDate.getMonth() + 1),
+            pad(fallbackDate.getDate())
+        ].join("-") + " " + [
+            pad(fallbackDate.getHours()),
+            pad(fallbackDate.getMinutes()),
+            pad(fallbackDate.getSeconds())
+        ].join(":");
+    }
+
     function normalizeSummary(summary) {
         return {
             total: Number(summary.total || 0),
@@ -32,7 +80,7 @@
             warning: Number(summary.warning || 0),
             critical: Number(summary.critical || 0),
             maintenance: Number(summary.maintenance || 0),
-            last_updated: summary.last_updated || "-"
+            last_updated: formatBrowserTimestamp(summary.last_updated || "-")
         };
     }
 
@@ -66,6 +114,52 @@
         return names[key] || envType;
     }
 
+    function canBookEnvironment(envId) {
+        if (USER_ROLE === "admin") {
+            return true;
+        }
+        return BOOKABLE_ENV_IDS.indexOf((envId || "").toString().toUpperCase()) !== -1;
+    }
+
+    function clearTooltipPlacement(card) {
+        if (!card) {
+            return;
+        }
+        card.classList.remove("tooltip-align-left", "tooltip-align-right", "tooltip-align-center");
+    }
+
+    function updateTooltipPlacement(card) {
+        if (!card) {
+            return;
+        }
+
+        clearTooltipPlacement(card);
+
+        const rect = card.getBoundingClientRect();
+        const mainContent = document.querySelector(".main-content");
+        const mainRect = mainContent
+            ? mainContent.getBoundingClientRect()
+            : { left: 0, right: window.innerWidth || document.documentElement.clientWidth || 0 };
+        const availableWidth = Math.max(220, mainRect.right - mainRect.left - 24);
+        const estimatedTooltipWidth = Math.min(360, availableWidth);
+        const centeredLeft = rect.left + (rect.width / 2) - (estimatedTooltipWidth / 2);
+        const centeredRight = rect.left + (rect.width / 2) + (estimatedTooltipWidth / 2);
+        const safeLeft = mainRect.left + 12;
+        const safeRight = mainRect.right - 12;
+
+        if (centeredLeft < safeLeft) {
+            card.classList.add("tooltip-align-left");
+            return;
+        }
+
+        if (centeredRight > safeRight) {
+            card.classList.add("tooltip-align-right");
+            return;
+        }
+
+        card.classList.add("tooltip-align-center");
+    }
+
     function getEnvIcon(envType) {
         const key = (envType || "").toUpperCase();
 
@@ -93,19 +187,62 @@
         }, {});
     }
 
+    function buildNotRunningTooltipLines(components) {
+        const items = Array.isArray(components) ? components.filter(Boolean) : [];
+        if (!items.length) {
+            return ["Not Running: None"];
+        }
+
+        const maxVisible = 15;
+        const visibleItems = items.slice(0, maxVisible);
+        const lines = ["Not Running Applications:"];
+
+        visibleItems.forEach(function (name, index) {
+            lines.push((index + 1) + ". " + name);
+        });
+
+        if (items.length > maxVisible) {
+            lines.push("+ " + (items.length - maxVisible) + " more");
+        }
+
+        return lines;
+    }
+
     function createCardHTML(status) {
-        const serverStatus = safeLower(status.status);
         const envId = status.env_id || "UNKNOWN";
         const active = activeEnvIds.includes(envId) ? " active-booking" : "";
         const componentSummary = status.component_summary || {};
-        const serverTypes = (status.server_types || []).join(", ");
-        const tooltip = [
-            envId + " - " + serverStatus.toUpperCase(),
-            "Running: " + Number(componentSummary.running || 0),
-            "Not running: " + Number(componentSummary.notrunning || 0),
-            "Unknown: " + Number(componentSummary.unknown || 0),
-            serverTypes ? "Server types: " + serverTypes : ""
-        ].filter(Boolean).join(" | ");
+        const runtime = status.tcs_runtime || {};
+        const versions = runtime.display_version || (runtime.versions || []).join(", ");
+        const serviceTypes = (runtime.service_types || []).join(", ");
+        const testingModes = (runtime.testing_modes || []).join(", ");
+        const notRunningComponents = status.not_running_components || [];
+        const tooltipLines = [
+            [
+                envId,
+                "Running: " + Number(componentSummary.running || 0),
+                "Not Running:" + Number(componentSummary.notrunning || 0)
+            ].join("|"),
+            [
+                versions ? "Version:" + versions : "",
+                serviceTypes ? "Service: " + serviceTypes : "",
+                testingModes ? "MODE:" + testingModes : ""
+            ].filter(Boolean).join(" | ")
+        ].concat(buildNotRunningTooltipLines(notRunningComponents))
+        .filter(function (line, index) {
+            if (!line) {
+                return false;
+            }
+
+            if (index === 1) {
+                return line.trim().length > 0;
+            }
+
+            return true;
+        });
+        const tooltip = tooltipLines.join("\n");
+
+        const serverStatus = safeLower(status.status);
 
         const redActive = serverStatus === "critical" ? "active" : "";
         const yellowActive = serverStatus === "warning" ? "active" : "";
@@ -118,15 +255,12 @@
         }
 
         return [
-            '<div class="env-card' + active + '" title="' + tooltip + '">',
-            '<div class="env-card-title">' + envId + '</div>',
+            '<div class="env-card' + active + '" tabindex="0" data-tooltip="' + escapeAttribute(tooltip) + '" data-env-id="' + escapeAttribute(envId) + '" data-env-type="' + escapeAttribute(status.env_type || "") + '">',
+            '<div class="env-card-title">' + escapeAttribute(envId) + '</div>',
             '<div class="traffic-light">',
             '<span class="light red ' + redActive + '"></span>',
             '<span class="light yellow ' + yellowActive + '"></span>',
             '<span class="light ' + (blueActive ? "blue" : "green") + ' ' + (blueActive || greenActive) + '"></span>',
-            "</div>",
-            '<div class="env-card-status ' + statusClass + '">',
-            serverStatus.toUpperCase(),
             "</div>",
             "</div>"
         ].join("");
@@ -166,6 +300,190 @@
         }).join("");
     }
 
+    function getContextMenuElements() {
+        return {
+            menu: document.getElementById("envContextMenu"),
+            title: document.getElementById("envContextMenuTitle"),
+        };
+    }
+
+    function hideContextMenu() {
+        const elements = getContextMenuElements();
+        if (!elements.menu) {
+            return;
+        }
+        elements.menu.hidden = true;
+        activeContextEnv = null;
+    }
+
+    function updateContextMenuActions() {
+        const elements = getContextMenuElements();
+        if (!elements.menu || !activeContextEnv) {
+            return;
+        }
+
+        const bookingButton = elements.menu.querySelector('button[data-action="booking"]');
+        if (!bookingButton) {
+            return;
+        }
+
+        const bookingAllowed = canBookEnvironment(activeContextEnv.env_id);
+        bookingButton.disabled = !bookingAllowed;
+        bookingButton.title = bookingAllowed
+            ? ""
+            : "Booking is allowed only for environments assigned to your team.";
+    }
+
+    function showContextMenu(event, card) {
+        const elements = getContextMenuElements();
+        if (!elements.menu || !card) {
+            return;
+        }
+
+        const envId = card.dataset.envId || "";
+        const envType = card.dataset.envType || "";
+        activeContextEnv = {
+            env_id: envId,
+            env_type: envType,
+        };
+
+        elements.title.textContent = envId || "Environment";
+        updateContextMenuActions();
+        elements.menu.hidden = false;
+
+        const menuRect = elements.menu.getBoundingClientRect();
+        const left = Math.min(
+            event.clientX,
+            window.innerWidth - menuRect.width - 12
+        );
+        const top = Math.min(
+            event.clientY,
+            window.innerHeight - menuRect.height - 12
+        );
+
+        elements.menu.style.left = Math.max(12, left) + "px";
+        elements.menu.style.top = Math.max(12, top) + "px";
+    }
+
+    function handleContextMenuAction(action) {
+        if (!activeContextEnv || !activeContextEnv.env_id) {
+            hideContextMenu();
+            return;
+        }
+
+        if (action === "booking") {
+            const params = new URLSearchParams({
+                env_id: activeContextEnv.env_id,
+            });
+            window.location.href = BOOKING_GRID_URL + "?" + params.toString();
+            return;
+        }
+
+        if (action === "logs") {
+            fetch("/api/environment-health/" + encodeURIComponent(activeContextEnv.env_id) + "/logs", {
+                credentials: "include",
+            })
+                .then(function (response) {
+                    return response.json().then(function (data) {
+                        return { ok: response.ok, data: data };
+                    });
+                })
+                .then(function (result) {
+                    window.alert(result.data.error || result.data.message || "Feature is not available yet.");
+                })
+                .catch(function () {
+                    window.alert("Feature is not available yet.");
+                });
+            hideContextMenu();
+            return;
+        }
+
+        if (action === "remediate") {
+            fetch("/api/environment-health/" + encodeURIComponent(activeContextEnv.env_id) + "/auto-remediate", {
+                method: "POST",
+                credentials: "include",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({}),
+            })
+                .then(function (response) {
+                    return response.json().then(function (data) {
+                        return { ok: response.ok, data: data };
+                    });
+                })
+                .then(function (result) {
+                    window.alert(result.data.error || result.data.message || "Feature is not available yet.");
+                })
+                .catch(function () {
+                    window.alert("Feature is not available yet.");
+                });
+            hideContextMenu();
+        }
+    }
+
+    function isMobileViewport() {
+        return window.matchMedia("(max-width: 768px)").matches;
+    }
+
+    function updateSidebarButton(button, layout) {
+        if (!button || !layout) {
+            return;
+        }
+
+        const sidebarVisible = isMobileViewport()
+            ? layout.classList.contains("sidebar-open")
+            : !layout.classList.contains("sidebar-collapsed");
+
+        button.setAttribute("aria-expanded", sidebarVisible ? "true" : "false");
+        const label = sidebarVisible ? "Hide Sidebar" : "Show Sidebar";
+        button.setAttribute("aria-label", label);
+        button.setAttribute("title", label);
+        button.innerHTML = '<i class="fas fa-bars"></i>';
+    }
+
+    function syncBackdrop(backdrop, layout) {
+        if (!backdrop || !layout) {
+            return;
+        }
+
+        backdrop.hidden = !(isMobileViewport() && layout.classList.contains("sidebar-open"));
+    }
+
+    function applyInitialSidebarState(layout, backdrop, button) {
+        if (!layout) {
+            return;
+        }
+
+        if (isMobileViewport()) {
+            layout.classList.remove("sidebar-collapsed");
+            layout.classList.remove("sidebar-open");
+        } else {
+            const storedState = window.localStorage.getItem(SIDEBAR_STATE_KEY);
+            layout.classList.toggle("sidebar-collapsed", storedState === "true");
+            layout.classList.remove("sidebar-open");
+        }
+
+        syncBackdrop(backdrop, layout);
+        updateSidebarButton(button, layout);
+    }
+
+    function toggleSidebar(layout, backdrop, button) {
+        if (!layout) {
+            return;
+        }
+
+        if (isMobileViewport()) {
+            layout.classList.toggle("sidebar-open");
+        } else {
+            const collapsed = layout.classList.toggle("sidebar-collapsed");
+            window.localStorage.setItem(SIDEBAR_STATE_KEY, collapsed ? "true" : "false");
+        }
+
+        syncBackdrop(backdrop, layout);
+        updateSidebarButton(button, layout);
+    }
+
     function refreshHealth(manual) {
         const button = document.getElementById("refreshButton");
         const originalHtml = button.innerHTML;
@@ -202,13 +520,90 @@
     }
 
     document.addEventListener("DOMContentLoaded", function () {
+        const layout = document.getElementById("environmentDashboardLayout");
+        const sidebarBackdrop = document.getElementById("environmentDashboardSidebarBackdrop");
+        const toggleSidebarButton = document.getElementById("toggleSidebarButton");
+        const dashboardGroups = document.getElementById("dashboardGroups");
+        const contextMenu = document.getElementById("envContextMenu");
+
         document.getElementById("refreshSecondsText").textContent = REFRESH_SECONDS;
         document.getElementById("refreshButton").addEventListener("click", function () {
             refreshHealth(true);
         });
+        if (toggleSidebarButton) {
+            toggleSidebarButton.addEventListener("click", function () {
+                toggleSidebar(layout, sidebarBackdrop, toggleSidebarButton);
+            });
+        }
+        if (sidebarBackdrop) {
+            sidebarBackdrop.addEventListener("click", function () {
+                if (isMobileViewport()) {
+                    layout.classList.remove("sidebar-open");
+                    syncBackdrop(sidebarBackdrop, layout);
+                    updateSidebarButton(toggleSidebarButton, layout);
+                }
+            });
+        }
+        window.addEventListener("resize", function () {
+            applyInitialSidebarState(layout, sidebarBackdrop, toggleSidebarButton);
+            hideContextMenu();
+        });
+        dashboardGroups.addEventListener("contextmenu", function (event) {
+            const card = event.target.closest(".env-card");
+            if (!card) {
+                hideContextMenu();
+                return;
+            }
+            event.preventDefault();
+            showContextMenu(event, card);
+        });
+        dashboardGroups.addEventListener("click", function () {
+            hideContextMenu();
+        });
+        dashboardGroups.addEventListener("mouseover", function (event) {
+            const card = event.target.closest(".env-card");
+            if (!card) {
+                return;
+            }
+            updateTooltipPlacement(card);
+        });
+        dashboardGroups.addEventListener("focusin", function (event) {
+            const card = event.target.closest(".env-card");
+            if (!card) {
+                return;
+            }
+            updateTooltipPlacement(card);
+        });
+        document.addEventListener("click", function (event) {
+            if (!contextMenu || contextMenu.hidden) {
+                return;
+            }
+            if (!event.target.closest("#envContextMenu")) {
+                hideContextMenu();
+            }
+        });
+        document.addEventListener("keydown", function (event) {
+            if (event.key === "Escape") {
+                hideContextMenu();
+            }
+        });
+        if (contextMenu) {
+            contextMenu.addEventListener("click", function (event) {
+                const button = event.target.closest("button[data-action]");
+                if (!button) {
+                    return;
+                }
+                if (button.disabled) {
+                    event.preventDefault();
+                    return;
+                }
+                handleContextMenuAction(button.dataset.action);
+            });
+        }
 
         updateSummary(currentSummary);
         renderDashboard();
+        applyInitialSidebarState(layout, sidebarBackdrop, toggleSidebarButton);
 
         window.setInterval(function () {
             refreshHealth(false);

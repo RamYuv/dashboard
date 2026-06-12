@@ -1,12 +1,16 @@
 body {
     background: linear-gradient(135deg, #edf6ff 0%, #f8fbff 45%, #fff8ef 100%);
+    font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    color: #152033;
     min-height: 100vh;
 }
 
 :root {
-    --app-shell-header-height: 70px;
-    --app-shell-header-start: #102447;
-    --app-shell-header-end: #1a3566;
+    --app-shell-header-height: 40px;
+    --app-shell-header-start: #002855;
+    --app-shell-header-end: #002855;
     --app-shell-header-text: #f8fbff;
     --app-shell-header-accent: rgba(255, 255, 255, 0.14);
     --admin-sticky-top: var(--app-shell-header-height);
@@ -19,8 +23,8 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 1rem;
-    padding: 0.7rem 1.25rem;
+    gap: 0.65rem;
+    padding: 0.35rem 0.85rem;
     background: linear-gradient(90deg, var(--app-shell-header-start), var(--app-shell-header-end));
     color: var(--app-shell-header-text);
     box-shadow: 0 10px 24px rgba(16, 36, 71, 0.18);
@@ -37,38 +41,47 @@ body {
 .app-shell-brand {
     display: flex;
     align-items: center;
-    gap: 0.9rem;
+    gap: 1.15rem;
     min-width: 0;
+}
+
+.app-shell-brand-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    min-width: 0;
+    color: inherit;
+    text-decoration: none;
+}
+
+.app-shell-brand-link:hover,
+.app-shell-brand-link:focus {
+    color: inherit;
+    text-decoration: none;
 }
 
 .app-shell-branding {
     display: flex;
     align-items: center;
-    gap: 1.15rem;
+    gap: 0.7rem;
     min-width: 0;
     flex-wrap: nowrap;
 }
 
-.app-shell-logo {
-    width: 40px;
-    height: 40px;
-    border-radius: 11px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.1));
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    font-weight: 800;
-    font-size: 1rem;
-    letter-spacing: 0.03em;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+.app-shell-logo-image {
+    width: 78px;
+    max-width: min(28vw, 78px);
+    height: auto;
+    display: block;
+    object-fit: contain;
 }
 
 .app-shell-title {
-    font-size: 1.28rem;
-    font-weight: 800;
-    letter-spacing: -0.02em;
-    line-height: 1.1;
+    font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+    font-size: clamp(1rem, 0.9rem + 0.5vw, 1.2rem);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    line-height: 1;
     color: #ffffff;
     white-space: nowrap;
 }
@@ -76,9 +89,9 @@ body {
 .app-shell-actions {
     display: flex;
     align-items: center;
-    gap: 0.85rem;
+    gap: 0.6rem;
     flex-wrap: wrap;
-    font-size: 1rem;
+    font-size: 0.88rem;
 }
 
 .app-shell-actions a,
@@ -94,31 +107,64 @@ body {
 .app-shell-home {
     display: inline-flex;
     align-items: center;
-    gap: 0.45rem;
+    gap: 0.3rem;
     padding: 0;
     border: 0;
     border-radius: 0;
     background: transparent;
-    font-size: 1rem;
-    font-weight: 600;
+    font-size: 1.01rem;
+    font-weight: 400;
     color: rgba(248, 251, 255, 0.88) !important;
+    text-decoration: none !important;
 }
 
 .app-shell-home:hover {
     background: transparent;
     color: #ffffff !important;
-    text-decoration: underline;
+    text-decoration: none;
+}
+
+.app-shell-secondary-nav {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    flex-wrap: wrap;
+}
+
+.app-shell-secondary-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.28rem;
+    padding: 0.16rem 0.45rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(248, 251, 255, 0.92) !important;
+    font-size: 0.76rem;
+    font-weight: 600;
+    line-height: 1.2;
+}
+
+.app-shell-secondary-link:hover,
+.app-shell-secondary-link:focus {
+    background: rgba(255, 255, 255, 0.16);
+    color: #ffffff !important;
+    text-decoration: none;
+}
+
+.app-shell-secondary-link.active {
+    background: rgba(255, 255, 255, 0.24);
+    color: #ffffff !important;
 }
 
 .app-shell-user-toggle {
     display: inline-flex;
     align-items: center;
-    gap: 0.45rem;
+    gap: 0.3rem;
     padding: 0;
     border: 0;
     background: transparent;
     color: rgba(248, 251, 255, 0.92);
-    font-size: 1rem;
+    font-size: 0.88rem;
     font-weight: 600;
     box-shadow: none !important;
 }
@@ -265,11 +311,12 @@ body {
 
 @media (max-width: 991.98px) {
     .app-shell-header {
-        padding: 0.6rem 1rem;
+        padding: 0.3rem 0.75rem;
     }
 
-    .app-shell-title {
-        font-size: 1.12rem;
+    .app-shell-logo-image {
+        width: 68px;
+        max-width: 40vw;
     }
 
     .admin-sticky-header,
@@ -289,12 +336,25 @@ body {
         align-items: flex-start;
     }
 
+    .app-shell-logo-image {
+        width: 60px;
+        max-width: 45vw;
+    }
+
     .app-shell-branding {
         align-items: flex-start;
+    }
+
+    .app-shell-title {
+        font-size: 1rem;
     }
 
     .app-shell-actions {
         width: 100%;
         gap: 0.75rem;
+    }
+
+    .app-shell-secondary-nav {
+        width: 100%;
     }
 }

@@ -1,6 +1,8 @@
 {% extends "booking_workspace_base.html" %}
 {% set workspace_nav = "calendar" %}
 {% block workspace_title %}Booking Calendar{% endblock %}
+{% block workspace_shell_title %}Booking Calendar{% endblock %}
+{% block workspace_shell_subtitle %}Read-only calendar view for all environment reservations and deployment bookings.{% endblock %}
 {% block workspace_extra_head %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css">
 {% endblock %}
@@ -21,38 +23,37 @@
 .page-header {
     background: var(--primary-gradient);
     color: #ffffff;
-    padding: 1.25rem 1.5rem;
+    padding: 1rem 1.25rem;
+}
+
+.page-header-main {
+    display: flex;
+    align-items: baseline;
+    gap: 0.85rem;
+    flex-wrap: wrap;
 }
 
 .page-header h2 {
     margin: 0;
-    font-size: 1.75rem;
-    font-weight: 700;
+    font-size: 1.45rem;
+    font-weight: 400;
 }
 
-.page-header p {
-    margin: 0.35rem 0 0;
+.page-header-copy {
+    margin: 0;
     opacity: 0.92;
-}
-
-.count-badge {
-    background: rgba(255, 255, 255, 0.18);
-    color: #ffffff;
-    border-radius: 999px;
-    padding: 0.35rem 0.75rem;
-    font-size: 0.85rem;
-    font-weight: 600;
+    font-size: 0.98rem;
 }
 
 .alert-host {
-    padding: 1rem 1.5rem 0;
+    padding: 0.75rem 1.25rem 0;
 }
 
 .quick-stats {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 0.9rem;
-    padding: 1rem 1.5rem 0;
+    gap: 0.45rem;
+    padding: 0.45rem 1rem 0;
 }
 
 .stat-card,
@@ -61,21 +62,21 @@
     background: #f8fafc;
     border: 1px solid #e2e8f0;
     border-radius: 12px;
-    padding: 1rem;
+    padding: 0.5rem 0.7rem;
 }
 
 .stat-label {
     color: #64748b;
-    font-size: 0.78rem;
+    font-size: 0.7rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
 }
 
 .stat-value {
-    margin-top: 0.35rem;
+    margin-top: 0.15rem;
     color: #0f172a;
-    font-size: 1.4rem;
+    font-size: 0.88rem;
     font-weight: 700;
 }
 
@@ -83,64 +84,62 @@
 .content-grid {
     display: grid;
     grid-template-columns: 1fr;
-    gap: 1rem;
-    padding: 1rem 1.5rem 0;
+    gap: 0.45rem;
+    padding: 0.45rem 1rem 0;
 }
 
 .content-grid {
-    padding: 1rem 1.5rem 1.5rem;
+    padding: 0.45rem 1rem 1rem;
 }
 
 .filter-grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 0.75rem;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0.55rem;
+    align-items: end;
+}
+
+.filter-grid .form-label {
+    margin-bottom: 0.2rem;
+    font-size: 0.82rem;
+}
+
+.filter-grid .form-control,
+.filter-grid .form-select {
+    padding: 0.36rem 0.6rem;
+    min-height: 34px;
+    font-size: 0.88rem;
 }
 
 .legend-list {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.75rem 1rem;
+    gap: 0.35rem 0.7rem;
 }
 
 .legend-item {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.4rem;
     color: #334155;
-    font-size: 0.9rem;
+    font-size: 0.78rem;
 }
 
 .calendar-card {
-    padding: 1.25rem;
+    padding: 0.85rem;
 }
 
 #calendar {
-    min-height: 760px;
+    min-height: 620px;
 }
 
 .calendar-actions {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-end;
     align-items: center;
-    gap: 1rem;
+    gap: 0.45rem;
     flex-wrap: wrap;
-    margin-bottom: 1rem;
-}
-
-.calendar-actions-copy {
-    color: #64748b;
-    font-size: 0.95rem;
-}
-
-.detail-card {
-    padding: 1.25rem;
-}
-
-.detail-card h5 {
-    font-weight: 700;
-    color: #1e293b;
-    margin-bottom: 1rem;
+    margin-bottom: 0.35rem;
 }
 
 .detail-empty {
@@ -180,13 +179,13 @@
 }
 
 .fc .fc-toolbar-title {
-    font-size: 1.25rem;
+    font-size: 1.05rem;
     font-weight: 700;
     color: #1e293b;
 }
 
 .fc .fc-toolbar.fc-header-toolbar {
-    margin-bottom: 1.25rem;
+    margin-bottom: 0.85rem;
 }
 
 .fc .fc-button {
@@ -214,8 +213,8 @@
     cursor: pointer;
     border: 0;
     border-radius: 8px;
-    padding: 3px 7px;
-    font-size: 0.78rem;
+    padding: 2px 6px;
+    font-size: 0.74rem;
     font-weight: 600;
 }
 
@@ -226,6 +225,77 @@
 }
 
 .booking-deployment { box-shadow: inset 0 0 0 2px rgba(245, 158, 11, 0.95); }
+
+.calendar-hover-card {
+    position: fixed;
+    z-index: 2200;
+    width: min(320px, calc(100vw - 1rem));
+    padding: 0.8rem 0.9rem;
+    border: 1px solid #dbe5f3;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.98);
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.16);
+    backdrop-filter: blur(10px);
+    pointer-events: none;
+}
+
+.calendar-hover-card[hidden] {
+    display: none;
+}
+
+.calendar-hover-title {
+    margin: 0 0 0.35rem;
+    color: #0f172a;
+    font-size: 0.96rem;
+    font-weight: 600;
+}
+
+.calendar-hover-meta {
+    display: grid;
+    gap: 0.35rem;
+}
+
+.calendar-hover-row {
+    display: grid;
+    grid-template-columns: 88px 1fr;
+    gap: 0.45rem;
+    align-items: start;
+    font-size: 0.82rem;
+}
+
+.calendar-hover-label {
+    color: #64748b;
+    font-weight: 600;
+}
+
+.calendar-hover-value {
+    color: #1e293b;
+    word-break: break-word;
+}
+
+.booking-detail-modal .modal-content {
+    border: 0;
+    border-radius: 14px;
+    box-shadow: 0 18px 42px rgba(15, 23, 42, 0.18);
+    max-height: calc(100vh - var(--app-shell-header-height) - 2rem);
+    overflow: hidden;
+}
+
+.booking-detail-modal .modal-dialog {
+    max-width: min(92vw, 900px);
+    margin-top: calc(var(--app-shell-header-height) + 1rem);
+    margin-bottom: 1rem;
+}
+
+.booking-detail-modal .modal-header {
+    border-bottom: 1px solid #e2e8f0;
+    padding: 0.9rem 1rem;
+}
+
+.booking-detail-modal .modal-body {
+    padding: 1rem;
+    overflow-y: auto;
+}
 {% endblock %}
 {% block workspace_mobile_styles %}
 .main-content {
@@ -237,22 +307,22 @@
     grid-template-columns: 1fr;
 }
 
+.content-grid {
+    grid-template-columns: 1fr;
+}
+
 #calendar {
-    min-height: 620px;
+    min-height: 540px;
+}
+
+.booking-detail-modal .modal-dialog {
+    max-width: calc(100vw - 1rem);
+    margin-top: calc(var(--app-shell-header-height) + 0.75rem);
+    margin-bottom: 0.5rem;
 }
 {% endblock %}
 {% block workspace_content %}
 <div class="page-card">
-    <div class="page-header d-flex flex-wrap justify-content-between align-items-start gap-3">
-        <div>
-            <h2><i class="fas fa-calendar-alt me-2"></i>Booking Calendar</h2>
-            <p>Read-only calendar view for all environment reservations and deployment bookings.</p>
-        </div>
-        <div class="count-badge">
-            <i class="fas fa-user me-1"></i>{{ user.user_id }} | {{ user.role }}
-        </div>
-    </div>
-
     <div id="messageContainer" class="alert-host"></div>
 
     <div class="quick-stats">
@@ -307,6 +377,11 @@
                     <label for="filterRequestedBy" class="form-label">Requested By</label>
                     <input id="filterRequestedBy" class="form-control" type="text" placeholder="Search user">
                 </div>
+                <div>
+                    <button id="clearFiltersButton" type="button" class="btn btn-outline-secondary btn-sm w-100">
+                        <i class="fas fa-rotate-left me-1"></i>Clear Filters
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -323,22 +398,32 @@
     <div class="content-grid">
         <div class="calendar-card">
             <div class="calendar-actions">
-                <div class="calendar-actions-copy">
-                    Use month view for overview and switch to week/day only when you need deeper detail.
-                </div>
-                <button id="clearFiltersButton" type="button" class="btn btn-outline-secondary btn-sm">
-                    <i class="fas fa-rotate-left me-1"></i>Clear Filters
-                </button>
             </div>
             <div id="calendar"></div>
         </div>
+    </div>
+</div>
 
-        <aside class="detail-card">
-            <h5><i class="fas fa-circle-info me-2"></i>Booking Details</h5>
-            <div id="bookingDetails" class="detail-empty">
-                Select a booking from the calendar to view its details here.
+<div class="calendar-hover-card" id="calendarHoverCard" hidden>
+    <div class="calendar-hover-title" id="calendarHoverTitle">Booking</div>
+    <div class="calendar-hover-meta" id="calendarHoverMeta"></div>
+</div>
+
+<div class="modal fade booking-detail-modal" id="bookingDetailsModal" tabindex="-1" aria-labelledby="bookingDetailsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="bookingDetailsModalLabel">
+                    <i class="fas fa-circle-info me-2"></i>Booking Details
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-        </aside>
+            <div class="modal-body">
+                <div id="bookingDetails" class="detail-empty">
+                    Select a booking from the calendar to view its details here.
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}
