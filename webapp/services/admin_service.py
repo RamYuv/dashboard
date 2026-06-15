@@ -45,6 +45,11 @@ def normalize_checkbox(value):
     return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
+def is_valid_host_id(host_id):
+    normalized = (host_id or "").strip()
+    return bool(normalized) and "-" not in normalized and normalized.replace("_", "").isalnum()
+
+
 def build_admin_page_context(active_tab=None):
     selected_tab = active_tab if active_tab in ADMIN_TABS else ADMIN_TABS[0]
     environments = Environment.query.order_by(Environment.env_type, Environment.env_id).all()
@@ -265,17 +270,25 @@ def delete_environment(form):
 
 
 def create_host(form):
+    host_id = (form.get("host_id") or "").strip()
     hostname = (form.get("hostname") or "").strip()
     ip_address = (form.get("ip_address") or "").strip() or None
     domain = (form.get("domain") or "").strip().upper() or None
     description = (form.get("description") or "").strip() or None
     is_active = normalize_checkbox(form.get("is_active"))
+    if not host_id:
+        return "Host ID is required."
+    if not is_valid_host_id(host_id):
+        return "Host ID can contain only letters, numbers, and underscores. Hyphens are not allowed."
     if not hostname:
         return "Host name is required."
-    if Host.query.filter_by(hostname=hostname, ip_address=ip_address).first() is not None:
-        return "Host already exists for that host name and IP address."
+    if Host.query.filter_by(host_id=host_id).first() is not None:
+        return "Host ID already exists."
+    if Host.query.filter_by(hostname=hostname, ip_address=ip_address, domain=domain).first() is not None:
+        return "Host already exists for that host name, IP address, and domain."
     db.session.add(
         Host(
+            host_id=host_id,
             hostname=hostname,
             ip_address=ip_address,
             domain=domain,
@@ -287,42 +300,45 @@ def create_host(form):
 
 
 def update_host(form):
-    host_id = form.get("host_id") or ""
-    try:
-        host_id = int(host_id)
-    except (TypeError, ValueError):
+    original_host_id = (form.get("original_host_id") or form.get("host_id") or "").strip()
+    host_id = (form.get("host_id") or "").strip()
+    if not original_host_id:
         return "Host was not found."
+    if not is_valid_host_id(host_id):
+        return "Host ID can contain only letters, numbers, and underscores. Hyphens are not allowed."
+    if host_id != original_host_id:
+        return "Host ID cannot be changed."
 
-    host = Host.query.get(host_id)
+    host = Host.query.get(original_host_id)
     if host is None:
         return "Host was not found."
 
     hostname = (form.get("hostname") or "").strip()
     ip_address = (form.get("ip_address") or "").strip() or None
+    domain = (form.get("domain") or "").strip().upper() or None
     if not hostname:
         return "Host name is required."
 
     duplicate = Host.query.filter(
         Host.hostname == hostname,
         Host.ip_address == ip_address,
+        Host.domain == domain,
         Host.host_id != host.host_id,
     ).first()
     if duplicate is not None:
-        return "Host already exists for that host name and IP address."
+        return "Host already exists for that host name, IP address, and domain."
 
     host.hostname = hostname
     host.ip_address = ip_address
-    host.domain = (form.get("domain") or "").strip().upper() or None
+    host.domain = domain
     host.description = (form.get("description") or "").strip() or None
     host.is_active = normalize_checkbox(form.get("is_active"))
     return None
 
 
 def delete_host(form):
-    host_id = form.get("host_id") or ""
-    try:
-        host_id = int(host_id)
-    except (TypeError, ValueError):
+    host_id = (form.get("host_id") or "").strip()
+    if not host_id:
         return "Host was not found."
 
     host = Host.query.get(host_id)
@@ -410,8 +426,10 @@ def create_environment_host_mapping(form):
 
     try:
         server_type_id = int(form.get("server_type_id") or "")
-        host_id = int(form.get("host_id") or "")
     except ValueError:
+        return "Host and server type selections are required."
+    host_id = (form.get("host_id") or "").strip()
+    if not host_id:
         return "Host and server type selections are required."
 
     server_type = ServerType.query.get(server_type_id)
@@ -467,8 +485,10 @@ def update_environment_host_mapping(form):
 
     try:
         server_type_id = int(form.get("server_type_id") or "")
-        host_id = int(form.get("host_id") or "")
     except ValueError:
+        return "Host and server type selections are required."
+    host_id = (form.get("host_id") or "").strip()
+    if not host_id:
         return "Host and server type selections are required."
 
     server_type = ServerType.query.get(server_type_id)
@@ -673,68 +693,35 @@ def export_operational_config():
     ).all()
 
     mappings_by_env = {}
-    mapped_host_keys = set()
     for mapping in mappings:
         mappings_by_env.setdefault(mapping.env_id, []).append(mapping)
-        if mapping.host:
-            mapped_host_keys.add((mapping.host.hostname, mapping.host.ip_address))
+    host_rows = []
+    for host in hosts:
+        host_rows.append(
+            {
+                "host_id": host.host_id,
+                "hostname": host.hostname,
+                "ip_address": host.ip_address,
+                "domain": host.domain,
+                "description": host.description,
+            }
+        )
 
-    environment_host_inventory = []
+    environment_host_mappings = []
     for environment in environments:
-        env_mappings = mappings_by_env.get(environment.env_id) or []
-        if not env_mappings:
-            continue
-
-        credentials = {
-            (
-                (mapping.deployment_user or "").strip() or None,
-                (mapping.deployment_password or "").strip() or None,
-            )
-            for mapping in env_mappings
-        }
-        shared_credentials = credentials.pop() if len(credentials) == 1 else None
-        environment_entry = {"env_id": environment.env_id}
-        if shared_credentials:
-            if shared_credentials[0]:
-                environment_entry["deployment_user"] = shared_credentials[0]
-            if shared_credentials[1]:
-                environment_entry["deployment_password"] = shared_credentials[1]
-
-        group = {
-            "environments": [environment_entry],
-            "env_type": environment.env_type,
-            "mappings": [],
-        }
-
-        for mapping in env_mappings:
+        for mapping in mappings_by_env.get(environment.env_id) or []:
             host = mapping.host
             server_type = mapping.server_type
-            mapping_row = {
-                "server_type_key": server_type.server_type_key if server_type else None,
-                "hostname": host.hostname if host else None,
-                "ip_address": host.ip_address if host else None,
-                "domain": host.domain if host else None,
-                "description": host.description if host else None,
-            }
-            if not shared_credentials:
-                if mapping.deployment_user:
-                    mapping_row["deployment_user"] = mapping.deployment_user
-                if mapping.deployment_password:
-                    mapping_row["deployment_password"] = mapping.deployment_password
-            group["mappings"].append(mapping_row)
-
-        environment_host_inventory.append(group)
-
-    unmapped_hosts = [
-        {
-            "hostname": host.hostname,
-            "ip_address": host.ip_address,
-            "domain": host.domain,
-            "description": host.description,
-        }
-        for host in hosts
-        if (host.hostname, host.ip_address) not in mapped_host_keys
-    ]
+            environment_host_mappings.append(
+                {
+                    "env_id": environment.env_id,
+                    "env_type": environment.env_type,
+                    "server_type_key": server_type.server_type_key if server_type else None,
+                    "host_id": host.host_id if host else None,
+                    "deployment_user": mapping.deployment_user,
+                    "deployment_password": mapping.deployment_password,
+                }
+            )
 
     return {
         "metadata": {
@@ -772,8 +759,8 @@ def export_operational_config():
             }
             for build in component_builds
         ],
-        "hosts": unmapped_hosts,
-        "environment_host_inventory": environment_host_inventory,
+        "hosts": host_rows,
+        "environment_host_mappings": environment_host_mappings,
         "deployment_targets": get_deployment_target_options(),
     }
 

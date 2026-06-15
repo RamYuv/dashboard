@@ -65,117 +65,47 @@ def _create_if_missing(model, defaults=None, **filters):
     return record
 
 
-def _normalize_environment_host_inventory(data):
-    """Expand grouped environment-host inventory into flat hosts and mappings."""
-    inventory_groups = data.get("environment_host_inventory") or []
-    if not inventory_groups:
-        return (
-            data.get("hosts") or [],
-            data.get("environment_host_mappings") or [],
-        )
+def _normalize_seed_hosts(hosts, mappings):
+    """Validate seeded hosts and mappings for the current JSON structure."""
+    normalized_hosts = []
+    hosts_by_id = {}
 
-    hosts = list(data.get("hosts") or [])
-    mappings = []
-    seen_hosts = {
-        (
-            (host.get("hostname") or "").strip(),
-            (host.get("ip_address") or "").strip(),
-        )
-        for host in hosts
-    }
-
-    for group_index, group in enumerate(inventory_groups, start=1):
-        raw_environments = group.get("environments") or []
-        environment_entries = []
-        for env in raw_environments:
-            env_id = (env.get("env_id") or "").strip()
-            if not env_id:
-                raise ValueError(
-                    "Inventory group #{} has an environment entry without env_id.".format(
-                        group_index
-                    )
-                )
-            environment_entries.append(
-                {
-                    "env_id": env_id,
-                    "deployment_user": (env.get("deployment_user") or "").strip() or None,
-                    "deployment_password": (env.get("deployment_password") or "").strip() or None,
-                }
-            )
-
-        env_ids = group.get("env_ids") or []
-        single_env_id = (group.get("env_id") or "").strip()
-        if single_env_id:
-            env_ids = env_ids + [single_env_id]
-        env_ids = [env_id for env_id in env_ids if (env_id or "").strip()]
-        env_type = (group.get("env_type") or "").strip().upper()
-        default_user = (group.get("deployment_user") or "").strip() or None
-        default_password = (group.get("deployment_password") or "").strip() or None
-        group_mappings = group.get("mappings") or []
-
-        if not environment_entries:
-            environment_entries = [
-                {
-                    "env_id": env_id,
-                    "deployment_user": default_user,
-                    "deployment_password": default_password,
-                }
-                for env_id in env_ids
-            ]
-
-        if not environment_entries:
+    for index, host in enumerate(hosts, start=1):
+        normalized_host = dict(host)
+        host_id = (normalized_host.get("host_id") or "").strip() or None
+        if not host_id:
+            raise ValueError("Seed host #{} must include host_id.".format(index))
+        if host_id in hosts_by_id:
             raise ValueError(
-                "Inventory group #{} must include environments, env_id, or env_ids.".format(group_index)
+                "Seed host #{} uses duplicate host_id '{}'.".format(
+                    index,
+                    host_id,
+                )
             )
-        if not env_type:
+        normalized_host["host_id"] = host_id
+        hosts_by_id[host_id] = normalized_host
+        normalized_hosts.append(normalized_host)
+
+    normalized_mappings = []
+    for index, mapping in enumerate(mappings, start=1):
+        normalized_mapping = dict(mapping)
+        host_id = (normalized_mapping.get("host_id") or "").strip() or None
+        if not host_id:
+            raise ValueError("Seed mapping #{} must include host_id.".format(index))
+        host = hosts_by_id.get(host_id)
+        if host is None:
             raise ValueError(
-                "Inventory group #{} must include env_type.".format(group_index)
+                "Seed mapping #{} references unknown host_id '{}'.".format(
+                    index,
+                    host_id,
+                )
             )
+        normalized_mapping["host_id"] = host_id
+        normalized_mapping["hostname"] = host.get("hostname")
+        normalized_mapping["ip_address"] = host.get("ip_address")
+        normalized_mappings.append(normalized_mapping)
 
-        for mapping_index, mapping in enumerate(group_mappings, start=1):
-            hostname = (mapping.get("hostname") or "").strip()
-            ip_address = (mapping.get("ip_address") or "").strip()
-            server_type_key = (mapping.get("server_type_key") or "").strip()
-            host_domain = (mapping.get("domain") or "").strip() or None
-            host_description = (mapping.get("description") or "").strip() or None
-
-            if not hostname or not ip_address or not server_type_key:
-                raise ValueError(
-                    "Inventory group #{} mapping #{} must include server_type_key, hostname, and ip_address.".format(
-                        group_index,
-                        mapping_index,
-                    )
-                )
-
-            host_key = (hostname, ip_address)
-            if host_key not in seen_hosts:
-                hosts.append(
-                    {
-                        "hostname": hostname,
-                        "ip_address": ip_address,
-                        "domain": host_domain,
-                        "description": host_description,
-                    }
-                )
-                seen_hosts.add(host_key)
-
-            mapping_user = (mapping.get("deployment_user") or "").strip() or None
-            mapping_password = (mapping.get("deployment_password") or "").strip() or None
-
-            for environment_entry in environment_entries:
-                mappings.append(
-                    {
-                        "env_id": environment_entry["env_id"],
-                        "env_type": env_type,
-                        "server_type_key": server_type_key,
-                        "hostname": hostname,
-                        "ip_address": ip_address,
-                        "deployment_user": mapping_user or environment_entry["deployment_user"],
-                        "deployment_password": mapping_password or environment_entry["deployment_password"],
-                    }
-                )
-
-    return hosts, mappings
+    return normalized_hosts, normalized_mappings
 
 
 def load_host_seed_data():
@@ -194,7 +124,10 @@ def load_host_seed_data():
     with SEED_HOSTS_CONFIG_PATH.open("r", encoding="utf-8-sig") as seed_file:
         data = json.load(seed_file)
 
-    normalized_hosts, normalized_mappings = _normalize_environment_host_inventory(data)
+    normalized_hosts, normalized_mappings = _normalize_seed_hosts(
+        data.get("hosts") or [],
+        data.get("environment_host_mappings") or [],
+    )
 
     for index, mapping in enumerate(normalized_mappings, start=1):
         if not (mapping.get("ip_address") or "").strip():
@@ -232,10 +165,9 @@ def _seeders():
 
 
 def _resolve_seed_host(host_data):
-    """Resolve a seeded host record by hostname and IP address."""
-    hostname = host_data["hostname"]
-    ip_address = host_data.get("ip_address")
-    return _first(Host, hostname=hostname, ip_address=ip_address)
+    """Resolve a seeded host record by host_id."""
+    host_id = (host_data.get("host_id") or "").strip()
+    return _first(Host, host_id=host_id) if host_id else None
 
 
 def _seed_team_membership(user, team, role, team_lead=False):
@@ -386,9 +318,10 @@ def seed_default_hosts():
     for host_data in seed_data["hosts"]:
         _create_if_missing(
             Host,
-            hostname=host_data["hostname"],
-            ip_address=host_data.get("ip_address"),
+            host_id=host_data["host_id"],
             defaults={
+                "hostname": host_data["hostname"],
+                "ip_address": host_data.get("ip_address"),
                 "domain": host_data.get("domain"),
                 "description": host_data["description"],
             },
@@ -486,4 +419,3 @@ def seed_default_component_builds():
                 version=version,
             )
     db.session.commit()
-

@@ -97,7 +97,6 @@ def _build_server_type_map(env_ids):
             for row in EnvironmentHostMapping.query.with_entities(EnvironmentHostMapping.server_type_id)
             .filter(
                 EnvironmentHostMapping.env_id == env_id,
-                EnvironmentHostMapping.is_shared.is_(False),
             )
             .distinct()
             .all()

@@ -137,7 +137,7 @@ class Team(db.Model):
     __tablename__ = "teams"
 
     team_id = db.Column(db.Integer, primary_key=True)
-    team_name = db.Column(db.String(100), unique=True, nullable=False)
+    team_name = db.Column(db.String(40), unique=True, nullable=False)
     description = db.Column(db.Text)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -182,9 +182,9 @@ class TeamMember(db.Model):
 class Environment(db.Model):
     __tablename__ = "environments"
 
-    env_id = db.Column(db.String(50), primary_key=True)  # DEV01, ST01
-    env_type = db.Column(db.String(50), nullable=False)  # DEV / ST / QA / PROD
-    domain = db.Column(db.String(100))
+    env_id = db.Column(db.String(16), primary_key=True)  # DEV01, ST01
+    env_type = db.Column(db.String(16), nullable=False)  # DEV / ST / QA / PROD
+    domain = db.Column(db.String(24))
     description = db.Column(db.Text)
 
     is_active = db.Column(db.Boolean, default=True)
@@ -196,18 +196,17 @@ class Environment(db.Model):
 # ==========================================================
 class Host(db.Model):
     __tablename__ = "hosts"
-
-    host_id = db.Column(db.Integer, primary_key=True)
+    host_id = db.Column(db.String(50), primary_key=True)
     # Real server hostname/address, e.g. core-host or serveraddress.
-    hostname = db.Column(db.String(100), nullable=False)
-    ip_address = db.Column(db.String(100))
-    domain = db.Column(db.String(50))  # DEV / ST / PROD / TOOLS
+    hostname = db.Column(db.String(40), nullable=False)
+    ip_address = db.Column(db.String(25))
+    domain = db.Column(db.String(10))  # DEV / ST / PROD / TOOLS
     description = db.Column(db.Text)
 
     is_active = db.Column(db.Boolean, default=True)
 
     __table_args__ = (
-        db.UniqueConstraint("hostname", "ip_address", name="uq_host_hostname_ip"),
+        db.UniqueConstraint("hostname", "ip_address", "domain", name="uq_host_identity"),
     )
 
 
@@ -251,10 +250,7 @@ class EnvironmentHostMapping(db.Model):
         nullable=False,
     )
 
-    env_type = db.Column(db.String(50))
-    # Deprecated compatibility column kept so existing SQLite databases
-    # with a NOT NULL is_shared field can still accept inserts.
-    is_shared = db.Column(db.Boolean, default=False, nullable=False)
+    env_type = db.Column(db.String(16))
 
     server_type_id = db.Column(
         db.Integer,
@@ -263,7 +259,7 @@ class EnvironmentHostMapping(db.Model):
     )
 
     host_id = db.Column(
-        db.Integer,
+        db.String(48),
         db.ForeignKey("hosts.host_id"),
         nullable=False
     )
