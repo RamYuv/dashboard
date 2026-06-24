@@ -38,13 +38,8 @@ class EnvMonitorWorker:
                 included.append(server_type_key)
         return included
 
-    def _include_shared_mappings(self):
-        return bool(self.app.config.get("MONITOR_INCLUDE_SHARED_MAPPINGS", False))
-
     def _should_monitor_mapping(self, mapping, included_server_types):
         if mapping is None:
-            return False
-        if not self._include_shared_mappings() and getattr(mapping, "is_shared", False):
             return False
         if not getattr(mapping, "env_id", None):
             return False

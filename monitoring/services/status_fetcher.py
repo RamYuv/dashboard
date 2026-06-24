@@ -94,7 +94,7 @@ class VmStatusFetcher:
         if "command not found" in normalized:
             vm_status["vm_color"] = "Black"
             return vm_status
-        if "no apps are running" in normalized or "no instances running" in normalized:
+        if "no instances running" in normalized:
             vm_status["vm_color"] = "Yellow"
             return vm_status
 

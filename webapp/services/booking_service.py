@@ -4,7 +4,15 @@ Booking service for managing environment reservations.
 
 import logging
 from datetime import datetime
-from zoneinfo import ZoneInfo
+
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:
+    import pytz
+
+    def ZoneInfo(timezone_name):
+        """Compatibility wrapper for Python versions without zoneinfo."""
+        return pytz.timezone(timezone_name)
 
 from flask import current_app
 

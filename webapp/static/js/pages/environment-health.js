@@ -125,7 +125,7 @@
         if (!card) {
             return;
         }
-        card.classList.remove("tooltip-align-left", "tooltip-align-right", "tooltip-align-center");
+        card.classList.remove("tooltip-align-left", "tooltip-align-right", "tooltip-align-center", "tooltip-below");
     }
 
     function updateTooltipPlacement(card) {
@@ -146,6 +146,15 @@
         const centeredRight = rect.left + (rect.width / 2) + (estimatedTooltipWidth / 2);
         const safeLeft = mainRect.left + 12;
         const safeRight = mainRect.right - 12;
+        const tooltipLineCount = ((card.dataset.tooltip || "").match(/\n/g) || []).length + 1;
+        const estimatedTooltipHeight = Math.min(320, Math.max(72, (tooltipLineCount * 20) + 24));
+        const topBar = document.querySelector(".top-bar, .navbar, header");
+        const topBarBottom = topBar ? topBar.getBoundingClientRect().bottom : 0;
+        const safeTop = Math.max(12, topBarBottom + 12);
+
+        if (rect.top - estimatedTooltipHeight < safeTop) {
+            card.classList.add("tooltip-below");
+        }
 
         if (centeredLeft < safeLeft) {
             card.classList.add("tooltip-align-left");
@@ -190,7 +199,7 @@
     function buildNotRunningTooltipLines(components) {
         const items = Array.isArray(components) ? components.filter(Boolean) : [];
         if (!items.length) {
-            return ["Not Running: None"];
+            return [];
         }
 
         const maxVisible = 15;
@@ -208,27 +217,35 @@
         return lines;
     }
 
+    function getTooltipStatusLine(serverStatus) {
+        if (serverStatus === "healthy") {
+            return "Status: Running";
+        }
+        if (serverStatus === "warning") {
+            return "Status: Idle";
+        }
+        return "";
+    }
+
     function createCardHTML(status) {
         const envId = status.env_id || "UNKNOWN";
         const active = activeEnvIds.includes(envId) ? " active-booking" : "";
-        const componentSummary = status.component_summary || {};
         const runtime = status.tcs_runtime || {};
         const versions = runtime.display_version || (runtime.versions || []).join(", ");
         const serviceTypes = (runtime.service_types || []).join(", ");
         const testingModes = (runtime.testing_modes || []).join(", ");
         const notRunningComponents = status.not_running_components || [];
+        const serverStatus = safeLower(status.status);
+        const statusLine = getTooltipStatusLine(serverStatus);
         const tooltipLines = [
+            envId,
             [
-                envId,
-                "Running: " + Number(componentSummary.running || 0),
-                "Not Running:" + Number(componentSummary.notrunning || 0)
-            ].join("|"),
-            [
-                versions ? "Version:" + versions : "",
+                versions ? "Version: " + versions : "",
                 serviceTypes ? "Service: " + serviceTypes : "",
-                testingModes ? "MODE:" + testingModes : ""
-            ].filter(Boolean).join(" | ")
-        ].concat(buildNotRunningTooltipLines(notRunningComponents))
+                testingModes ? "MODE: " + testingModes : ""
+            ].filter(Boolean).join(" | "),
+            statusLine
+        ].concat(serverStatus === "critical" ? buildNotRunningTooltipLines(notRunningComponents) : [])
         .filter(function (line, index) {
             if (!line) {
                 return false;
@@ -241,8 +258,6 @@
             return true;
         });
         const tooltip = tooltipLines.join("\n");
-
-        const serverStatus = safeLower(status.status);
 
         const redActive = serverStatus === "critical" ? "active" : "";
         const yellowActive = serverStatus === "warning" ? "active" : "";

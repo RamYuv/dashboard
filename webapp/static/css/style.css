@@ -8,7 +8,7 @@ body {
 }
 
 :root {
-    --app-shell-header-height: 40px;
+    --app-shell-header-height: 72px;
     --app-shell-header-start: #002855;
     --app-shell-header-end: #002855;
     --app-shell-header-text: #f8fbff;
@@ -24,7 +24,7 @@ body {
     align-items: center;
     justify-content: space-between;
     gap: 0.65rem;
-    padding: 0.35rem 0.85rem;
+    padding: 0.75rem 0.85rem;
     background: linear-gradient(90deg, var(--app-shell-header-start), var(--app-shell-header-end));
     color: var(--app-shell-header-text);
     box-shadow: 0 10px 24px rgba(16, 36, 71, 0.18);
@@ -69,8 +69,8 @@ body {
 }
 
 .app-shell-logo-image {
-    width: 78px;
-    max-width: min(28vw, 78px);
+    width: 96px;
+    max-width: min(28vw, 96px);
     height: auto;
     display: block;
     object-fit: contain;
@@ -311,11 +311,11 @@ body {
 
 @media (max-width: 991.98px) {
     .app-shell-header {
-        padding: 0.3rem 0.75rem;
+        padding: 0.55rem 0.75rem;
     }
 
     .app-shell-logo-image {
-        width: 68px;
+        width: 80px;
         max-width: 40vw;
     }
 
@@ -334,10 +334,11 @@ body {
     .app-shell-header {
         flex-direction: column;
         align-items: flex-start;
+        padding: 0.5rem 0.75rem;
     }
 
     .app-shell-logo-image {
-        width: 60px;
+        width: 72px;
         max-width: 45vw;
     }
 

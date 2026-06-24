@@ -265,6 +265,12 @@
             z-index: 1300;
         }
 
+        .env-card.tooltip-below:hover::after,
+        .env-card.tooltip-below:focus-visible::after {
+            top: calc(100% + 12px);
+            bottom: auto;
+        }
+
         .env-card.tooltip-align-left:hover::after,
         .env-card.tooltip-align-left:focus-visible::after {
             left: 0;
@@ -290,6 +296,16 @@
             border-top: 8px solid rgba(15, 23, 42, 0.97);
             pointer-events: none;
             z-index: 1299;
+        }
+
+        .env-card.tooltip-below:hover::before,
+        .env-card.tooltip-below:focus-visible::before {
+            top: calc(100% + 4px);
+            bottom: auto;
+            border-left: 7px solid transparent;
+            border-right: 7px solid transparent;
+            border-top: 0;
+            border-bottom: 8px solid rgba(19, 28, 56, 0.95);
         }
 
         .env-card.tooltip-align-left:hover::before,

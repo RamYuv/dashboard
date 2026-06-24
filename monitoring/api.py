@@ -79,6 +79,35 @@ def _preferred_tcs_version(versions):
     return max(candidates, key=_version_sort_key)
 
 
+def _extract_version_date(version):
+    value = (version or "").strip()
+    if not value:
+        return ""
+
+    match = re.search(r"_(\d{8})$", value)
+    if not match:
+        return ""
+    return match.group(1)
+
+
+def _display_tcs_version(versions):
+    candidates = [value.strip() for value in (versions or []) if (value or "").strip()]
+    if not candidates:
+        return ""
+    if len(set(candidates)) == 1:
+        return candidates[0]
+
+    dated_candidates = [
+        version_date
+        for version_date in (_extract_version_date(value) for value in candidates)
+        if version_date
+    ]
+    if dated_candidates:
+        return max(dated_candidates)
+
+    return _preferred_tcs_version(candidates)
+
+
 def _infer_env_type(env_id):
     if not env_id:
         return "Unknown"
@@ -215,7 +244,7 @@ def _build_environment_health_payload(env_statuses, last_update, active_booking_
             "server_types": env_server_types.get(env_id, []),
             "tcs_runtime": {
                 "versions": runtime_details.get("versions", []),
-                "display_version": _preferred_tcs_version(runtime_details.get("versions", [])),
+                "display_version": _display_tcs_version(runtime_details.get("versions", [])),
                 "has_mixed_versions": len(runtime_details.get("versions", [])) > 1,
                 "service_types": runtime_details.get("service_types", []),
                 "testing_modes": runtime_details.get("testing_modes", []),

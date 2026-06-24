@@ -27,6 +27,10 @@ class VersionFetcher:
     DEFAULT_COMMANDS = {
         "version_info": "tcsexec version",
     }
+    DEPLOYED_NUM_SERVICE_TYPE_MAP = {
+        "21": "DOM",
+        "22": "MON",
+    }
 
     def __init__(self, executor=None, command_map=None):
         self.executor = executor or FabricRemoteExecutor()
@@ -156,8 +160,9 @@ class VersionFetcher:
             component_name: version
         }, {
             "mode": (deploy_info.get("mode") or "").strip(),
-            "service_types": self._parse_service_types(
-                deploy_info.get("deploy_service"),
+            "service_types": (
+                self._parse_deployed_num_service_types(deploy_info.get("deployed_num"))
+                or self._parse_service_types(deploy_info.get("deploy_service"))
             ),
         }
 
@@ -172,6 +177,18 @@ class VersionFetcher:
                 normalized.append(value)
         return normalized
 
+    def _parse_deployed_num_service_types(self, deployed_num_raw):
+        if not deployed_num_raw:
+            return []
+
+        normalized = []
+        for token in re.split(r"[\s,]+", deployed_num_raw or ""):
+            value = token.strip()
+            service_type = self.DEPLOYED_NUM_SERVICE_TYPE_MAP.get(value)
+            if service_type and service_type not in normalized:
+                normalized.append(service_type)
+        return normalized
+
     def _select_preferred_version(self, versions_raw):
         candidates = [
             token.strip()
@@ -181,9 +198,6 @@ class VersionFetcher:
         if not candidates:
             return None
 
-        for candidate in candidates:
-            if "_patch" in candidate.lower():
-                return candidate
         return candidates[0]
 
     def fetch_versions(self, host, username, password, server_type=None, host_label=None):
