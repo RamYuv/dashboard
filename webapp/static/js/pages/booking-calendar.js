@@ -4,6 +4,7 @@
     const environments = pageData.environments || [];
     const statusLabels = pageData.statusLabels || {};
     const userTimezone = common.getUserTimezone(pageData.serverTimezone || "UTC");
+    const bookingGridUrl = pageData.bookingGridUrl || "/booking/grid";
     let calendar = null;
     let allBookings = [];
     let bookingDetailsModal = null;
@@ -12,6 +13,7 @@
     let hoverTitle = null;
     let hoverMeta = null;
     let activeHoverEventId = null;
+    let suppressNextSelect = false;
 
     function getStatusLabel(status) {
         return statusLabels[status] || status;
@@ -281,6 +283,106 @@
         refreshCalendar();
     }
 
+    function padDatePart(value) {
+        return String(value).padStart(2, "0");
+    }
+
+    function formatLocalQueryDateTime(date) {
+        return [
+            date.getFullYear(),
+            padDatePart(date.getMonth() + 1),
+            padDatePart(date.getDate())
+        ].join("-") + "T" + [
+            padDatePart(date.getHours()),
+            padDatePart(date.getMinutes())
+        ].join(":");
+    }
+
+    function startOfToday() {
+        const value = new Date();
+        value.setHours(0, 0, 0, 0);
+        return value;
+    }
+
+    function isPastCalendarSelection(selectionInfo) {
+        const selectionStart = selectionInfo && selectionInfo.start instanceof Date
+            ? selectionInfo.start
+            : null;
+        if (!selectionStart) {
+            return false;
+        }
+
+        return selectionStart.getTime() < startOfToday().getTime();
+    }
+
+    function showPastSelectionMessage() {
+        window.alert("Please select today or a future date range to create a booking.");
+    }
+
+    function redirectToBookingForm(selectionInfo) {
+        const params = new URLSearchParams();
+        const start = selectionInfo.start instanceof Date ? selectionInfo.start : null;
+        const end = selectionInfo.end instanceof Date ? selectionInfo.end : null;
+
+        if (!start) {
+            return;
+        }
+
+        if (isPastCalendarSelection(selectionInfo)) {
+            showPastSelectionMessage();
+            if (calendar) {
+                calendar.unselect();
+            }
+            return;
+        }
+
+        params.set("start", formatLocalQueryDateTime(start));
+
+        if (end) {
+            let adjustedEnd = new Date(end.getTime());
+            if (selectionInfo.allDay) {
+                adjustedEnd = new Date(adjustedEnd.getTime() - (30 * 60 * 1000));
+            }
+            params.set("end", formatLocalQueryDateTime(adjustedEnd));
+        }
+
+        window.location.href = bookingGridUrl + "?" + params.toString();
+    }
+
+    function handleDateClick(info) {
+        suppressNextSelect = true;
+        redirectToBookingForm({
+            start: info.date,
+            end: null,
+            allDay: !!info.allDay,
+        });
+    }
+
+    function handleDateRangeSelect(info) {
+        if (suppressNextSelect) {
+            suppressNextSelect = false;
+            if (calendar) {
+                calendar.unselect();
+            }
+            return;
+        }
+        redirectToBookingForm(info);
+    }
+
+    function handleEventClick(info) {
+        renderDetails(info.event);
+    }
+
+    function handleEventMouseEnter(info) {
+        if (window.matchMedia("(hover: hover)").matches) {
+            showHoverCard(info.event, info.jsEvent);
+        }
+    }
+
+    function handleEventMouseLeave() {
+        hideHoverCard();
+    }
+
     document.addEventListener("DOMContentLoaded", function () {
         bookingDetailsModal = new bootstrap.Modal(document.getElementById("bookingDetailsModal"));
         hoverCard = document.getElementById("calendarHoverCard");
@@ -291,7 +393,7 @@
             height: "auto",
             nowIndicator: true,
             editable: false,
-            selectable: false,
+            selectable: true,
             slotMinTime: "00:00:00",
             slotMaxTime: "24:00:00",
             headerToolbar: {
@@ -300,17 +402,14 @@
                 right: "dayGridMonth,timeGridWeek,timeGridDay,listWeek",
             },
             events: loadBookings,
-            eventClick: function (info) {
-                renderDetails(info.event);
+            selectAllow: function (selectionInfo) {
+                return true;
             },
-            eventMouseEnter: function (info) {
-                if (window.matchMedia("(hover: hover)").matches) {
-                    showHoverCard(info.event, info.jsEvent);
-                }
-            },
-            eventMouseLeave: function () {
-                hideHoverCard();
-            },
+            dateClick: handleDateClick,
+            select: handleDateRangeSelect,
+            eventClick: handleEventClick,
+            eventMouseEnter: handleEventMouseEnter,
+            eventMouseLeave: handleEventMouseLeave,
         });
 
         calendar.render();

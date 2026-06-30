@@ -130,6 +130,25 @@ class User(db.Model):
         )
 
 
+class PasswordChangeRequest(db.Model):
+    __tablename__ = "password_change_requests"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(
+        db.String(50),
+        db.ForeignKey("users.user_id"),
+        nullable=False,
+        index=True,
+    )
+    new_password_hash = db.Column(db.String(255), nullable=False)
+    verification_code = db.Column(db.String(12), nullable=False)
+    expires_at = db.Column(db.DateTime, nullable=False, index=True)
+    attempt_count = db.Column(db.Integer, nullable=False, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    user = db.relationship("User", backref="password_change_requests")
+
+
 # ==========================================================
 # TEAM
 # ==========================================================

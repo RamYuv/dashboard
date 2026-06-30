@@ -26,8 +26,8 @@ app2: Running (pid:5678)
         self.assertEqual(parsed["component_data"]["app1"]["run_status"], "Running")
         self.assertEqual(parsed["component_data"]["app2"]["run_status"], "Running")
 
-    def test_yellow_when_service_installed_but_no_apps_running(self):
-        parsed = self.fetcher.parse_output("No apps are running")
+    def test_yellow_when_output_reports_no_instances_running(self):
+        parsed = self.fetcher.parse_output("No instances running")
         self.assertEqual(parsed["vm_color"], "Yellow")
         self.assertEqual(parsed["component_data"], {})
 
@@ -39,6 +39,17 @@ app2: NotRunning
 """.strip()
         )
         self.assertEqual(parsed["vm_color"], "Red")
+        self.assertEqual(parsed["component_data"]["app2"]["run_status"], "NotRunning")
+
+    def test_red_when_all_reported_apps_are_not_running(self):
+        parsed = self.fetcher.parse_output(
+            """
+app1: NotRunning
+app2: NotRunning
+""".strip()
+        )
+        self.assertEqual(parsed["vm_color"], "Red")
+        self.assertEqual(parsed["component_data"]["app1"]["run_status"], "NotRunning")
         self.assertEqual(parsed["component_data"]["app2"]["run_status"], "NotRunning")
 
     def test_black_when_command_not_found(self):

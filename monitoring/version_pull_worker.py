@@ -65,6 +65,151 @@ class VersionPullWorker:
         )
         return mappings
 
+    def _group_mappings_by_environment(self, mappings):
+        grouped = []
+        current_env_id = None
+        current_group = None
+
+        for mapping in mappings:
+            env_id = getattr(mapping, "env_id", None)
+            if env_id != current_env_id:
+                current_env_id = env_id
+                current_group = {"env_id": env_id, "mappings": []}
+                grouped.append(current_group)
+            current_group["mappings"].append(mapping)
+
+        return grouped
+
+    def _resolve_host_connection(self, mapping):
+        host = mapping.host
+        if not host:
+            return None, None
+
+        hostname = (host.ip_address or "").strip() or (host.hostname or "").strip() or None
+        host_label = (host.hostname or "").strip() or hostname
+        return hostname, host_label
+
+    def _resolve_mapping_target(self, mapping):
+        server_type_key = mapping.server_type.server_type_key if mapping.server_type else None
+        target_key = mapping.server_type.target_key if mapping.server_type else None
+        target_def = get_target_definition(target_key)
+        if not target_def:
+            return None
+
+        lookup, packages = self._build_package_lookup(target_def)
+        return {
+            "server_type_key": server_type_key,
+            "target_key": target_key,
+            "lookup": lookup,
+            "packages": packages,
+        }
+
+    def _upsert_version_rows(
+        self,
+        mapping,
+        target_info,
+        versions_map,
+        raw_output,
+        deployment_details,
+    ):
+        created = 0
+        updated = 0
+        skipped = 0
+
+        server_type_key = target_info["server_type_key"]
+        target_key = target_info["target_key"]
+        lookup = target_info["lookup"]
+        packages = target_info["packages"]
+        testing_mode = (deployment_details.get("mode") or "").strip()
+        service_types = deployment_details.get("service_types") or []
+
+        for comp_name, comp_version in (versions_map or {}).items():
+            normalized_name = (comp_name or "").strip()
+            package_key = lookup.get(normalized_name) or lookup.get(normalized_name.lower())
+            if package_key is None and server_type_key:
+                package_key = lookup.get(server_type_key) or lookup.get(server_type_key.lower())
+            if package_key is None and len(packages) == 1:
+                package_key = next(iter(packages.keys()))
+            if package_key is None:
+                skipped += 1
+                continue
+
+            package_name = packages.get(package_key, {}).get("package_name") or package_key
+            state = CurrentDeploymentState.query.filter_by(
+                env_scope_type="ENV",
+                env_id=mapping.env_id,
+                env_type=mapping.env_type,
+                environment_host_mapping_id=mapping.environment_host_mapping_id,
+                package_key=package_key,
+            ).first()
+
+            resolved_mode = testing_mode if target_key == "TCS_APP" else ""
+            resolved_service_types = service_types if target_key == "TCS_APP" else []
+
+            if state is None:
+                state = CurrentDeploymentState(
+                    env_scope_type="ENV",
+                    env_id=mapping.env_id,
+                    env_type=mapping.env_type,
+                    environment_host_mapping_id=mapping.environment_host_mapping_id,
+                    target_key=target_key,
+                    package_key=package_key,
+                    package_name=package_name,
+                    current_version=comp_version,
+                    testing_mode=resolved_mode,
+                    source="PULL",
+                    status="CURRENT",
+                    notes=(raw_output or "")[:4000],
+                )
+                state.set_service_types(resolved_service_types)
+                db.session.add(state)
+                created += 1
+                continue
+
+            mode_changed = (state.testing_mode or "") != resolved_mode
+            service_types_changed = state.get_service_types() != resolved_service_types
+            if (
+                (state.current_version or "") != (comp_version or "") or
+                (state.source or "") != "PULL" or
+                mode_changed or
+                service_types_changed
+            ):
+                state.current_version = comp_version
+                state.testing_mode = resolved_mode
+                state.set_service_types(resolved_service_types)
+                state.source = "PULL"
+                state.package_name = package_name
+                state.deployment_request_id = None
+                state.updated_by = None
+                state.notes = (raw_output or "")[:4000]
+                updated += 1
+
+        return {"created": created, "updated": updated, "skipped": skipped}
+
+    def _process_mapping(self, mapping):
+        hostname, host_label = self._resolve_host_connection(mapping)
+        if not hostname:
+            return {"created": 0, "updated": 0, "skipped": 1}
+
+        target_info = self._resolve_mapping_target(mapping)
+        if not target_info:
+            return {"created": 0, "updated": 0, "skipped": 1}
+
+        parsed_output = self.version_fetcher.fetch_version_details(
+            hostname,
+            mapping.deployment_user or "",
+            mapping.deployment_password or "",
+            server_type=target_info["server_type_key"],
+            host_label=host_label,
+        )
+        return self._upsert_version_rows(
+            mapping,
+            target_info,
+            parsed_output.get("versions") or {},
+            parsed_output.get("raw_output") or "",
+            parsed_output.get("deployment_details") or {},
+        )
+
     def refresh(self):
         """Run one version pull pass and persist discovered versions."""
         created = 0
@@ -72,99 +217,14 @@ class VersionPullWorker:
         skipped = 0
 
         mappings = self._load_mappings()
-        for mapping in mappings:
-            host = mapping.host
-            if not host:
-                skipped += 1
-                continue
-            hostname = (host.ip_address or "").strip() or (host.hostname or "").strip()
-            username = mapping.deployment_user or ""
-            password = mapping.deployment_password or ""
+        environment_groups = self._group_mappings_by_environment(mappings)
 
-            server_type_key = mapping.server_type.server_type_key if mapping.server_type else None
-            target_key = mapping.server_type.target_key if mapping.server_type else None
-            target_def = get_target_definition(target_key)
-            if not target_def:
-                skipped += 1
-                continue
-
-            lookup, packages = self._build_package_lookup(target_def)
-
-            versions_map, raw = self.version_fetcher.fetch_versions(
-                hostname, username, password, server_type=server_type_key, host_label=host.hostname
-            )
-            parsed_output = self.version_fetcher.parse_output(raw)
-            deployment_details = parsed_output.get("deployment_details") or {}
-            testing_mode = (deployment_details.get("mode") or "").strip()
-            service_types = deployment_details.get("service_types") or []
-
-            # For each component found, try to resolve to a package_key
-            for comp_name, comp_version in (versions_map or {}).items():
-                normalized_name = (comp_name or "").strip()
-                package_key = lookup.get(normalized_name) or lookup.get(normalized_name.lower())
-                if package_key is None and server_type_key:
-                    package_key = lookup.get(server_type_key) or lookup.get(server_type_key.lower())
-                # If not found, and target only has one package, use it
-                if package_key is None and len(packages) == 1:
-                    package_key = next(iter(packages.keys()))
-                if package_key is None:
-                    # Cannot resolve component to a configured package; skip
-                    skipped += 1
-                    continue
-
-                package_name = packages.get(package_key, {}).get("package_name") or package_key
-
-                # Upsert CurrentDeploymentState for this mapping + package_key
-                state = CurrentDeploymentState.query.filter_by(
-                    env_scope_type="ENV",
-                    env_id=mapping.env_id,
-                    env_type=mapping.env_type,
-                    environment_host_mapping_id=mapping.environment_host_mapping_id,
-                    package_key=package_key,
-                ).first()
-                if state is None:
-                    state = CurrentDeploymentState(
-                        env_scope_type="ENV",
-                        env_id=mapping.env_id,
-                        env_type=mapping.env_type,
-                        environment_host_mapping_id=mapping.environment_host_mapping_id,
-                        target_key=target_key,
-                        package_key=package_key,
-                        package_name=package_name,
-                        current_version=comp_version,
-                        testing_mode=testing_mode if target_key == "TCS_APP" else "",
-                        source="PULL",
-                        status="CURRENT",
-                        notes=(raw or "")[:4000],
-                    )
-                    state.set_service_types(service_types if target_key == "TCS_APP" else [])
-                    db.session.add(state)
-                    created += 1
-                else:
-                    # Update only if version differs or source isn't PULL.
-                    mode_changed = (state.testing_mode or "") != (
-                        testing_mode if target_key == "TCS_APP" else ""
-                    )
-                    service_types_changed = state.get_service_types() != (
-                        service_types if target_key == "TCS_APP" else []
-                    )
-                    if (
-                        (state.current_version or "") != (comp_version or "") or
-                        (state.source or "") != "PULL" or
-                        mode_changed or
-                        service_types_changed
-                    ):
-                        state.current_version = comp_version
-                        state.testing_mode = testing_mode if target_key == "TCS_APP" else ""
-                        state.set_service_types(service_types if target_key == "TCS_APP" else [])
-                        state.source = "PULL"
-                        state.package_name = package_name
-                        # Clear provenance fields since this value now reflects
-                        # an observed pull rather than a deployment request.
-                        state.deployment_request_id = None
-                        state.updated_by = None
-                        state.notes = (raw or "")[:4000]
-                        updated += 1
+        for environment_group in environment_groups:
+            for mapping in environment_group["mappings"]:
+                summary = self._process_mapping(mapping)
+                created += summary["created"]
+                updated += summary["updated"]
+                skipped += summary["skipped"]
 
         try:
             db.session.commit()

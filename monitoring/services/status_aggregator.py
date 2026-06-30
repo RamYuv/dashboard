@@ -15,15 +15,27 @@ class EnvStatusAggregator:
 
     def _calculate_env_color(self, vm_colors: List[str]) -> str:
         """Derive one overall environment color from a list of VM colors."""
-        env_color = "Green"
-        for vm_color in vm_colors:
-            if vm_color == "Red":
-                return "Red"
-            if vm_color == "Yellow" and env_color == "Green":
-                env_color = "Yellow"
-            elif vm_color == "Black" and env_color in ["Green", "Yellow"]:
-                env_color = "Black"
-        return env_color
+        normalized_colors = [str(vm_color or "Black") for vm_color in vm_colors]
+        if not normalized_colors:
+            return "Black"
+
+        if "Red" in normalized_colors:
+            return "Red"
+
+        has_green = "Green" in normalized_colors
+        has_yellow = "Yellow" in normalized_colors
+        has_black = "Black" in normalized_colors
+
+        # If one server in an environment is healthy while another is idle,
+        # the environment is partially down and should be surfaced as critical.
+        if has_green and has_yellow:
+            return "Red"
+
+        if has_black:
+            return "Black"
+        if has_yellow:
+            return "Yellow"
+        return "Green"
 
     def _summarize_components(self, vm_details: Dict[str, Any]) -> Dict[str, int]:
         """Count component run states across all VM details in one environment."""

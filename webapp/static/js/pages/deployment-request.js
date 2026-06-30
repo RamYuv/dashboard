@@ -50,6 +50,28 @@
         }
     }
 
+    function applyDateRestrictions() {
+        common.applyMinDate("formStartDate");
+    }
+
+    function showPastTimePopup() {
+        window.alert("Previous time is not allowed.");
+    }
+
+    function validateDateNotInPast() {
+        return common.validateNoPastDate("formStartDate", function () {
+            showFormMessage("Previous booking date is not allowed.", "danger");
+            window.alert("Previous booking date is not allowed.");
+        });
+    }
+
+    function validateTimeNotInPast() {
+        return common.validateNoPastDateTime("formStartDate", "formStartTime", function () {
+            showFormMessage("Previous time is not allowed.", "danger");
+            showPastTimePopup();
+        });
+    }
+
     function isEnvScopedReservation(payload) {
         return payload &&
             payload.env_id &&
@@ -324,6 +346,13 @@
         if (!payload.planned_start_time) {
             return "Planned start time is required.";
         }
+        if (common.isPastDateTimeSelection(
+            document.getElementById("formStartDate").value,
+            document.getElementById("formStartTime").value
+        )) {
+            showPastTimePopup();
+            return "Previous time is not allowed.";
+        }
         if (!payload.env_id) {
             return deploymentMode === "tools"
                 ? "Tool environment is required."
@@ -470,7 +499,21 @@
             });
         }
 
+        applyDateRestrictions();
         applyDefaultStartTime(false);
+        const startDateField = document.getElementById("formStartDate");
+        const startTimeField = document.getElementById("formStartTime");
+        if (startDateField) {
+            startDateField.addEventListener("change", function () {
+                validateDateNotInPast();
+                validateTimeNotInPast();
+            });
+        }
+        if (startTimeField) {
+            startTimeField.addEventListener("change", function () {
+                validateTimeNotInPast();
+            });
+        }
         const envTypeField = document.getElementById("formEnvType");
         if (envTypeField) {
             envTypeField.addEventListener("change", function () {

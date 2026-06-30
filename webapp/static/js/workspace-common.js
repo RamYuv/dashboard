@@ -136,6 +136,10 @@
         };
     }
 
+    function getTodayDateString() {
+        return buildLocalDateTimeParts({ slotMinutes: 30, roundUp: false }).date;
+    }
+
     function populateTimeSlotOptions(config) {
         const select = typeof config.selectId === "string"
             ? document.getElementById(config.selectId)
@@ -169,6 +173,68 @@
             return "";
         }
         return dateValue + "T" + timeValue;
+    }
+
+    function isPastDateTimeSelection(dateValue, timeValue) {
+        const combined = combineLocalDateAndTime(dateValue, timeValue);
+        if (!combined) {
+            return false;
+        }
+
+        return new Date(combined).getTime() < Date.now();
+    }
+
+    function applyMinDate(input) {
+        const resolvedInput = typeof input === "string"
+            ? document.getElementById(input)
+            : input;
+        if (!resolvedInput) {
+            return;
+        }
+
+        resolvedInput.min = getTodayDateString();
+    }
+
+    function validateNoPastDate(input, onInvalid) {
+        const resolvedInput = typeof input === "string"
+            ? document.getElementById(input)
+            : input;
+        if (!resolvedInput || !resolvedInput.value) {
+            return true;
+        }
+
+        const today = getTodayDateString();
+        if (resolvedInput.value >= today) {
+            return true;
+        }
+
+        resolvedInput.value = today;
+        if (typeof onInvalid === "function") {
+            onInvalid();
+        }
+        return false;
+    }
+
+    function validateNoPastDateTime(dateInput, timeInput, onInvalid) {
+        const resolvedDateInput = typeof dateInput === "string"
+            ? document.getElementById(dateInput)
+            : dateInput;
+        const resolvedTimeInput = typeof timeInput === "string"
+            ? document.getElementById(timeInput)
+            : timeInput;
+        if (!resolvedDateInput || !resolvedTimeInput || !resolvedDateInput.value || !resolvedTimeInput.value) {
+            return true;
+        }
+
+        if (!isPastDateTimeSelection(resolvedDateInput.value, resolvedTimeInput.value)) {
+            return true;
+        }
+
+        resolvedTimeInput.value = "";
+        if (typeof onInvalid === "function") {
+            onInvalid();
+        }
+        return false;
     }
 
     function populateEnvironmentOptions(config) {
@@ -260,6 +326,7 @@
     window.WorkspaceCommon = {
         clearHost: clearHost,
         combineLocalDateAndTime: combineLocalDateAndTime,
+        applyMinDate: applyMinDate,
         buildLocalDateTimeParts: buildLocalDateTimeParts,
         buildLocalDateValue: buildLocalDateValue,
         escapeHtml: escapeHtml,
@@ -267,15 +334,19 @@
         buildLocalDateTimeValue: buildLocalDateTimeValue,
         formatDisplayDate: formatDisplayDate,
         formatLocalInput: formatLocalInput,
+        getTodayDateString: getTodayDateString,
         getUserTimezone: getUserTimezone,
         initDateTimeTimezoneHints: initDateTimeTimezoneHints,
         inferEnvType: inferEnvType,
+        isPastDateTimeSelection: isPastDateTimeSelection,
         parseJsonResponse: parseJsonResponse,
         populateEnvironmentOptions: populateEnvironmentOptions,
         populateTimeSlotOptions: populateTimeSlotOptions,
         resetSelect: resetSelect,
         setInlineMessage: setInlineMessage,
         showAlertHost: showAlertHost,
+        validateNoPastDate: validateNoPastDate,
+        validateNoPastDateTime: validateNoPastDateTime,
     };
 
     document.addEventListener("DOMContentLoaded", initDateTimeTimezoneHints);

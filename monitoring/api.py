@@ -61,15 +61,17 @@ def _status_label(normalized_status):
 def _version_sort_key(version):
     value = (version or "").strip()
     if not value:
-        return ((), -1, "")
+        return (-1, -1, (), "")
 
     numeric_parts = tuple(
         int(part)
         for part in re.findall(r"\d+", value)
     )
+    version_date = _extract_version_date(value)
+    date_number = int(version_date) if version_date else -1
     patch_match = re.search(r"_patch(\d+)", value, re.IGNORECASE)
     patch_number = int(patch_match.group(1)) if patch_match else 0
-    return (numeric_parts, patch_number, value.lower())
+    return (date_number, patch_number, numeric_parts, value.lower())
 
 
 def _preferred_tcs_version(versions):
@@ -77,6 +79,11 @@ def _preferred_tcs_version(versions):
     if not candidates:
         return ""
     return max(candidates, key=_version_sort_key)
+
+
+def _display_all_tcs_versions(versions):
+    candidates = [value.strip() for value in (versions or []) if (value or "").strip()]
+    return ", ".join(candidates)
 
 
 def _extract_version_date(version):
@@ -97,14 +104,9 @@ def _display_tcs_version(versions):
     if len(set(candidates)) == 1:
         return candidates[0]
 
-    dated_candidates = [
-        version_date
-        for version_date in (_extract_version_date(value) for value in candidates)
-        if version_date
-    ]
-    if dated_candidates:
-        return max(dated_candidates)
-
+    # If you later want the tooltip to show every discovered version instead of
+    # picking the latest one, replace the return below with:
+    # return _display_all_tcs_versions(candidates)
     return _preferred_tcs_version(candidates)
 
 

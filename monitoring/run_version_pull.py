@@ -22,11 +22,9 @@ logger = logging.getLogger(__name__)
 
 
 def run_once():
-    # Use a minimal monitoring-only app to avoid bootstrapping the full web
-    # application (and avoid triggering unrelated monitoring refreshes).
+    """Create the monitoring app, run one version pull, and return the summary."""
     app = create_monitoring_app()
     with app.app_context():
-        # prefer the container's version_worker if available (wires executor)
         worker = getattr(app.container, "version_worker", None) or VersionPullWorker(app)
         summary = worker.refresh()
         logger.info("Version pull completed: %s", summary)
@@ -36,8 +34,7 @@ def run_once():
 def main():
     logging.basicConfig(level=logging.INFO)
     try:
-        summary = run_once()
-        # Treat non-empty summary as success
+        run_once()
         sys.exit(0)
     except Exception:
         logger.exception("Version pull runner failed.")

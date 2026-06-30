@@ -11,7 +11,10 @@
     const RUNTIME_EMPTY_MESSAGE = "No current TCS runtime details were found for the selected environment.";
     const RUNTIME_ERROR_MESSAGE = "Unable to load current TCS runtime right now.";
     let cachedBookings = [];
-    const initialEnvId = new URLSearchParams(window.location.search).get("env_id") || "";
+    const queryParams = new URLSearchParams(window.location.search);
+    const initialEnvId = queryParams.get("env_id") || "";
+    const initialStart = queryParams.get("start") || "";
+    const initialEnd = queryParams.get("end") || "";
     let runtimeRequestToken = 0;
     let availabilityToast = null;
     const elements = {};
@@ -244,6 +247,45 @@
         }
     }
 
+    function applyDateRestrictions() {
+        common.applyMinDate(elements.startDate);
+        common.applyMinDate(elements.endDate);
+    }
+
+    function showPastTimePopup() {
+        window.alert("Previous time is not allowed.");
+    }
+
+    function validateDateNotInPast(dateElement) {
+        return common.validateNoPastDate(dateElement, function () {
+            showFormMessage("Previous booking date is not allowed.", "danger");
+            window.alert("Previous booking date is not allowed.");
+        });
+    }
+
+    function validateTimeNotInPast(dateElement, timeElement) {
+        return common.validateNoPastDateTime(dateElement, timeElement, function () {
+            showFormMessage("Previous time is not allowed.", "danger");
+            showPastTimePopup();
+        });
+    }
+
+    function validateBookingWindowNotInPast() {
+        if (common.isPastDateTimeSelection(elements.startDate.value, elements.startTime.value)) {
+            showFormMessage("Previous time is not allowed.", "danger");
+            showPastTimePopup();
+            return false;
+        }
+
+        if (common.isPastDateTimeSelection(elements.endDate.value, elements.endTime.value)) {
+            showFormMessage("Previous time is not allowed.", "danger");
+            showPastTimePopup();
+            return false;
+        }
+
+        return true;
+    }
+
     function applyInitialEnvironmentSelection() {
         if (!initialEnvId) {
             return;
@@ -264,6 +306,51 @@
             "Environment " + selectedEnvironment.env_id + " was preselected from the health dashboard.",
             "muted"
         );
+    }
+
+    function splitLocalDateTime(value) {
+        const rawValue = String(value || "").trim();
+        if (!rawValue || rawValue.indexOf("T") === -1) {
+            return null;
+        }
+
+        const parts = rawValue.split("T");
+        const dateValue = parts[0] || "";
+        const timeValue = (parts[1] || "").slice(0, 5);
+        if (!dateValue || !timeValue) {
+            return null;
+        }
+
+        return {
+            date: dateValue,
+            time: timeValue,
+        };
+    }
+
+    function applyInitialDateRangeSelection() {
+        const startParts = splitLocalDateTime(initialStart);
+        const endParts = splitLocalDateTime(initialEnd);
+        if (!startParts) {
+            return;
+        }
+
+        if (elements.startDate) {
+            elements.startDate.value = startParts.date;
+        }
+        if (elements.startTime) {
+            elements.startTime.value = startParts.time;
+        }
+
+        if (endParts) {
+            if (elements.endDate) {
+                elements.endDate.value = endParts.date;
+            }
+            if (elements.endTime) {
+                elements.endTime.value = endParts.time;
+            }
+        }
+
+        showFormMessage("Booking window was prefilled from the calendar selection.", "muted");
     }
 
     function showFormMessage(message, type) {
@@ -330,6 +417,10 @@
             return;
         }
 
+        if (!validateBookingWindowNotInPast()) {
+            return;
+        }
+
         if (hasInvalidTimeRange(values.startTime, values.endTime)) {
             showFormMessage("End time must be after start time.", "danger");
             return;
@@ -380,6 +471,10 @@
 
         if (!values.startTime || !values.endTime || !values.envId) {
             showFormMessage("Please fill start date/time, end date/time, and environment.", "danger");
+            return;
+        }
+
+        if (!validateBookingWindowNotInPast()) {
             return;
         }
 
@@ -436,11 +531,30 @@
         elements.envId.addEventListener("change", function () {
             loadCurrentTcsRuntime(this.value);
         });
+        elements.startDate.addEventListener("change", function () {
+            validateDateNotInPast(elements.startDate);
+            if (elements.endDate && elements.endDate.value && elements.endDate.value < elements.startDate.value) {
+                elements.endDate.value = elements.startDate.value;
+            }
+            validateTimeNotInPast(elements.startDate, elements.startTime);
+        });
+        elements.endDate.addEventListener("change", function () {
+            validateDateNotInPast(elements.endDate);
+            validateTimeNotInPast(elements.endDate, elements.endTime);
+        });
+        elements.startTime.addEventListener("change", function () {
+            validateTimeNotInPast(elements.startDate, elements.startTime);
+        });
+        elements.endTime.addEventListener("change", function () {
+            validateTimeNotInPast(elements.endDate, elements.endTime);
+        });
         elements.checkAvailabilityBtn.addEventListener("click", checkAvailability);
         elements.form.addEventListener("submit", handleQuickBookingSubmit);
 
         populateQuickEnvOptions("");
+        applyDateRestrictions();
         applyDefaultDateTimeValues(false);
+        applyInitialDateRangeSelection();
         showRuntimePlaceholder(RUNTIME_PLACEHOLDER_MESSAGE);
         fetchBookingList();
         updatePolicyHint();

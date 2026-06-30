@@ -51,11 +51,15 @@ class VmStatusFetcher:
         result = self.executor.run(host, username, password, command)
         if not result.ok:
             logger.warning(
-                "Monitoring command %s failed for host %s exit_code=%s stderr=%s",
+                "Monitoring command %s failed for host=%s user=%s server_type=%s exit_code=%s stderr=%s stdout=%s combined_output=%s",
                 command_name,
                 host,
+                username or "n/a",
+                server_type or "n/a",
                 result.exit_code,
                 (result.stderr or "").strip() or "n/a",
+                (result.stdout or "").strip() or "n/a",
+                (result.combined_output or "").strip() or "n/a",
             )
             return result.combined_output or REMOTE_EXECUTION_FAILED_OUTPUT
         return result.stdout or result.combined_output
@@ -94,7 +98,10 @@ class VmStatusFetcher:
         if "command not found" in normalized:
             vm_status["vm_color"] = "Black"
             return vm_status
-        if "no instances running" in normalized:
+        if (
+            "no instances are running" in normalized or
+            "no instances running" in normalized
+        ):
             vm_status["vm_color"] = "Yellow"
             return vm_status
 
@@ -134,7 +141,7 @@ class VmStatusFetcher:
             vm_status["component_data"] = comp_data
             return vm_status
         if not_running_count == len(comp_data):
-            status_color = "Yellow"
+            status_color = "Red"
         elif not_running_count > 0:
             status_color = "Red"
         else:

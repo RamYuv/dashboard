@@ -191,13 +191,16 @@ class VersionFetcher:
 
     def _select_preferred_version(self, versions_raw):
         candidates = [
-            token.strip()
+            token.strip().rstrip(",")
             for token in re.split(r"\s+", versions_raw or "")
-            if token.strip()
+            if token.strip().rstrip(",")
         ]
         if not candidates:
             return None
 
+        # The deployment command already emits versions in priority order.
+        # Persist only the first version token so downstream UI logic can
+        # display one resolved value per host instead of a raw version list.
         return candidates[0]
 
     def fetch_versions(self, host, username, password, server_type=None, host_label=None):
@@ -215,3 +218,23 @@ class VersionFetcher:
         except Exception:
             logger.exception("Failed to fetch version info for host %s.", host)
             return {}, ""
+
+    def fetch_version_details(self, host, username, password, server_type=None, host_label=None):
+        """Fetch and parse version information for one host as a structured payload."""
+        _ = host_label
+        try:
+            output = self.execute_command(
+                "version_info",
+                host,
+                username,
+                password,
+                server_type=server_type,
+            )
+            return self.parse_output(output)
+        except Exception:
+            logger.exception("Failed to fetch version details for host %s.", host)
+            return {
+                "versions": {},
+                "deployment_details": {"mode": "", "service_types": []},
+                "raw_output": "",
+            }

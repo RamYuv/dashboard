@@ -1,6 +1,8 @@
 import logging
+import random
+from datetime import datetime, timedelta
 
-from flask import flash, redirect, render_template, request, session, url_for
+from flask import flash, jsonify, redirect, render_template, request, session, url_for
 from sqlalchemy.exc import IntegrityError
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -8,10 +10,14 @@ from .blueprint import main_bp
 from ..auth_service import current_user, login_required
 from ..constants import VALID_TEAMS
 from ..helpers import normalize_role, normalize_team
-from ..models import Team, TeamMember, User, db
+from ..models import PasswordChangeRequest, Team, TeamMember, User, db
+from ..services.email_service import EmailDeliveryError, SendmailEmailService
 
 
 logger = logging.getLogger(__name__)
+PASSWORD_CHANGE_SESSION_KEY = "password_change_otp"
+FORGOT_PASSWORD_SESSION_KEY = "forgot_password_otp"
+PASSWORD_CHANGE_OTP_TTL_SECONDS = 120
 
 
 def _registration_team_choices():
@@ -25,8 +31,141 @@ def _render_register_page(team_choices):
     return render_template("register.html", team_choices=team_choices)
 
 
-def _render_change_password_page(user):
-    return render_template("change_password.html", user=user)
+def _render_password_page(mode, user=None):
+    is_forgot_password = mode == "forgot-password"
+    return render_template(
+        "change_password.html",
+        user=user,
+        page_mode=mode,
+        page_title="Forgot Password" if is_forgot_password else "Change Password",
+        page_heading="Forgot Password" if is_forgot_password else "Change Password",
+        page_description=(
+            "Enter your user ID, choose a new password, then verify with a code sent to your email."
+            if is_forgot_password
+            else "Update your password, then verify the change with a code sent to your email."
+        ),
+        submit_button_label="Send Verification Code",
+        cancel_url=url_for("main.login") if is_forgot_password else url_for("main.profile"),
+        cancel_label="Back to Login" if is_forgot_password else "Cancel",
+        success_redirect_url=url_for("main.login") if is_forgot_password else url_for("main.profile"),
+        request_url=url_for("main.forgot_password") if is_forgot_password else url_for("main.change_password"),
+        verify_url=(
+            url_for("main.verify_forgot_password")
+            if is_forgot_password
+            else url_for("main.verify_password_change")
+        ),
+    )
+
+
+def _validate_password_policy(password):
+    if not password:
+        return "New password is required."
+    if len(password) < 8:
+        return "Password must be at least 8 characters long."
+    if not any(char.isupper() for char in password):
+        return "Password must include at least one uppercase letter."
+    if not any(char.islower() for char in password):
+        return "Password must include at least one lowercase letter."
+    if not any(char.isdigit() for char in password):
+        return "Password must include at least one digit."
+    if not any(char in "@$!%*?&" for char in password):
+        return "Password must include at least one symbol (@$!%*?&)."
+    return None
+
+
+def _password_change_email_message(user, code):
+    return "\n".join([
+        "A password change was requested for your Envista account.",
+        "",
+        "User ID: {}".format(user.user_id),
+        "Verification code: {}".format(code),
+        "",
+        "This code will expire in 2 minutes.",
+        "If you did not request this change, please ignore this email.",
+    ])
+
+
+def _forgot_password_email_message(user, code):
+    return "\n".join([
+        "A password reset was requested for your Envista account.",
+        "",
+        "User ID: {}".format(user.user_id),
+        "Verification code: {}".format(code),
+        "",
+        "This code will expire in 2 minutes.",
+        "If you did not request this reset, please ignore this email.",
+    ])
+
+
+def _clear_otp_session(session_key):
+    session.pop(session_key, None)
+
+
+def _clear_password_change_session():
+    _clear_otp_session(PASSWORD_CHANGE_SESSION_KEY)
+
+
+def _clear_forgot_password_session():
+    _clear_otp_session(FORGOT_PASSWORD_SESSION_KEY)
+
+
+def _clear_pending_password_change_requests(user_id):
+    if not user_id:
+        return
+
+    PasswordChangeRequest.query.filter_by(user_id=user_id).delete()
+
+
+def _store_password_change_session(request_id):
+    session[PASSWORD_CHANGE_SESSION_KEY] = request_id
+    session.modified = True
+
+
+def _store_forgot_password_session(request_id):
+    session[FORGOT_PASSWORD_SESSION_KEY] = request_id
+    session.modified = True
+
+
+def _create_password_change_request(user, new_password_hash, code):
+    _clear_pending_password_change_requests(user.user_id)
+    pending_request = PasswordChangeRequest(
+        user_id=user.user_id,
+        new_password_hash=new_password_hash,
+        verification_code=str(code),
+        expires_at=datetime.utcnow() + timedelta(seconds=PASSWORD_CHANGE_OTP_TTL_SECONDS),
+        attempt_count=0,
+    )
+    db.session.add(pending_request)
+    db.session.commit()
+    return pending_request
+
+
+def _delete_pending_password_change_request(pending_request):
+    if pending_request is None:
+        return
+    db.session.delete(pending_request)
+    db.session.commit()
+
+
+def _load_pending_password_change_request():
+    request_id = session.get(PASSWORD_CHANGE_SESSION_KEY)
+    if not request_id:
+        return None
+    return db.session.get(PasswordChangeRequest, request_id)
+
+
+def _load_pending_forgot_password_request():
+    request_id = session.get(FORGOT_PASSWORD_SESSION_KEY)
+    if not request_id:
+        return None
+    return db.session.get(PasswordChangeRequest, request_id)
+
+
+def _find_user_by_username(username):
+    normalized_username = (username or "").strip().lower()
+    if not normalized_username:
+        return None
+    return User.query.filter_by(username=normalized_username).first()
 
 
 def _normalize_registration_form():
@@ -148,7 +287,7 @@ def login():
         username = request.form.get("username", "").strip().lower()
         password = request.form.get("password", "")
 
-        user = User.query.filter_by(username=username).first()
+        user = _find_user_by_username(username)
         if user is None or not check_password_hash(user.password_hash, password):
             logger.warning("Login failed for username %s", username or "unknown")
             flash("Invalid username or password.", "danger")
@@ -160,6 +299,68 @@ def login():
         return redirect(url_for("main.environment_health"))
 
     return render_template("login.html")
+
+
+@main_bp.route("/forgot-password", methods=["GET", "POST"])
+def forgot_password():
+    if request.method == "POST":
+        username = request.form.get("username", "")
+        new_password = request.form.get("new_password", "")
+        confirm_password = request.form.get("confirm_password", "")
+
+        user = _find_user_by_username(username)
+        if user is None:
+            return jsonify(success=False, error="User ID was not found."), 400
+
+        policy_error = _validate_password_policy(new_password)
+        if policy_error:
+            return jsonify(success=False, error=policy_error), 400
+
+        if new_password != confirm_password:
+            return jsonify(success=False, error="New password and confirm password do not match."), 400
+
+        recipient = (user.email_id or "").strip()
+        if not recipient:
+            return jsonify(
+                success=False,
+                error="Your account does not have an email address configured. Please contact support.",
+            ), 400
+
+        verification_code = random.randint(100000, 999999)
+        try:
+            SendmailEmailService.send_message(
+                subject="[Envista] Forgot password verification",
+                recipients=[recipient],
+                body=_forgot_password_email_message(user, verification_code),
+                reply_to=recipient,
+            )
+        except EmailDeliveryError as exc:
+            logger.exception(
+                "Forgot password verification email failed for user %s: %s",
+                user.user_id,
+                exc,
+            )
+            return jsonify(
+                success=False,
+                error="Unable to send the verification code right now. Please try again later.",
+            ), 500
+
+        pending_request = _create_password_change_request(
+            user,
+            generate_password_hash(new_password),
+            verification_code,
+        )
+        _store_forgot_password_session(pending_request.id)
+        logger.info("Forgot password verification initiated for user %s", user.user_id)
+        return jsonify(success=True)
+
+    request_id = session.get(FORGOT_PASSWORD_SESSION_KEY)
+    pending_request = db.session.get(PasswordChangeRequest, request_id) if request_id else None
+    _clear_forgot_password_session()
+    if pending_request is not None:
+        _clear_pending_password_change_requests(pending_request.user_id)
+        db.session.commit()
+    return _render_password_page("forgot-password")
 
 
 @main_bp.route("/logout")
@@ -182,6 +383,9 @@ def profile():
 @login_required
 def change_password():
     user = current_user()
+    if user is None:
+        _clear_password_change_session()
+        return redirect(url_for("main.login"))
 
     if request.method == "POST":
         current_password = request.form.get("current_password", "")
@@ -189,21 +393,114 @@ def change_password():
         confirm_password = request.form.get("confirm_password", "")
 
         if not check_password_hash(user.password_hash, current_password):
-            flash("Current password is incorrect.", "danger")
-            return _render_change_password_page(user)
+            return jsonify(success=False, error="Current password is incorrect."), 400
 
-        if not new_password:
-            flash("New password is required.", "danger")
-            return _render_change_password_page(user)
+        policy_error = _validate_password_policy(new_password)
+        if policy_error:
+            return jsonify(success=False, error=policy_error), 400
 
         if new_password != confirm_password:
-            flash("New password and confirm password do not match.", "danger")
-            return _render_change_password_page(user)
+            return jsonify(success=False, error="New password and confirm password do not match."), 400
 
-        user.password_hash = generate_password_hash(new_password)
-        db.session.commit()
-        logger.info("User %s changed password successfully", user.user_id)
-        flash("Password updated successfully.", "success")
-        return redirect(url_for("main.profile"))
+        recipient = (user.email_id or "").strip()
+        if not recipient:
+            return jsonify(
+                success=False,
+                error="Your account does not have an email address configured. Please contact support.",
+            ), 400
 
-    return _render_change_password_page(user)
+        verification_code = random.randint(100000, 999999)
+        try:
+            SendmailEmailService.send_message(
+                subject="[Envista] Password change verification",
+                recipients=[recipient],
+                body=_password_change_email_message(user, verification_code),
+                reply_to=recipient,
+            )
+        except EmailDeliveryError as exc:
+            logger.exception(
+                "Password change verification email failed for user %s: %s",
+                user.user_id,
+                exc,
+            )
+            return jsonify(
+                success=False,
+                error="Unable to send the verification code right now. Please try again later.",
+            ), 500
+
+        pending_request = _create_password_change_request(
+            user,
+            generate_password_hash(new_password),
+            verification_code,
+        )
+        _store_password_change_session(pending_request.id)
+        logger.info("Password change verification initiated for user %s", user.user_id)
+        return jsonify(success=True)
+
+    _clear_password_change_session()
+    _clear_pending_password_change_requests(user.user_id)
+    db.session.commit()
+    return _render_password_page("change-password", user=user)
+
+
+@main_bp.route("/verify-password-change", methods=["POST"])
+@login_required
+def verify_password_change():
+    user = current_user()
+    data = request.get_json(silent=True) or {}
+    submitted_code = str(data.get("code", "")).strip()
+    if user is None:
+        _clear_password_change_session()
+        return jsonify(success=False, error="Your session expired. Please log in again."), 401
+
+    pending_change = _load_pending_password_change_request()
+
+    if not pending_change:
+        return jsonify(success=False, error="Verification session expired. Please start again."), 400
+    if pending_change.user_id != user.user_id:
+        _clear_password_change_session()
+        return jsonify(success=False, error="Verification session is invalid for this user."), 400
+    if pending_change.expires_at < datetime.utcnow():
+        _delete_pending_password_change_request(pending_change)
+        _clear_password_change_session()
+        return jsonify(success=False, error="Verification code expired. Please start again."), 400
+    if submitted_code != str(pending_change.verification_code):
+        return jsonify(success=False, error="Invalid verification code."), 400
+
+    user.password_hash = pending_change.new_password_hash or user.password_hash
+    db.session.delete(pending_change)
+    db.session.commit()
+    _clear_password_change_session()
+    logger.info("User %s changed password successfully via OTP verification", user.user_id)
+    return jsonify(success=True)
+
+
+@main_bp.route("/verify-forgot-password", methods=["POST"])
+def verify_forgot_password():
+    data = request.get_json(silent=True) or {}
+    submitted_code = str(data.get("code", "")).strip()
+    pending_change = _load_pending_forgot_password_request()
+
+    if not pending_change:
+        return jsonify(success=False, error="Verification session expired. Please start again."), 400
+
+    if pending_change.expires_at < datetime.utcnow():
+        _delete_pending_password_change_request(pending_change)
+        _clear_forgot_password_session()
+        return jsonify(success=False, error="Verification code expired. Please start again."), 400
+
+    if submitted_code != str(pending_change.verification_code):
+        return jsonify(success=False, error="Invalid verification code."), 400
+
+    user = db.session.get(User, pending_change.user_id)
+    if user is None:
+        _delete_pending_password_change_request(pending_change)
+        _clear_forgot_password_session()
+        return jsonify(success=False, error="User account was not found."), 400
+
+    user.password_hash = pending_change.new_password_hash or user.password_hash
+    db.session.delete(pending_change)
+    db.session.commit()
+    _clear_forgot_password_session()
+    logger.info("User %s reset password successfully via forgot-password OTP", user.user_id)
+    return jsonify(success=True)

@@ -3,7 +3,7 @@ Booking service for managing environment reservations.
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 try:
     from zoneinfo import ZoneInfo
@@ -91,12 +91,12 @@ class BookingService:
         try:
             return ZoneInfo(timezone_name), timezone_name
         except Exception:
-            return ZoneInfo("UTC"), "UTC"
+            return timezone.utc, "UTC"
 
     @staticmethod
     def _format_booking_time(booking_time, booking):
         timezone_info, timezone_name = BookingService._resolve_display_timezone(booking)
-        utc_value = booking_time.replace(tzinfo=ZoneInfo("UTC"))
+        utc_value = booking_time.replace(tzinfo=timezone.utc)
         local_value = utc_value.astimezone(timezone_info)
         return "{} ({})".format(local_value.strftime("%Y-%m-%d %H:%M"), timezone_name)
 
