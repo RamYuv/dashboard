@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 
 from flask import flash, jsonify, redirect, render_template, request, session, url_for
 from sqlalchemy.exc import IntegrityError
-from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash as generate_hzn_hash
 
 from .blueprint import main_bp
 from ..auth_service import current_user, login_required
@@ -15,9 +15,9 @@ from ..services.email_service import EmailDeliveryError, SendmailEmailService
 
 
 logger = logging.getLogger(__name__)
-PASSWORD_CHANGE_SESSION_KEY = "password_change_otp"
-FORGOT_PASSWORD_SESSION_KEY = "forgot_password_otp"
-PASSWORD_CHANGE_OTP_TTL_SECONDS = 120
+HZN_CHANGE_SESSION_KEY = "password_change_otp"
+FORGOT_HZN_SESSION_KEY = "forgot_password_otp"
+HZN_CHANGE_OTP_TTL_SECONDS = 120
 
 
 def _registration_team_choices():
@@ -31,7 +31,7 @@ def _render_register_page(team_choices):
     return render_template("register.html", team_choices=team_choices)
 
 
-def _render_password_page(mode, user=None):
+def _render_hzn_page(mode, user=None):
     is_forgot_password = mode == "forgot-password"
     return render_template(
         "change_password.html",
@@ -48,16 +48,16 @@ def _render_password_page(mode, user=None):
         cancel_url=url_for("main.login") if is_forgot_password else url_for("main.profile"),
         cancel_label="Back to Login" if is_forgot_password else "Cancel",
         success_redirect_url=url_for("main.login") if is_forgot_password else url_for("main.profile"),
-        request_url=url_for("main.forgot_password") if is_forgot_password else url_for("main.change_password"),
+        request_url=url_for("main.forgot_hzn") if is_forgot_password else url_for("main.change_hzn"),
         verify_url=(
-            url_for("main.verify_forgot_password")
+            url_for("main.verify_forgot_hzn")
             if is_forgot_password
-            else url_for("main.verify_password_change")
+            else url_for("main.verify_hzn_change")
         ),
     )
 
 
-def _validate_password_policy(password):
+def _validate_hzn_policy(password):
     if not password:
         return "New password is required."
     if len(password) < 8:
@@ -73,7 +73,7 @@ def _validate_password_policy(password):
     return None
 
 
-def _password_change_email_message(user, code):
+def _hzn_change_email_message(user, code):
     return "\n".join([
         "A password change was requested for your Envista account.",
         "",
@@ -85,7 +85,7 @@ def _password_change_email_message(user, code):
     ])
 
 
-def _forgot_password_email_message(user, code):
+def _forgot_hzn_email_message(user, code):
     return "\n".join([
         "A password reset was requested for your Envista account.",
         "",
@@ -101,38 +101,38 @@ def _clear_otp_session(session_key):
     session.pop(session_key, None)
 
 
-def _clear_password_change_session():
-    _clear_otp_session(PASSWORD_CHANGE_SESSION_KEY)
+def _clear_hzn_change_session():
+    _clear_otp_session(HZN_CHANGE_SESSION_KEY)
 
 
-def _clear_forgot_password_session():
-    _clear_otp_session(FORGOT_PASSWORD_SESSION_KEY)
+def _clear_forgot_hzn_session():
+    _clear_otp_session(FORGOT_HZN_SESSION_KEY)
 
 
-def _clear_pending_password_change_requests(user_id):
+def _clear_pending_hzn_change_requests(user_id):
     if not user_id:
         return
 
     PasswordChangeRequest.query.filter_by(user_id=user_id).delete()
 
 
-def _store_password_change_session(request_id):
-    session[PASSWORD_CHANGE_SESSION_KEY] = request_id
+def _store_hzn_change_session(request_id):
+    session[HZN_CHANGE_SESSION_KEY] = request_id
     session.modified = True
 
 
-def _store_forgot_password_session(request_id):
-    session[FORGOT_PASSWORD_SESSION_KEY] = request_id
+def _store_forgot_hzn_session(request_id):
+    session[FORGOT_HZN_SESSION_KEY] = request_id
     session.modified = True
 
 
-def _create_password_change_request(user, new_password_hash, code):
-    _clear_pending_password_change_requests(user.user_id)
+def _create_hzn_change_request(user, new_hzn_hash, code):
+    _clear_pending_hzn_change_requests(user.user_id)
     pending_request = PasswordChangeRequest(
         user_id=user.user_id,
-        new_password_hash=new_password_hash,
+        new_hzn_hash=new_hzn_hash,
         verification_code=str(code),
-        expires_at=datetime.utcnow() + timedelta(seconds=PASSWORD_CHANGE_OTP_TTL_SECONDS),
+        expires_at=datetime.utcnow() + timedelta(seconds=HZN_CHANGE_OTP_TTL_SECONDS),
         attempt_count=0,
     )
     db.session.add(pending_request)
@@ -140,22 +140,22 @@ def _create_password_change_request(user, new_password_hash, code):
     return pending_request
 
 
-def _delete_pending_password_change_request(pending_request):
+def _delete_pending_hzn_change_request(pending_request):
     if pending_request is None:
         return
     db.session.delete(pending_request)
     db.session.commit()
 
 
-def _load_pending_password_change_request():
-    request_id = session.get(PASSWORD_CHANGE_SESSION_KEY)
+def _load_pending_hzn_change_request():
+    request_id = session.get(HZN_CHANGE_SESSION_KEY)
     if not request_id:
         return None
     return db.session.get(PasswordChangeRequest, request_id)
 
 
-def _load_pending_forgot_password_request():
-    request_id = session.get(FORGOT_PASSWORD_SESSION_KEY)
+def _load_pending_forgot_hzn_request():
+    request_id = session.get(FORGOT_HZN_SESSION_KEY)
     if not request_id:
         return None
     return db.session.get(PasswordChangeRequest, request_id)
@@ -175,7 +175,7 @@ def _normalize_registration_form():
         "username": request.form.get("user_id", "").strip().lower(),
         "email_id": request.form.get("email", "").strip().lower(),
         "password": request.form.get("password", ""),
-        "confirm_password": request.form.get("confirm_password", ""),
+        "confirm_hzn": request.form.get("confirm_hzn", ""),
         "team": normalize_team(request.form.get("team", "support")),
         "role": normalize_role("user"),
     }
@@ -214,7 +214,7 @@ def register():
             flash("First name, last name, user ID, email, and password are required.", "danger")
             return _render_register_page(team_choices)
 
-        if form_data["password"] != form_data["confirm_password"]:
+        if form_data["password"] != form_data["confirm_hzn"]:
             flash("Passwords do not match.", "danger")
             return _render_register_page(team_choices)
 
@@ -246,7 +246,7 @@ def register():
                 form_data["first_name"],
                 form_data["last_name"],
             ).strip(),
-            password_hash=generate_password_hash(form_data["password"]),
+            hzn_hash=generate_hzn_hash(form_data["password"]),
             role=form_data["role"],
         )
         db.session.add(user)
@@ -288,7 +288,7 @@ def login():
         password = request.form.get("password", "")
 
         user = _find_user_by_username(username)
-        if user is None or not check_password_hash(user.password_hash, password):
+        if user is None or not check_password_hash(user.hzn_hash, password):
             logger.warning("Login failed for username %s", username or "unknown")
             flash("Invalid username or password.", "danger")
             return render_template("login.html")
@@ -302,21 +302,21 @@ def login():
 
 
 @main_bp.route("/forgot-password", methods=["GET", "POST"])
-def forgot_password():
+def forgot_hzn():
     if request.method == "POST":
         username = request.form.get("username", "")
-        new_password = request.form.get("new_password", "")
-        confirm_password = request.form.get("confirm_password", "")
+        new_hzn = request.form.get("new_hzn", "")
+        confirm_hzn = request.form.get("confirm_hzn", "")
 
         user = _find_user_by_username(username)
         if user is None:
             return jsonify(success=False, error="User ID was not found."), 400
 
-        policy_error = _validate_password_policy(new_password)
+        policy_error = _validate_hzn_policy(new_hzn)
         if policy_error:
             return jsonify(success=False, error=policy_error), 400
 
-        if new_password != confirm_password:
+        if new_hzn != confirm_hzn:
             return jsonify(success=False, error="New password and confirm password do not match."), 400
 
         recipient = (user.email_id or "").strip()
@@ -331,7 +331,7 @@ def forgot_password():
             SendmailEmailService.send_message(
                 subject="[Envista] Forgot password verification",
                 recipients=[recipient],
-                body=_forgot_password_email_message(user, verification_code),
+                body=_forgot_hzn_email_message(user, verification_code),
                 reply_to=recipient,
             )
         except EmailDeliveryError as exc:
@@ -345,22 +345,22 @@ def forgot_password():
                 error="Unable to send the verification code right now. Please try again later.",
             ), 500
 
-        pending_request = _create_password_change_request(
+        pending_request = _create_hzn_change_request(
             user,
-            generate_password_hash(new_password),
+            generate_hzn_hash(new_hzn),
             verification_code,
         )
-        _store_forgot_password_session(pending_request.id)
+        _store_forgot_hzn_session(pending_request.id)
         logger.info("Forgot password verification initiated for user %s", user.user_id)
         return jsonify(success=True)
 
-    request_id = session.get(FORGOT_PASSWORD_SESSION_KEY)
+    request_id = session.get(FORGOT_HZN_SESSION_KEY)
     pending_request = db.session.get(PasswordChangeRequest, request_id) if request_id else None
-    _clear_forgot_password_session()
+    _clear_forgot_hzn_session()
     if pending_request is not None:
-        _clear_pending_password_change_requests(pending_request.user_id)
+        _clear_pending_hzn_change_requests(pending_request.user_id)
         db.session.commit()
-    return _render_password_page("forgot-password")
+    return _render_hzn_page("forgot-password")
 
 
 @main_bp.route("/logout")
@@ -381,25 +381,25 @@ def profile():
 
 @main_bp.route("/change-password", methods=["GET", "POST"])
 @login_required
-def change_password():
+def change_hzn():
     user = current_user()
     if user is None:
-        _clear_password_change_session()
+        _clear_hzn_change_session()
         return redirect(url_for("main.login"))
 
     if request.method == "POST":
         current_password = request.form.get("current_password", "")
-        new_password = request.form.get("new_password", "")
-        confirm_password = request.form.get("confirm_password", "")
+        new_hzn = request.form.get("new_hzn", "")
+        confirm_hzn = request.form.get("confirm_hzn", "")
 
-        if not check_password_hash(user.password_hash, current_password):
+        if not check_password_hash(user.hzn_hash, current_password):
             return jsonify(success=False, error="Current password is incorrect."), 400
 
-        policy_error = _validate_password_policy(new_password)
+        policy_error = _validate_hzn_policy(new_hzn)
         if policy_error:
             return jsonify(success=False, error=policy_error), 400
 
-        if new_password != confirm_password:
+        if new_hzn != confirm_hzn:
             return jsonify(success=False, error="New password and confirm password do not match."), 400
 
         recipient = (user.email_id or "").strip()
@@ -414,7 +414,7 @@ def change_password():
             SendmailEmailService.send_message(
                 subject="[Envista] Password change verification",
                 recipients=[recipient],
-                body=_password_change_email_message(user, verification_code),
+                body=_hzn_change_email_message(user, verification_code),
                 reply_to=recipient,
             )
         except EmailDeliveryError as exc:
@@ -428,65 +428,65 @@ def change_password():
                 error="Unable to send the verification code right now. Please try again later.",
             ), 500
 
-        pending_request = _create_password_change_request(
+        pending_request = _create_hzn_change_request(
             user,
-            generate_password_hash(new_password),
+            generate_hzn_hash(new_hzn),
             verification_code,
         )
-        _store_password_change_session(pending_request.id)
+        _store_hzn_change_session(pending_request.id)
         logger.info("Password change verification initiated for user %s", user.user_id)
         return jsonify(success=True)
 
-    _clear_password_change_session()
-    _clear_pending_password_change_requests(user.user_id)
+    _clear_hzn_change_session()
+    _clear_pending_hzn_change_requests(user.user_id)
     db.session.commit()
-    return _render_password_page("change-password", user=user)
+    return _render_hzn_page("change-password", user=user)
 
 
 @main_bp.route("/verify-password-change", methods=["POST"])
 @login_required
-def verify_password_change():
+def verify_hzn_change():
     user = current_user()
     data = request.get_json(silent=True) or {}
     submitted_code = str(data.get("code", "")).strip()
     if user is None:
-        _clear_password_change_session()
+        _clear_hzn_change_session()
         return jsonify(success=False, error="Your session expired. Please log in again."), 401
 
-    pending_change = _load_pending_password_change_request()
+    pending_change = _load_pending_hzn_change_request()
 
     if not pending_change:
         return jsonify(success=False, error="Verification session expired. Please start again."), 400
     if pending_change.user_id != user.user_id:
-        _clear_password_change_session()
+        _clear_hzn_change_session()
         return jsonify(success=False, error="Verification session is invalid for this user."), 400
     if pending_change.expires_at < datetime.utcnow():
-        _delete_pending_password_change_request(pending_change)
-        _clear_password_change_session()
+        _delete_pending_hzn_change_request(pending_change)
+        _clear_hzn_change_session()
         return jsonify(success=False, error="Verification code expired. Please start again."), 400
     if submitted_code != str(pending_change.verification_code):
         return jsonify(success=False, error="Invalid verification code."), 400
 
-    user.password_hash = pending_change.new_password_hash or user.password_hash
+    user.hzn_hash = pending_change.new_hzn_hash or user.hzn_hash
     db.session.delete(pending_change)
     db.session.commit()
-    _clear_password_change_session()
+    _clear_hzn_change_session()
     logger.info("User %s changed password successfully via OTP verification", user.user_id)
     return jsonify(success=True)
 
 
 @main_bp.route("/verify-forgot-password", methods=["POST"])
-def verify_forgot_password():
+def verify_forgot_hzn():
     data = request.get_json(silent=True) or {}
     submitted_code = str(data.get("code", "")).strip()
-    pending_change = _load_pending_forgot_password_request()
+    pending_change = _load_pending_forgot_hzn_request()
 
     if not pending_change:
         return jsonify(success=False, error="Verification session expired. Please start again."), 400
 
     if pending_change.expires_at < datetime.utcnow():
-        _delete_pending_password_change_request(pending_change)
-        _clear_forgot_password_session()
+        _delete_pending_hzn_change_request(pending_change)
+        _clear_forgot_hzn_session()
         return jsonify(success=False, error="Verification code expired. Please start again."), 400
 
     if submitted_code != str(pending_change.verification_code):
@@ -494,13 +494,13 @@ def verify_forgot_password():
 
     user = db.session.get(User, pending_change.user_id)
     if user is None:
-        _delete_pending_password_change_request(pending_change)
-        _clear_forgot_password_session()
+        _delete_pending_hzn_change_request(pending_change)
+        _clear_forgot_hzn_session()
         return jsonify(success=False, error="User account was not found."), 400
 
-    user.password_hash = pending_change.new_password_hash or user.password_hash
+    user.hzn_hash = pending_change.new_hzn_hash or user.hzn_hash
     db.session.delete(pending_change)
     db.session.commit()
-    _clear_forgot_password_session()
+    _clear_forgot_hzn_session()
     logger.info("User %s reset password successfully via forgot-password OTP", user.user_id)
     return jsonify(success=True)

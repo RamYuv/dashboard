@@ -2,7 +2,7 @@
     <div class="col-12">
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-2">
             <h1 class="admin-section-heading mb-0">{{ tab_titles.get(active_tab, "Environment Mapping Management") }}</h1>
-            <button class="btn btn-success" type="button" data-bs-toggle="modal" data-bs-target="#addEnvironmentHostMappingModal" data-admin-modal-trigger data-admin-form="#addEnvironmentHostMappingForm" data-admin-action="create" data-admin-title="#addEnvironmentHostMappingModalLabel" data-admin-title-text="Add Environment Host Mapping" data-admin-submit="#addEnvironmentHostMappingSubmit" data-admin-submit-text="Save Mapping" data-admin-values='{"environment_host_mapping_id":"","env_id":"","server_type_id":"","host_id":"","deployment_user":"","deployment_password":""}'>
+            <button class="btn btn-success" type="button" data-bs-toggle="modal" data-bs-target="#addEnvironmentHostMappingModal" data-admin-modal-trigger data-admin-form="#addEnvironmentHostMappingForm" data-admin-action="create" data-admin-title="#addEnvironmentHostMappingModalLabel" data-admin-title-text="Add Environment Host Mapping" data-admin-submit="#addEnvironmentHostMappingSubmit" data-admin-submit-text="Save Mapping" data-admin-values='{"environment_host_mapping_id":"","env_id":"","server_type_id":"","host_id":"","deployment_user":"","deploy_user_hzn":""}'>
                 <i class="fas fa-plus me-2"></i>Add New
             </button>
         </div>
@@ -24,7 +24,7 @@
                                 <td>{{ mapping.deployment_user or "-" }}</td>
                                 <td class="admin-action-cell">
                                     <div class="admin-row-actions">
-                                        <button class="btn btn-outline-primary admin-icon-btn" type="button" data-bs-toggle="modal" data-bs-target="#addEnvironmentHostMappingModal" data-admin-modal-trigger data-admin-form="#addEnvironmentHostMappingForm" data-admin-action="update_environment_host_mapping" data-admin-title="#addEnvironmentHostMappingModalLabel" data-admin-title-text="Edit Environment Host Mapping" data-admin-submit="#addEnvironmentHostMappingSubmit" data-admin-submit-text="Update Mapping" data-admin-values='{{ {"environment_host_mapping_id": mapping.environment_host_mapping_id, "env_id": mapping.env_id, "server_type_id": mapping.server_type_id, "host_id": mapping.host_id, "deployment_user": mapping.deployment_user or "", "deployment_password": mapping.deployment_password or ""}|tojson }}' aria-label="Edit mapping">
+                                        <button class="btn btn-outline-primary admin-icon-btn" type="button" data-bs-toggle="modal" data-bs-target="#addEnvironmentHostMappingModal" data-admin-modal-trigger data-admin-form="#addEnvironmentHostMappingForm" data-admin-action="update_environment_host_mapping" data-admin-title="#addEnvironmentHostMappingModalLabel" data-admin-title-text="Edit Environment Host Mapping" data-admin-submit="#addEnvironmentHostMappingSubmit" data-admin-submit-text="Update Mapping" data-admin-values='{{ {"environment_host_mapping_id": mapping.environment_host_mapping_id, "env_id": mapping.env_id, "server_type_id": mapping.server_type_id, "host_id": mapping.host_id, "deployment_user": mapping.deployment_user or "", "deploy_user_hzn": mapping.deploy_user_hzn or ""}|tojson }}' aria-label="Edit mapping">
                                             <i class="fas fa-pen"></i>
                                         </button>
                                         <form method="post" class="d-inline">
@@ -96,8 +96,8 @@
                             <input class="form-control" id="deployment_user" name="deployment_user">
                         </div>
                         <div class="col-12">
-                            <label class="form-label" for="deployment_password">Deployment Password</label>
-                            <input class="form-control" id="deployment_password" name="deployment_password">
+                            <label class="form-label" for="deploy_user_hzn">Deployment Password</label>
+                            <input class="form-control" id="deploy_user_hzn" name="deploy_user_hzn">
                         </div>
                     </div>
                 </form>

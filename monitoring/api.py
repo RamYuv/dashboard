@@ -110,6 +110,38 @@ def _display_tcs_version(versions):
     return _preferred_tcs_version(candidates)
 
 
+def _is_gateway_runtime(package_key, package_name):
+    aliases = {
+        (package_key or "").strip().lower(),
+        (package_name or "").strip().lower(),
+    }
+    return any(alias in {"gateway", "getway"} for alias in aliases if alias)
+
+
+def _display_tcs_runtime_version(runtime_rows):
+    normalized_rows = []
+    for row in runtime_rows or []:
+        version = (row.get("version") or "").strip()
+        if not version:
+            continue
+        normalized_rows.append(
+            {
+                "version": version,
+                "package_key": (row.get("package_key") or "").strip(),
+                "package_name": (row.get("package_name") or "").strip(),
+            }
+        )
+
+    if not normalized_rows:
+        return ""
+
+    for row in normalized_rows:
+        if _is_gateway_runtime(row.get("package_key"), row.get("package_name")):
+            return row["version"]
+
+    return _display_tcs_version([row["version"] for row in normalized_rows])
+
+
 def _infer_env_type(env_id):
     if not env_id:
         return "Unknown"
@@ -149,6 +181,7 @@ def _build_tcs_runtime_map(env_ids):
     runtime_map = {
         env_id: {
             "versions": [],
+            "runtime_rows": [],
             "service_types": [],
             "testing_modes": [],
         }
@@ -170,11 +203,19 @@ def _build_tcs_runtime_map(env_ids):
     for row in rows:
         bucket = runtime_map.setdefault(
             row.env_id,
-            {"versions": [], "service_types": [], "testing_modes": []},
+            {"versions": [], "runtime_rows": [], "service_types": [], "testing_modes": []},
         )
         version = (row.current_version or "").strip()
         if version and version not in bucket["versions"]:
             bucket["versions"].append(version)
+        if version:
+            bucket["runtime_rows"].append(
+                {
+                    "version": version,
+                    "package_key": row.package_key,
+                    "package_name": row.package_name,
+                }
+            )
 
         testing_mode = (row.testing_mode or "").strip()
         if testing_mode and testing_mode not in bucket["testing_modes"]:
@@ -246,7 +287,7 @@ def _build_environment_health_payload(env_statuses, last_update, active_booking_
             "server_types": env_server_types.get(env_id, []),
             "tcs_runtime": {
                 "versions": runtime_details.get("versions", []),
-                "display_version": _display_tcs_version(runtime_details.get("versions", [])),
+                "display_version": _display_tcs_runtime_version(runtime_details.get("runtime_rows", [])),
                 "has_mixed_versions": len(runtime_details.get("versions", [])) > 1,
                 "service_types": runtime_details.get("service_types", []),
                 "testing_modes": runtime_details.get("testing_modes", []),
@@ -279,9 +320,6 @@ def _build_environment_health_payload(env_statuses, last_update, active_booking_
 def api_environment_health():
     current_app.monitor_state.refresh_from_persisted()
     env_statuses, last_update = current_app.monitor_state.snapshot()
-    if not env_statuses and hasattr(current_app, "container"):
-        env_statuses = current_app.container.env_worker.refresh()
-        env_statuses, last_update = current_app.monitor_state.snapshot()
 
     active_booking_envs = _get_active_booking_env_ids()
     payload = _build_environment_health_payload(env_statuses, last_update, active_booking_envs)

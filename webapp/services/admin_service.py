@@ -3,7 +3,7 @@
 from datetime import datetime
 
 from flask import current_app
-from werkzeug.security import generate_password_hash
+from werkzeug.security import generate_password_hash as generate_hzn_hash
 
 from ..auth_service import get_allowed_screens
 from ..component_build_catalog import (
@@ -422,7 +422,7 @@ def delete_server_type(form):
 def create_environment_host_mapping(form):
     env_id = (form.get("env_id") or "").strip().upper()
     deployment_user = (form.get("deployment_user") or "").strip() or None
-    deployment_password = (form.get("deployment_password") or "").strip() or None
+    deploy_user_hzn = (form.get("deploy_user_hzn") or "").strip() or None
 
     try:
         server_type_id = int(form.get("server_type_id") or "")
@@ -452,7 +452,7 @@ def create_environment_host_mapping(form):
     if existing is not None:
         existing.host_id = host_id
         existing.deployment_user = deployment_user
-        existing.deployment_password = deployment_password
+        existing.deploy_user_hzn = deploy_user_hzn
         return None
 
     db.session.add(
@@ -462,7 +462,7 @@ def create_environment_host_mapping(form):
             server_type_id=server_type_id,
             host_id=host_id,
             deployment_user=deployment_user,
-            deployment_password=deployment_password,
+            deploy_user_hzn=deploy_user_hzn,
         )
     )
     return None
@@ -481,7 +481,7 @@ def update_environment_host_mapping(form):
 
     env_id = (form.get("env_id") or "").strip().upper()
     deployment_user = (form.get("deployment_user") or "").strip() or None
-    deployment_password = (form.get("deployment_password") or "").strip() or None
+    deploy_user_hzn = (form.get("deploy_user_hzn") or "").strip() or None
 
     try:
         server_type_id = int(form.get("server_type_id") or "")
@@ -510,7 +510,7 @@ def update_environment_host_mapping(form):
     mapping.server_type_id = server_type_id
     mapping.host_id = host_id
     mapping.deployment_user = deployment_user
-    mapping.deployment_password = deployment_password
+    mapping.deploy_user_hzn = deploy_user_hzn
     return None
 
 
@@ -676,101 +676,12 @@ def build_component_build_rows(component_builds):
     return rows
 
 
-def export_operational_config():
-    """Build an export of live operational config managed from the database."""
-    environments = Environment.query.order_by(Environment.env_type, Environment.env_id).all()
-    hosts = Host.query.order_by(Host.hostname, Host.ip_address).all()
-    server_types = ServerType.query.order_by(ServerType.target_key, ServerType.server_type_key).all()
-    component_builds = ComponentBuild.query.order_by(
-        ComponentBuild.target_key,
-        ComponentBuild.build_name,
-        ComponentBuild.version,
-    ).all()
-    mappings = EnvironmentHostMapping.query.order_by(
-        EnvironmentHostMapping.env_type,
-        EnvironmentHostMapping.env_id,
-        EnvironmentHostMapping.environment_host_mapping_id,
-    ).all()
-
-    mappings_by_env = {}
-    for mapping in mappings:
-        mappings_by_env.setdefault(mapping.env_id, []).append(mapping)
-    host_rows = []
-    for host in hosts:
-        host_rows.append(
-            {
-                "host_id": host.host_id,
-                "hostname": host.hostname,
-                "ip_address": host.ip_address,
-                "domain": host.domain,
-                "description": host.description,
-            }
-        )
-
-    environment_host_mappings = []
-    for environment in environments:
-        for mapping in mappings_by_env.get(environment.env_id) or []:
-            host = mapping.host
-            server_type = mapping.server_type
-            environment_host_mappings.append(
-                {
-                    "env_id": environment.env_id,
-                    "env_type": environment.env_type,
-                    "server_type_key": server_type.server_type_key if server_type else None,
-                    "host_id": host.host_id if host else None,
-                    "deployment_user": mapping.deployment_user,
-                    "deployment_password": mapping.deployment_password,
-                }
-            )
-
-    return {
-        "metadata": {
-            "generated_at": datetime.utcnow().isoformat() + "Z",
-            "source": "database_export",
-            "seed_bootstrap_only": bool(current_app.config.get("SEED_BOOTSTRAP_ONLY", True)),
-            "deployment_engine": (current_app.config.get("DEPLOYMENT_ENGINE") or "SCRIPT").strip().upper(),
-            "notes": [
-                "This export reflects live database-managed operational configuration.",
-                "default_seed_hosts.json is treated as bootstrap-only after first setup.",
-            ],
-        },
-        "teams": [team.team_name for team in Team.query.order_by(Team.team_name).all()],
-        "environments": [
-            {
-                "env_id": environment.env_id,
-                "env_type": environment.env_type,
-                "domain": environment.domain,
-            }
-            for environment in environments
-        ],
-        "server_types": [
-            {
-                "server_type_key": server_type.server_type_key,
-                "target_key": server_type.target_key,
-                "description": server_type.description,
-            }
-            for server_type in server_types
-        ],
-        "component_builds": [
-            {
-                "target_key": build.target_key,
-                "build_name": build.build_name,
-                "version": build.version,
-            }
-            for build in component_builds
-        ],
-        "hosts": host_rows,
-        "environment_host_mappings": environment_host_mappings,
-        "deployment_targets": get_deployment_target_options(),
-    }
-
-
 def create_user(form):
     user_id = (form.get("user_id") or "").strip().lower()
     email_id = (form.get("email_id") or "").strip().lower()
     first_name = (form.get("first_name") or "").strip()
     last_name = (form.get("last_name") or "").strip()
-    password = form.get("password") or ""
+    hzn = form.get("password") or ""
     requested_role = (form.get("role") or "user").strip().lower()
     valid_roles = get_valid_roles()
 
@@ -778,7 +689,7 @@ def create_user(form):
         return "User ID is required."
     if not email_id:
         return "Email is required."
-    if not password:
+    if not hzn:
         return "Password is required."
     if requested_role not in valid_roles:
         return "Please select a valid role."
@@ -826,7 +737,7 @@ def create_user(form):
         first_name=first_name or None,
         last_name=last_name or None,
         name="{} {}".format(first_name, last_name).strip() or user_id,
-        password_hash=generate_password_hash(password),
+        hzn_hash=generate_hzn_hash(hzn),
         role=role,
     )
     db.session.add(user)

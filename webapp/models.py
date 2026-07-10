@@ -73,7 +73,7 @@ class User(db.Model):
     first_name = db.Column(db.String(100))
     last_name = db.Column(db.String(100))
     name = db.Column(db.String(100))
-    password_hash = db.Column(db.String(255), nullable=False)
+    hzn_hash = db.Column(db.String(255), nullable=False)
 
     # Self-registered accounts start as "user"; admins can promote them later.
     role = db.Column(db.String(20), nullable=False, default="user")
@@ -140,7 +140,7 @@ class PasswordChangeRequest(db.Model):
         nullable=False,
         index=True,
     )
-    new_password_hash = db.Column(db.String(255), nullable=False)
+    new_hzn_hash = db.Column(db.String(255), nullable=False)
     verification_code = db.Column(db.String(12), nullable=False)
     expires_at = db.Column(db.DateTime, nullable=False, index=True)
     attempt_count = db.Column(db.Integer, nullable=False, default=0)
@@ -285,7 +285,7 @@ class EnvironmentHostMapping(db.Model):
     # Maps a server type such as Core to the actual target host machine.
 
     deployment_user = db.Column(db.String(100))
-    deployment_password = db.Column(db.String(255))
+    deploy_user_hzn = db.Column(db.String(255))
 
     environment = db.relationship("Environment", backref="host_mappings")
     server_type = db.relationship("ServerType", backref="environment_mappings")

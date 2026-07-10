@@ -198,7 +198,7 @@ class VersionPullWorker:
         parsed_output = self.version_fetcher.fetch_version_details(
             hostname,
             mapping.deployment_user or "",
-            mapping.deployment_password or "",
+            mapping.deploy_user_hzn or "",
             server_type=target_info["server_type_key"],
             host_label=host_label,
         )

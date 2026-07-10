@@ -27,6 +27,15 @@ class Config:
 
     # Monitoring scheduler/cache
     MONITOR_REFRESH_SECONDS = int(os.environ.get('MONITOR_REFRESH_SECONDS', 60))
+    MONITOR_FETCH_THREADS = max(1, int(os.environ.get('MONITOR_FETCH_THREADS', 4)))
+    MONITOR_VERSION_PULL_ENABLED = _read_bool(
+        os.environ.get('MONITOR_VERSION_PULL_ENABLED', 'true'),
+        default=True,
+    )
+    MONITOR_VERSION_PULL_SECONDS = max(
+        60,
+        int(os.environ.get('MONITOR_VERSION_PULL_SECONDS', 15 * 60))
+    )
     MONITOR_SCHEDULER_ENABLED = _read_bool(os.environ.get('MONITOR_SCHEDULER_ENABLED', 'false'))
     MONITOR_INCLUDED_SERVER_TYPES = os.environ.get(
         'MONITOR_INCLUDED_SERVER_TYPES',

@@ -3,7 +3,7 @@ import pathlib
 import unittest
 
 
-MODULE_PATH = pathlib.Path(__file__).resolve().parents[1] / "api.py"
+MODULE_PATH = pathlib.Path(__file__).resolve().parents[2] / "monitoring" / "api.py"
 SPEC = importlib.util.spec_from_file_location("monitoring_api_under_test", MODULE_PATH)
 monitoring_api = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(monitoring_api)
@@ -44,6 +44,43 @@ class MonitoringApiVersionDisplayTests(unittest.TestCase):
             result,
             "tcs_server-mqm_PC-1020.1.1.2.1_Patch2_mqm_keept_20260623",
         )
+
+    def test_display_tcs_runtime_version_prefers_getway_row_for_tooltip(self):
+        result = monitoring_api._display_tcs_runtime_version(
+            [
+                {
+                    "package_key": "core",
+                    "package_name": "core",
+                    "version": "tcs_server-1.1.2.1_Patch1_20260623",
+                },
+                {
+                    "package_key": "getway",
+                    "package_name": "getway",
+                    "version": "tcs_server-mqm_PC-1020.1.1.2.1_Patch2_mqm_keept_20260623",
+                },
+            ]
+        )
+        self.assertEqual(
+            result,
+            "tcs_server-mqm_PC-1020.1.1.2.1_Patch2_mqm_keept_20260623",
+        )
+
+    def test_display_tcs_runtime_version_falls_back_when_gateway_row_missing(self):
+        result = monitoring_api._display_tcs_runtime_version(
+            [
+                {
+                    "package_key": "core",
+                    "package_name": "core",
+                    "version": "tcs_server-1.1.2.1_Patch1_20260623",
+                },
+                {
+                    "package_key": "cordb",
+                    "package_name": "cordb",
+                    "version": "tcs_server-1.1.2.1_Patch1_20260624",
+                },
+            ]
+        )
+        self.assertEqual(result, "tcs_server-1.1.2.1_Patch1_20260624")
 
 
 if __name__ == "__main__":

@@ -244,9 +244,6 @@
                     <a href="{{ url_for('main.user_management_screen') }}" class="btn btn-primary">
                         <i class="fas fa-user-shield me-2"></i>User Management
                     </a>
-                    <a href="{{ url_for('main.admin_export_config') }}" class="btn btn-outline-primary">
-                        <i class="fas fa-file-export me-2"></i>Export Live Config
-                    </a>
                     <a href="{{ url_for('main.environment_health') }}" class="btn btn-outline-secondary">
                         <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
                     </a>
@@ -731,8 +728,8 @@
                         <input class="form-control" id="deployment_user" name="deployment_user">
                     </div>
                     <div class="mb-3">
-                        <label class="form-label" for="deployment_password">Deployment Password</label>
-                        <input class="form-control" id="deployment_password" name="deployment_password">
+                        <label class="form-label" for="deploy_user_hzn">Deployment Password</label>
+                        <input class="form-control" id="deploy_user_hzn" name="deploy_user_hzn">
                         <div class="form-text">Bootstrap seeding may populate this initially, but long term it should be maintained here or moved to secret storage.</div>
                     </div>
                     <button class="btn btn-primary w-100" type="submit">Save Mapping</button>

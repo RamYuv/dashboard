@@ -1,15 +1,9 @@
-"""Dedicated monitoring worker and embeddable background service.
-
-This module supports two operating modes:
-1. Standalone worker process via ``python monitoring/worker_main.py``
-2. Embedded background thread started by ``run.py`` for local/dev usage
-
-Both modes call the same monitoring refresh logic so behavior stays consistent.
-"""
+"""Dedicated monitoring worker and web-owned process helpers."""
 
 import logging
 import os
 import signal
+import subprocess
 import sys
 import threading
 import time
@@ -20,7 +14,7 @@ PROJECT_ROOT = os.path.dirname(CURRENT_DIR)
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-from webapp import create_app
+from monitoring.factory import create_monitoring_app
 
 
 logger = logging.getLogger(__name__)
@@ -38,6 +32,11 @@ class BackgroundMonitoringService(object):
     def __init__(self, app, interval_seconds):
         self.app = app
         self.interval_seconds = max(5, int(interval_seconds or 30))
+        self.version_pull_enabled = bool(app.config.get("MONITOR_VERSION_PULL_ENABLED", True))
+        self.version_pull_interval_seconds = max(
+            self.interval_seconds,
+            int(app.config.get("MONITOR_VERSION_PULL_SECONDS", 900) or 900),
+        )
         self._stop_event = threading.Event()
         self._thread = None
 
@@ -71,6 +70,7 @@ class BackgroundMonitoringService(object):
             logger.info("Background monitoring service stopped.")
 
     def _run(self):
+        next_version_pull_at = 0
         while not self._stop_event.is_set():
             try:
                 with self.app.app_context():
@@ -79,15 +79,64 @@ class BackgroundMonitoringService(object):
                         "Monitoring refresh completed. Snapshot count=%s",
                         len(snapshot or {})
                     )
+                    if self.version_pull_enabled:
+                        now = time.monotonic()
+                        if now >= next_version_pull_at:
+                            summary = self.app.container.version_worker.refresh()
+                            logger.info("Version pull completed: %s", summary)
+                            next_version_pull_at = now + self.version_pull_interval_seconds
             except Exception:
                 logger.exception("Monitoring refresh failed in background service.")
             if self._stop_event.wait(self.interval_seconds):
                 break
 
 
+class MonitoringProcessService(object):
+    """Run monitoring in one child process owned by the web app."""
+
+    def __init__(self):
+        self._process = None
+
+    def start(self):
+        if self._process is not None and self._process.poll() is None:
+            logger.info("Monitoring process is already running. pid=%s", self._process.pid)
+            return
+
+        command = [sys.executable, "-m", "monitoring.worker_main"]
+        self._process = subprocess.Popen(command, cwd=PROJECT_ROOT)
+        logger.info("Started monitoring child process. pid=%s", self._process.pid)
+
+    def stop(self, timeout=5):
+        if self._process is None:
+            return
+        if self._process.poll() is not None:
+            return
+
+        logger.info("Stopping monitoring child process. pid=%s", self._process.pid)
+        self._process.terminate()
+        try:
+            self._process.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            logger.warning(
+                "Monitoring child process did not stop in %s seconds. Killing pid=%s",
+                timeout,
+                self._process.pid,
+            )
+            self._process.kill()
+            self._process.wait(timeout=timeout)
+
+    def join(self, timeout=None):
+        if self._process is None:
+            return
+        try:
+            self._process.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            return
+
+
 def run_worker():
     """Run monitoring as a standalone dedicated worker process."""
-    app = create_app()
+    app = create_monitoring_app()
     service = BackgroundMonitoringService(
         app,
         app.config.get("MONITOR_REFRESH_SECONDS", 30),

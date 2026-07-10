@@ -64,6 +64,22 @@
             padding: 6px 0;
         }
 
+        .toolbar-primary {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 0;
+        }
+
+        .toolbar-page-title {
+            color: #0f172a;
+            font-size: 20px;
+            font-weight: 700;
+            line-height: 1.1;
+            letter-spacing: -0.02em;
+            white-space: nowrap;
+        }
+
         .toolbar-actions {
             display: flex;
             align-items: center;
@@ -83,49 +99,23 @@
             box-shadow: 0 3px 8px rgba(34, 51, 84, 0.08);
         }
 
-        .sidebar-toggle-btn {
-            width: 42px;
-            height: 42px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            border: 1px solid rgba(15, 24, 56, 0.18);
-            border-radius: 10px;
-            background: linear-gradient(180deg, #1f2f5c 0%, #111b3b 100%);
-            color: #f8fbff;
-            box-shadow: 0 10px 20px rgba(17, 27, 59, 0.18);
-            transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
-        }
-
-        .sidebar-toggle-btn:hover,
-        .sidebar-toggle-btn:focus {
-            color: #ffffff;
-            background: linear-gradient(180deg, #243768 0%, #16244f 100%);
-            box-shadow: 0 12px 22px rgba(17, 27, 59, 0.24);
-            transform: translateY(-1px);
-        }
-
-        .sidebar-toggle-btn i {
-            font-size: 16px;
-        }
-
         .summary-grid {
             display: grid;
             grid-template-columns: repeat(5, 1fr);
-            gap: 10px;
-            margin-bottom: 12px;
+            gap: 8px;
+            margin-bottom: 10px;
         }
 
         .summary-card {
             background: #eaedee;
             border: 1px solid var(--panel-line);
-            border-radius: 12px;
-            min-height: 82px;
-            padding: 12px 14px;
+            border-radius: 10px;
+            min-height: 48px;
+            padding: 5px 10px;
             display: flex;
             align-items: center;
-            gap: 10px;
-            box-shadow: 0 8px 18px rgba(34, 51, 84, 0.08);
+            gap: 8px;
+            box-shadow: 0 4px 10px rgba(34, 51, 84, 0.06);
         }
 
         .summary-icon {
@@ -145,15 +135,15 @@
         .summary-icon.maintenance { background: rgba(59, 130, 246, 0.22); color: #3b82f6; }
 
         .summary-title {
-            font-size: 12px;
+            font-size: 11px;
             color: var(--text-strong);
-            margin-bottom: 2px;
+            margin-bottom: 0;
             font-weight: 700;
             line-height: 1.15;
         }
 
         .summary-number {
-            font-size: 20px;
+            font-size: 14px;
             font-weight: 700;
             color: var(--text-strong);
             line-height: 1;
@@ -197,42 +187,55 @@
         }
 
         .server-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
-            gap: 12px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px 14px;
+            align-items: center;
             position: relative;
             overflow: visible;
         }
 
         .env-card {
-            background: #eaedee;
-            border: 1px solid rgba(154, 169, 188, 0.72);
-            border-radius: 16px;
-            min-height: auto;
-            padding: 8px 6px 7px;
-            text-align: center;
-            color: #0f1c33;
+            background: #ffffff;
+            border: 1px solid #d7dbe1;
+            border-radius: 14px;
+            min-height: 46px;
+            padding: 6px 12px;
+            text-align: left;
+            color: #334155;
             transition: 0.2s ease;
             cursor: pointer;
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 8px 16px rgba(53, 93, 140, 0.08);
-            display: flex;
-            flex-direction: column;
+            display: inline-flex;
             align-items: center;
-            justify-content: flex-start;
-            gap: 4px;
+            justify-content: center;
             position: relative;
             overflow: visible;
+            white-space: nowrap;
+            width: auto;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+        }
+
+        .env-card-row {
+            display: inline-flex;
+            flex-direction: row;
+            flex-wrap: nowrap;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 10px;
+            white-space: nowrap;
         }
 
         .env-card:hover {
-            transform: translateY(-3px);
-            border-color: rgba(41, 73, 120, 0.55);
-            box-shadow: 0 10px 22px rgba(53, 93, 140, 0.14);
+            transform: translateY(-1px);
+            background: #ffffff;
+            border-color: #cfd6de;
+            box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
             z-index: 40;
         }
 
         .env-card.active-booking {
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 0 0 2px rgba(34, 197, 94, 0.38), 0 10px 22px rgba(53, 93, 140, 0.14);
+            border-color: rgba(34, 197, 94, 0.42);
+            box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.10), 0 12px 28px rgba(15, 23, 42, 0.08);
         }
 
         .env-card:focus-visible {
@@ -321,12 +324,88 @@
         }
 
         .env-card-title {
-            font-weight: 700;
-            font-size: 17px;
+            display: inline-flex;
+            align-items: center;
+            flex: 0 1 auto;
+            font-weight: 800;
+            font-size: 11px;
             margin-bottom: 0;
             letter-spacing: 0.01em;
-            color: var(--text-strong);
-            line-height: 1.15;
+            color: #000000;
+            line-height: 1.1;
+            white-space: nowrap;
+            text-shadow: 0 0 0 transparent;
+        }
+
+        .status-signal {
+            flex: 0 0 auto;
+            width: 14px;
+            height: 14px;
+            margin: 0;
+            background: transparent;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .signal-dot {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            border: 1px solid rgba(15, 23, 42, 0.06);
+            background: #94a3b8;
+        }
+
+        .signal-dot.healthy {
+            background: #0aa10a;
+            box-shadow: 0 0 0 2px rgba(10, 161, 10, 0.10);
+        }
+
+        .signal-dot.warning {
+            background: #ff8b0f;
+            box-shadow: 0 0 0 2px rgba(255, 139, 15, 0.10);
+        }
+
+        .signal-dot.critical {
+            background: #dc2626;
+            box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.10);
+        }
+
+        .signal-dot.maintenance {
+            background: #2563eb;
+            box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.10);
+        }
+
+        .signal-dot.unknown {
+            background: #94a3b8;
+            box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.10);
+        }
+
+        @media (max-width: 768px) {
+            .server-grid {
+                gap: 10px 10px;
+            }
+
+            .env-card {
+                min-height: 40px;
+                padding: 5px 10px;
+                border-radius: 12px;
+            }
+
+            .env-card-row {
+                gap: 8px;
+            }
+
+            .env-card-title {
+                font-size: 10px;
+            }
+
+            .status-signal,
+            .signal-dot {
+                width: 12px;
+                height: 12px;
+            }
         }
 
         .traffic-light {
@@ -634,7 +713,180 @@
                 align-items: stretch;
             }
 
+            .toolbar-primary {
+                width: 100%;
+                justify-content: space-between;
+            }
+
+            .toolbar-page-title {
+                font-size: 16px;
+                white-space: normal;
+                text-align: right;
+            }
+
             .toolbar-actions {
                 width: 100%;
+            }
+        }
+
+        @media (min-width: 1920px) {
+            .content-wrapper {
+                padding: 26px 30px 36px;
+            }
+
+            .toolbar {
+                gap: 14px;
+                margin-bottom: 10px;
+                padding: 10px 0;
+            }
+
+            .toolbar-page-title {
+                font-size: 32px;
+            }
+
+            .toolbar .btn-dark-custom {
+                padding: 10px 18px;
+                font-size: 15px;
+                border-radius: 10px;
+            }
+
+            .summary-grid {
+                gap: 14px;
+                margin-bottom: 18px;
+            }
+
+            .summary-card {
+                min-height: 86px;
+                padding: 14px 18px;
+                border-radius: 16px;
+            }
+
+            .summary-title {
+                font-size: 17px;
+            }
+
+            .summary-number {
+                font-size: 30px;
+            }
+
+            .group-card {
+                border-radius: 24px;
+                padding: 24px 24px 28px;
+                margin-bottom: 18px;
+            }
+
+            .group-header {
+                gap: 14px;
+                margin-bottom: 20px;
+            }
+
+            .group-header h3 {
+                font-size: 28px;
+            }
+
+            .group-count {
+                font-size: 18px;
+            }
+
+            .server-grid {
+                gap: 22px 24px;
+            }
+
+            .env-card {
+                min-height: 82px;
+                padding: 12px 20px;
+                border-radius: 20px;
+            }
+
+            .env-card-row {
+                gap: 16px;
+            }
+
+            .env-card-title {
+                font-size: 22px;
+            }
+
+            .status-signal,
+            .signal-dot {
+                width: 24px;
+                height: 24px;
+            }
+
+            .info-card {
+                border-radius: 18px;
+                padding: 22px 26px;
+            }
+
+            .legend-item {
+                font-size: 16px;
+            }
+
+            .mini-light {
+                width: 18px;
+                height: 18px;
+            }
+        }
+
+        @media (min-width: 2560px) {
+            .content-wrapper {
+                padding: 34px 42px 46px;
+            }
+
+            .toolbar-page-title {
+                font-size: 40px;
+            }
+
+            .toolbar .btn-dark-custom {
+                padding: 12px 22px;
+                font-size: 18px;
+            }
+
+            .summary-card {
+                min-height: 104px;
+                padding: 18px 22px;
+            }
+
+            .summary-title {
+                font-size: 20px;
+            }
+
+            .summary-number {
+                font-size: 38px;
+            }
+
+            .group-card {
+                padding: 30px 30px 34px;
+            }
+
+            .group-header h3 {
+                font-size: 34px;
+            }
+
+            .group-count {
+                font-size: 22px;
+            }
+
+            .server-grid {
+                gap: 28px 30px;
+            }
+
+            .env-card {
+                min-height: 102px;
+                padding: 16px 28px;
+                border-radius: 24px;
+            }
+
+            .env-card-row {
+                gap: 20px;
+            }
+
+            .env-card-title {
+                font-size: 28px;
+            }
+
+            .status-signal,
+            .signal-dot {
+                width: 30px;
+                height: 30px;
             }
         }

@@ -3,8 +3,8 @@
 {% block navbar %}{% endblock %}
 {% block extra_head %}
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/environment-dashboard-sidebar.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/env-health-dashboard.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/environment-dashboard-sidebar.css', v='20260710-6') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/env-health-dashboard.css', v='20260710-6') }}">
 {% endblock %}
 {% block main_class %}container-fluid px-0 py-0{% endblock %}
 {% block shell_title %}Envista{% endblock %}
@@ -20,7 +20,7 @@
         </button>
         <ul class="dropdown-menu dropdown-menu-end app-shell-dropdown">
             <li><a class="dropdown-item" href="{{ url_for('main.profile') }}"><i class="far fa-id-badge"></i> View Profile</a></li>
-            <li><a class="dropdown-item" href="{{ url_for('main.change_password') }}"><i class="fas fa-key"></i> Change Password</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('main.change_hzn') }}"><i class="fas fa-key"></i> Change Password</a></li>
             <li><hr class="dropdown-divider"></li>
             <li><a class="dropdown-item" href="{{ url_for('main.logout') }}"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
         </ul>
@@ -30,8 +30,39 @@
 <div class="app-layout" id="environmentDashboardLayout">
     <div class="sidebar-backdrop" id="environmentDashboardSidebarBackdrop" hidden></div>
 
+    <button
+        id="sidebarReopenButton"
+        class="sidebar-reopen-button"
+        type="button"
+        aria-controls="environmentDashboardSidebar"
+        aria-expanded="false"
+        aria-label="Show Menu"
+        title="Show Menu"
+    >
+        <span class="sidebar-toggle-label">
+            <i class="fas fa-layer-group"></i>
+            <span>Menu</span>
+        </span>
+        <span class="sidebar-toggle-arrow" aria-hidden="true">
+            <i class="fas fa-angle-right"></i>
+        </span>
+    </button>
+
     <aside class="sidebar" id="environmentDashboardSidebar">
-        <div class="sidebar-menu-title">Menu</div>
+        <div class="sidebar-header-bar">
+            <div class="sidebar-menu-title">Menu</div>
+            <button
+                id="toggleSidebarButton"
+                class="sidebar-header-toggle"
+                type="button"
+                aria-controls="environmentDashboardSidebar"
+                aria-expanded="true"
+                aria-label="Hide Menu"
+                title="Hide Menu"
+            >
+                <i class="fas fa-angle-left"></i>
+            </button>
+        </div>
 
         <nav class="sidebar-nav">
             <a href="{{ url_for('main.environment_health') }}" class="menu-item active">Home</a>
@@ -68,17 +99,9 @@
 
         <section class="content-wrapper">
             <div class="toolbar">
-                <button
-                    id="toggleSidebarButton"
-                    class="btn-dark-custom sidebar-toggle-btn"
-                    type="button"
-                    aria-controls="environmentDashboardSidebar"
-                    aria-expanded="true"
-                    aria-label="Hide Sidebar"
-                    title="Hide Sidebar"
-                >
-                    <i class="fas fa-bars"></i>
-                </button>
+                <div class="toolbar-primary">
+                    <div class="toolbar-page-title">Environment Dashboard</div>
+                </div>
 
                 <div class="toolbar-actions">
                     <button class="btn-dark-custom" type="button">
@@ -95,55 +118,39 @@
                 </div>
             </div>
 
-            <div class="page-intro">
-                <div>
-                    <h1>Environment Dashboard</h1>
-                </div>
-            </div>
-
             <div class="summary-grid">
                 <div class="summary-card">
-                    <div class="summary-icon total"><i class="fas fa-server"></i></div>
                     <div>
                         <div class="summary-title">Total Environments</div>
                         <div class="summary-number" id="totalCount">{{ summary.total }}</div>
-                        <div class="summary-subtitle">All Environments</div>
                     </div>
                 </div>
 
                 <div class="summary-card">
-                    <div class="summary-icon healthy"><i class="fas fa-check"></i></div>
                     <div>
                         <div class="summary-title">Healthy</div>
                         <div class="summary-number" id="healthyCount">{{ summary.healthy }}</div>
-                        <div class="summary-subtitle" id="healthyPercent">0%</div>
                     </div>
                 </div>
 
                 <div class="summary-card">
-                    <div class="summary-icon warning"><i class="fas fa-exclamation-triangle"></i></div>
                     <div>
                         <div class="summary-title">Idle</div>
                         <div class="summary-number" id="warningCount">{{ summary.warning }}</div>
-                        <div class="summary-subtitle" id="warningPercent">0%</div>
                     </div>
                 </div>
 
                 <div class="summary-card">
-                    <div class="summary-icon critical"><i class="fas fa-times"></i></div>
                     <div>
                         <div class="summary-title">Critical</div>
                         <div class="summary-number" id="criticalCount">{{ summary.critical }}</div>
-                        <div class="summary-subtitle" id="criticalPercent">0%</div>
                     </div>
                 </div>
 
                 <div class="summary-card">
-                    <div class="summary-icon maintenance"><i class="fas fa-wrench"></i></div>
                     <div>
                         <div class="summary-title">Unavailable</div>
                         <div class="summary-number" id="maintenanceCount">{{ summary.maintenance if summary.maintenance is defined else 0 }}</div>
-                        <div class="summary-subtitle" id="maintenancePercent">0%</div>
                     </div>
                 </div>
             </div>
@@ -160,7 +167,7 @@
 
             <div class="bottom-info">
                 <div class="info-card">
-                    <strong>Traffic Light Legend</strong>
+                    <strong>Status Light Legend</strong>
                     <div class="legend-row mt-3">
                         <div class="legend-item">
                             <span class="mini-light green"></span>
@@ -176,7 +183,7 @@
                         </div>
                         <div class="legend-item">
                             <span class="mini-light gray"></span>
-                            <div><strong>Grey (No lights on)</strong><br><small class="text-muted">TCS not found</small></div>
+                            <div><strong>Grey</strong><br><small class="text-muted">TCS not found</small></div>
                         </div>
                     </div>
                 </div>
@@ -209,15 +216,13 @@
                                 <div class="about-guide-title">Environment DashBoard Guide</div>
                                 <div class="about-guide-row">
                                     <div class="guide-traffic-block">
-                                        <div class="traffic-light" aria-hidden="true">
-                                            <span class="light red active"></span>
-                                            <span class="light yellow active"></span>
-                                            <span class="light green active"></span>
+                                        <div class="status-signal" aria-hidden="true">
+                                            <span class="signal-dot green"></span>
                                         </div>
                                         <div class="guide-caption">DEV01</div>
                                     </div>
                                     <div class="about-guide-note">
-                                        <strong>Trafic Light: TCS Staus</strong>
+                                        <strong>Status Light: TCS Status</strong>
                                     </div>
                                 </div>
 
@@ -264,5 +269,5 @@
 </script>
 {% endblock %}
 {% block scripts %}
-    <script src="{{ url_for('static', filename='js/pages/environment-health.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/pages/environment-health.js', v='20260710-6') }}"></script>
 {% endblock %}

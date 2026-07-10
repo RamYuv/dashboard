@@ -1,6 +1,9 @@
 import sqlite3
+import time
+import os
 from pathlib import Path
 from flask import Flask
+from flask_migrate import Migrate
 
 try:
     from flask.logging import default_handler
@@ -9,11 +12,17 @@ except ImportError:
 
 from logging_setup import configure_application_logging
 from .config import Config
+
+if not hasattr(time, "clock"):
+    time.clock = time.perf_counter
+
 from .models import db
 from .monitor_state import MonitorState
 from monitoring.container import AppContainer
 from .auth_service import current_user
 from .db_init import init_db
+
+migrate = Migrate()
 
 
 def _project_sqlite_recovery_path(app):
@@ -61,6 +70,7 @@ def create_app(config_class=Config):
 
     _recover_sqlite_database_uri(app)
     db.init_app(app)
+    migrate.init_app(app, db)
 
     # Initialize shared monitor state
     app.monitor_state = MonitorState()
@@ -82,10 +92,8 @@ def create_app(config_class=Config):
         return {"current_user": current_user()}
 
     with app.app_context():
-        init_db()
+        if os.environ.get("SKIP_APP_INIT_DB", "").strip().lower() != "true":
+            init_db()
         app.monitor_state.load_persisted()
-        snapshot, _ = app.monitor_state.snapshot()
-        if not snapshot:
-            app.container.env_worker.refresh()
 
     return app

@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from flask import current_app, has_app_context
-from werkzeug.security import generate_password_hash
+from werkzeug.security import generate_password_hash as generate_hzn_hash
 
 from .component_build_catalog import (
     build_package_entries,
@@ -44,6 +44,16 @@ SEED_HOSTS_CONFIG_PATH = (
     Path(__file__).resolve().parent.parent / "configs" / "default_seed_hosts.json"
 )
 ACCESS_ADMIN_TEAM_NAME = "access_admin"
+
+EMPTY_SEED_DATA = {
+    "teams": [],
+    "environments": [],
+    "users": [],
+    "server_types": [],
+    "hosts": [],
+    "environment_host_mappings": [],
+    "component_builds": [],
+}
 
 
 def _first(model, **filters):
@@ -111,15 +121,7 @@ def _normalize_seed_hosts(hosts, mappings):
 def load_host_seed_data():
     """Load default seed data from JSON config."""
     if not SEED_HOSTS_CONFIG_PATH.exists():
-        return {
-            "teams": [],
-            "environments": [],
-            "users": [],
-            "server_types": [],
-            "hosts": [],
-            "environment_host_mappings": [],
-            "component_builds": [],
-        }
+        return dict(EMPTY_SEED_DATA)
 
     with SEED_HOSTS_CONFIG_PATH.open("r", encoding="utf-8-sig") as seed_file:
         data = json.load(seed_file)
@@ -288,7 +290,7 @@ def seed_default_users():
             defaults={
                 "email_id": user_data["email_id"],
                 "name": user_data["name"],
-                "password_hash": generate_password_hash(user_data["password"]),
+                "hzn_hash": generate_hzn_hash(user_data["password"]),
                 "role": user_data["role"],
             },
         )
@@ -367,7 +369,7 @@ def seed_default_environment_host_mappings():
                     server_type_id=server_type.server_type_id,
                     host_id=host.host_id,
                     deployment_user=mapping_data["deployment_user"],
-                    deployment_password=mapping_data["deployment_password"],
+                    deploy_user_hzn=mapping_data["deploy_user_hzn"],
                 )
             )
     db.session.commit()

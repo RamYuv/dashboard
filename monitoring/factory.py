@@ -17,6 +17,7 @@ from monitoring.container import AppContainer
 from monitoring.api import monitoring_bp
 from webapp.config import Config
 from webapp.db_init import init_db
+from webapp.monitor_state import MonitorState
 from webapp.models import db
 
 
@@ -30,10 +31,12 @@ def create_monitoring_app(config_class=Config):
     app.logger.propagate = True
 
     db.init_app(app)
-    app.container = AppContainer(app, None)
+    app.monitor_state = MonitorState()
+    app.container = AppContainer(app, app.monitor_state)
     app.register_blueprint(monitoring_bp)
 
     with app.app_context():
         init_db()
+        app.monitor_state.load_persisted()
 
     return app

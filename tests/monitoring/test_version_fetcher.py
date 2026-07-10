@@ -88,7 +88,7 @@ versions = tcs_server-1.1.2.1_Patch1_20260623 tcs_server-1.1.2.1_20260623
         self.assertEqual(parsed["deployment_details"], {"mode": "TFT", "service_types": ["MON", "DOM"]})
         self.assertEqual(parsed["versions"], {"core": "tcs_server-1.1.2.1_Patch1_20260623"})
 
-    def test_parse_output_selects_latest_patch_version_from_deploy_info(self):
+    def test_parse_output_uses_first_version_from_deploy_info_priority_list(self):
         fetcher = VersionFetcher(executor=SimpleExecutor(''))
         parsed = fetcher.parse_output(
             """
@@ -118,6 +118,26 @@ versions = tcs_server-1.1.2.1_Patch1_20260623 tcs_server-1.1.2.1_20260623
 """.strip()
         )
         self.assertEqual(parsed["versions"], {"core": "tcs_server-1.1.2.1_Patch1_20260623"})
+        self.assertEqual(parsed["deployment_details"], {"mode": "TFT", "service_types": ["DOM"]})
+
+    def test_parse_output_stores_only_first_version_from_gateway_deploy_info_list(self):
+        fetcher = VersionFetcher(executor=SimpleExecutor(''))
+        parsed = fetcher.parse_output(
+            """
+[Deployment Info]
+environment_name = dev01
+server = getway
+install_user = dev01app
+env_file = path/env/env_file.xml
+deployed_num = 21
+mode = TFT
+versions = tcs_server-mqm_PC-1020.1.1.2.1_Patch2_mqm_keept_20260623 tcs_server-1.1.2.1_Patch1_20260623 tcs_server-1.1.2.1_20260623
+""".strip()
+        )
+        self.assertEqual(
+            parsed["versions"],
+            {"getway": "tcs_server-mqm_PC-1020.1.1.2.1_Patch2_mqm_keept_20260623"},
+        )
         self.assertEqual(parsed["deployment_details"], {"mode": "TFT", "service_types": ["DOM"]})
 
     def test_parse_output_strips_trailing_comma_from_first_version_token(self):

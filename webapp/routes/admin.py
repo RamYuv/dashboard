@@ -1,8 +1,6 @@
 import logging
-import json
-from datetime import datetime
 
-from flask import Response, flash, redirect, render_template, request, url_for
+from flask import flash, redirect, render_template, request, url_for
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from .blueprint import main_bp
@@ -11,7 +9,6 @@ from ..models import db
 from ..services.admin_service import (
     ADMIN_TABS,
     build_admin_page_context,
-    export_operational_config,
     handle_admin_form,
 )
 
@@ -76,21 +73,6 @@ def admin_screen():
         "admin_screen_screenshot.html",
         title="Admin Screen",
         **build_admin_page_context(active_tab=active_tab),
-    )
-
-
-@main_bp.route("/screen/admin/export/config", methods=["GET"])
-@screen_required("admin_screen")
-def admin_export_config():
-    export_payload = export_operational_config()
-    timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
-    filename = "envbooking-operational-config-{}.json".format(timestamp)
-    return Response(
-        json.dumps(export_payload, indent=2),
-        mimetype="application/json",
-        headers={
-            "Content-Disposition": 'attachment; filename="{}"'.format(filename),
-        },
     )
 
 

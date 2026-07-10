@@ -75,7 +75,7 @@ class VersionFetcherTests(unittest.TestCase):
     def setUp(self):
         self.fetcher = VersionFetcher(executor=MagicMock())
 
-    def test_parse_output_prefers_patch_version_from_deploy_info(self):
+    def test_parse_output_uses_first_version_from_deploy_info(self):
         output = """
 [Deploy Info]
 env_name = DEV01
@@ -97,7 +97,7 @@ versions = tcs_service-1.1.2.3_Patch1_20260604 tcs_service-1.1.2.3_20260604
         )
         self.assertIn("versions =", parsed["raw_output"])
 
-    def test_parse_output_prefers_highest_patch_version_from_deploy_info(self):
+    def test_parse_output_uses_first_version_from_deploy_info_priority_list(self):
         output = """
 [Deploy Info]
 env_name = DEV01
@@ -112,6 +112,23 @@ versions = tcs_server-1.1.2.1_Patch2_20260623 tcs_server-1.1.2.1_Patch1_20260623
         self.assertEqual(
             parsed["versions"],
             {"gateway": "tcs_server-1.1.2.1_Patch2_20260623"},
+        )
+
+    def test_parse_output_uses_first_version_from_getway_deploy_info_priority_list(self):
+        output = """
+[Deployment Info]
+environment_name = dev01
+server = getway
+install_user = dev01app
+env_file = path/env/env_file.xml
+deployed_num = 21
+mode = TFT
+versions = tcs_server-mqm_PC-1020.1.1.2.1_Patch2_mqm_keept_20260623 tcs_server-1.1.2.1_Patch1_20260623 tcs_server-1.1.2.1_20260623
+"""
+        parsed = self.fetcher.parse_output(output)
+        self.assertEqual(
+            parsed["versions"],
+            {"getway": "tcs_server-mqm_PC-1020.1.1.2.1_Patch2_mqm_keept_20260623"},
         )
 
     def test_parse_output_uses_single_version_from_deploy_info(self):

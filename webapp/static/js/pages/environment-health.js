@@ -33,14 +33,6 @@
             .replace(/'/g, "&#39;");
     }
 
-    function calculatePercent(value, total) {
-        if (!total || total === 0) {
-            return "0.0%";
-        }
-
-        return ((value / total) * 100).toFixed(1) + "%";
-    }
-
     function formatBrowserTimestamp(value) {
         if (!value || value === "-" || value === "Never") {
             return value || "-";
@@ -92,10 +84,6 @@
         document.getElementById("warningCount").textContent = normalized.warning;
         document.getElementById("criticalCount").textContent = normalized.critical;
         document.getElementById("maintenanceCount").textContent = normalized.maintenance;
-        document.getElementById("healthyPercent").textContent = calculatePercent(normalized.healthy, normalized.total);
-        document.getElementById("warningPercent").textContent = calculatePercent(normalized.warning, normalized.total);
-        document.getElementById("criticalPercent").textContent = calculatePercent(normalized.critical, normalized.total);
-        document.getElementById("maintenancePercent").textContent = calculatePercent(normalized.maintenance, normalized.total);
         document.getElementById("lastUpdated").textContent = normalized.last_updated;
     }
 
@@ -231,7 +219,7 @@
         const envId = status.env_id || "UNKNOWN";
         const active = activeEnvIds.includes(envId) ? " active-booking" : "";
         const runtime = status.tcs_runtime || {};
-        const versions = runtime.display_version || (runtime.versions || []).join(", ");
+        const versions = runtime.display_version || "";
         const serviceTypes = (runtime.service_types || []).join(", ");
         const testingModes = (runtime.testing_modes || []).join(", ");
         const notRunningComponents = status.not_running_components || [];
@@ -259,11 +247,6 @@
         });
         const tooltip = tooltipLines.join("\n");
 
-        const redActive = serverStatus === "critical" ? "active" : "";
-        const yellowActive = serverStatus === "warning" ? "active" : "";
-        const greenActive = serverStatus === "healthy" ? "active" : "";
-        const blueActive = serverStatus === "maintenance" ? "active" : "";
-
         let statusClass = serverStatus;
         if (!["healthy", "warning", "critical", "maintenance"].includes(statusClass)) {
             statusClass = "unknown";
@@ -271,11 +254,11 @@
 
         return [
             '<div class="env-card' + active + '" tabindex="0" data-tooltip="' + escapeAttribute(tooltip) + '" data-env-id="' + escapeAttribute(envId) + '" data-env-type="' + escapeAttribute(status.env_type || "") + '">',
+            '<div class="env-card-row">',
+            '<div class="status-signal">',
+            '<span class="signal-dot ' + statusClass + '"></span>',
+            "</div>",
             '<div class="env-card-title">' + escapeAttribute(envId) + '</div>',
-            '<div class="traffic-light">',
-            '<span class="light red ' + redActive + '"></span>',
-            '<span class="light yellow ' + yellowActive + '"></span>',
-            '<span class="light ' + (blueActive ? "blue" : "green") + ' ' + (blueActive || greenActive) + '"></span>',
             "</div>",
             "</div>"
         ].join("");
@@ -441,8 +424,20 @@
         return window.matchMedia("(max-width: 768px)").matches;
     }
 
-    function updateSidebarButton(button, layout) {
-        if (!button || !layout) {
+    function renderSidebarToggleMarkup(sidebarVisible) {
+        return [
+            '<span class="sidebar-toggle-label">',
+            '<i class="fas fa-layer-group"></i>',
+            '<span>Menu</span>',
+            '</span>',
+            '<span class="sidebar-toggle-arrow" aria-hidden="true">',
+            '<i class="fas ' + (sidebarVisible ? 'fa-angle-left' : 'fa-angle-right') + '"></i>',
+            '</span>'
+        ].join("");
+    }
+
+    function updateSidebarButton(button, layout, reopenButton) {
+        if (!layout) {
             return;
         }
 
@@ -450,11 +445,21 @@
             ? layout.classList.contains("sidebar-open")
             : !layout.classList.contains("sidebar-collapsed");
 
-        button.setAttribute("aria-expanded", sidebarVisible ? "true" : "false");
-        const label = sidebarVisible ? "Hide Sidebar" : "Show Sidebar";
-        button.setAttribute("aria-label", label);
-        button.setAttribute("title", label);
-        button.innerHTML = '<i class="fas fa-bars"></i>';
+        const label = sidebarVisible ? "Hide Menu" : "Show Menu";
+
+        if (button) {
+            button.setAttribute("aria-expanded", sidebarVisible ? "true" : "false");
+            button.setAttribute("aria-label", label);
+            button.setAttribute("title", label);
+            button.innerHTML = '<i class="fas ' + (sidebarVisible ? 'fa-angle-left' : 'fa-angle-right') + '"></i>';
+        }
+
+        if (reopenButton) {
+            reopenButton.setAttribute("aria-expanded", sidebarVisible ? "true" : "false");
+            reopenButton.setAttribute("aria-label", sidebarVisible ? "Hide Menu" : "Show Menu");
+            reopenButton.setAttribute("title", sidebarVisible ? "Hide Menu" : "Show Menu");
+            reopenButton.innerHTML = renderSidebarToggleMarkup(sidebarVisible);
+        }
     }
 
     function syncBackdrop(backdrop, layout) {
@@ -465,7 +470,7 @@
         backdrop.hidden = !(isMobileViewport() && layout.classList.contains("sidebar-open"));
     }
 
-    function applyInitialSidebarState(layout, backdrop, button) {
+    function applyInitialSidebarState(layout, backdrop, button, reopenButton) {
         if (!layout) {
             return;
         }
@@ -480,10 +485,10 @@
         }
 
         syncBackdrop(backdrop, layout);
-        updateSidebarButton(button, layout);
+        updateSidebarButton(button, layout, reopenButton);
     }
 
-    function toggleSidebar(layout, backdrop, button) {
+    function toggleSidebar(layout, backdrop, button, reopenButton) {
         if (!layout) {
             return;
         }
@@ -496,7 +501,7 @@
         }
 
         syncBackdrop(backdrop, layout);
-        updateSidebarButton(button, layout);
+        updateSidebarButton(button, layout, reopenButton);
     }
 
     function refreshHealth(manual) {
@@ -538,6 +543,7 @@
         const layout = document.getElementById("environmentDashboardLayout");
         const sidebarBackdrop = document.getElementById("environmentDashboardSidebarBackdrop");
         const toggleSidebarButton = document.getElementById("toggleSidebarButton");
+        const sidebarReopenButton = document.getElementById("sidebarReopenButton");
         const dashboardGroups = document.getElementById("dashboardGroups");
         const contextMenu = document.getElementById("envContextMenu");
 
@@ -547,7 +553,12 @@
         });
         if (toggleSidebarButton) {
             toggleSidebarButton.addEventListener("click", function () {
-                toggleSidebar(layout, sidebarBackdrop, toggleSidebarButton);
+                toggleSidebar(layout, sidebarBackdrop, toggleSidebarButton, sidebarReopenButton);
+            });
+        }
+        if (sidebarReopenButton) {
+            sidebarReopenButton.addEventListener("click", function () {
+                toggleSidebar(layout, sidebarBackdrop, toggleSidebarButton, sidebarReopenButton);
             });
         }
         if (sidebarBackdrop) {
@@ -555,12 +566,12 @@
                 if (isMobileViewport()) {
                     layout.classList.remove("sidebar-open");
                     syncBackdrop(sidebarBackdrop, layout);
-                    updateSidebarButton(toggleSidebarButton, layout);
+                    updateSidebarButton(toggleSidebarButton, layout, sidebarReopenButton);
                 }
             });
         }
         window.addEventListener("resize", function () {
-            applyInitialSidebarState(layout, sidebarBackdrop, toggleSidebarButton);
+            applyInitialSidebarState(layout, sidebarBackdrop, toggleSidebarButton, sidebarReopenButton);
             hideContextMenu();
         });
         dashboardGroups.addEventListener("contextmenu", function (event) {
@@ -618,7 +629,7 @@
 
         updateSummary(currentSummary);
         renderDashboard();
-        applyInitialSidebarState(layout, sidebarBackdrop, toggleSidebarButton);
+        applyInitialSidebarState(layout, sidebarBackdrop, toggleSidebarButton, sidebarReopenButton);
 
         window.setInterval(function () {
             refreshHealth(false);

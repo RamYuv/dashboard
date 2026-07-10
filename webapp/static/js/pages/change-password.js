@@ -7,8 +7,8 @@
     const verifyPasswordButton = document.getElementById("verifyPasswordButton");
     const changePasswordMessage = document.getElementById("changePasswordMessage");
     const verifyPasswordMessage = document.getElementById("verifyPasswordMessage");
-    const newPasswordInput = document.getElementById("new_password");
-    const confirmPasswordInput = document.getElementById("confirm_password");
+    const newPasswordInput = document.getElementById("new_hzn");
+    const confirmPasswordInput = document.getElementById("confirm_hzn");
     const otpInputs = Array.prototype.slice.call(document.querySelectorAll(".otp-input"));
     const passwordFeedback = document.getElementById("passwordFeedback");
     const passwordMatchFeedback = document.getElementById("passwordMatchFeedback");

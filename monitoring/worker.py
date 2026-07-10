@@ -11,6 +11,8 @@ This module does not own scheduling. It only performs a single refresh when
 worker process.
 """
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
 from webapp.models import EnvironmentHostMapping
 from sqlalchemy.orm import joinedload
 
@@ -49,6 +51,7 @@ class EnvMonitorWorker:
     def _load_environment_mappings(self):
         """Load environment-to-server-type mappings and fetch raw VM status."""
         included_server_types = self._included_server_types()
+        max_workers = max(1, int(self.app.config.get("MONITOR_FETCH_THREADS", 4) or 1))
         mappings = (
             EnvironmentHostMapping.query
             .options(
@@ -62,7 +65,8 @@ class EnvMonitorWorker:
 
         vm_statuses = {}
         env_index = {}
-        host_status_cache = {}
+        fetch_plans = []
+        fetch_targets = {}
 
         for mapping in mappings:
             if not self._should_monitor_mapping(mapping, included_server_types):
@@ -85,20 +89,55 @@ class EnvMonitorWorker:
                 host = (mapping.host.ip_address or "").strip() or (mapping.host.hostname or "").strip() or None
                 host_label = (mapping.host.hostname or "").strip() or host
             username = mapping.deployment_user or ""
-            password = mapping.deployment_password or ""
+            password = mapping.deploy_user_hzn or ""
             fetch_key = (host, username, password, server_type)
-            if fetch_key not in host_status_cache:
-                fetched_status = self.status_fetcher.fetch_vm_status(
-                    host,
-                    username,
-                    password,
-                    server_type=server_type,
-                    host_label=host_label,
-                )
-                host_status_cache[fetch_key] = fetched_status
-            vm_statuses[vm_id] = host_status_cache[fetch_key]
+            fetch_targets.setdefault(fetch_key, {
+                "host": host,
+                "username": username,
+                "password": password,
+                "server_type": server_type,
+                "host_label": host_label,
+            })
+            fetch_plans.append((vm_id, fetch_key))
+
+        host_status_cache = self._fetch_host_statuses(fetch_targets, max_workers)
+        for vm_id, fetch_key in fetch_plans:
+            vm_statuses[vm_id] = host_status_cache.get(fetch_key, {})
 
         return list(env_index.values()), vm_statuses
+
+    def _fetch_host_statuses(self, fetch_targets, max_workers):
+        if not fetch_targets:
+            return {}
+
+        host_status_cache = {}
+        if max_workers <= 1 or len(fetch_targets) == 1:
+            for fetch_key, target in fetch_targets.items():
+                host_status_cache[fetch_key] = self.status_fetcher.fetch_vm_status(
+                    target["host"],
+                    target["username"],
+                    target["password"],
+                    server_type=target["server_type"],
+                    host_label=target["host_label"],
+                )
+            return host_status_cache
+
+        with ThreadPoolExecutor(max_workers=min(max_workers, len(fetch_targets))) as executor:
+            future_map = {
+                executor.submit(
+                    self.status_fetcher.fetch_vm_status,
+                    target["host"],
+                    target["username"],
+                    target["password"],
+                    server_type=target["server_type"],
+                    host_label=target["host_label"],
+                ): fetch_key
+                for fetch_key, target in fetch_targets.items()
+            }
+            for future in as_completed(future_map):
+                host_status_cache[future_map[future]] = future.result()
+
+        return host_status_cache
 
     def refresh(self):
         """Run one end-to-end monitoring refresh and persist the snapshot."""

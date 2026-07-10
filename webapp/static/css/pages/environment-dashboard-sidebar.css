@@ -1,5 +1,8 @@
 :root {
     --env-dashboard-sidebar-width: 240px;
+    --env-sidebar-reopen-left: 12px;
+    --env-sidebar-reopen-width: 128px;
+    --env-sidebar-reopen-gap: 14px;
     --env-sidebar-panel: #3e5163;
     --env-sidebar-submenu: rgba(28, 40, 60, 0.74);
     --env-sidebar-active: linear-gradient(135deg, #16244f 0%, #1d2f66 100%);
@@ -13,22 +16,52 @@
     width: var(--env-dashboard-sidebar-width);
     background: var(--env-sidebar-panel);
     border-right: 1px solid rgba(21, 32, 51, 0.18);
-    padding: 20px 0 28px;
+    padding: 0 0 28px;
     position: fixed;
     left: 0;
-    top: var(--app-shell-header-height);
+    top: calc(var(--app-shell-header-height) + 10px);
     bottom: 0;
-    height: calc(100vh - var(--app-shell-header-height));
+    height: calc(100vh - var(--app-shell-header-height) - 10px);
     z-index: 35;
     transition: transform 0.25s ease, box-shadow 0.25s ease;
 }
 
+.sidebar-header-bar {
+    padding: 0.72rem 0.78rem;
+    border-bottom: 1px solid rgba(226, 232, 240, 0.22);
+    background: rgba(255, 255, 255, 0.04);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
 .sidebar-menu-title {
     color: var(--env-sidebar-text);
-    font-size: 2rem;
+    font-size: 0.86rem;
     font-weight: 700;
-    padding: 0 22px 18px;
-    letter-spacing: 0.01em;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: 0;
+}
+
+.sidebar-header-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border: 1px solid #dbe5f0;
+    border-radius: 999px;
+    background: #ffffff;
+    color: #475569;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.sidebar-header-toggle:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    color: #1e293b;
 }
 
 .sidebar-nav {
@@ -156,9 +189,86 @@
     box-shadow: none;
 }
 
+.sidebar-reopen-button {
+    position: fixed;
+    left: var(--env-sidebar-reopen-left);
+    top: calc(var(--app-shell-header-height) + 20px);
+    z-index: 34;
+    min-height: 42px;
+    width: var(--env-sidebar-reopen-width);
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border: 1px solid #dbe5f0;
+    border-radius: 12px;
+    background: #ffffff;
+    color: #475569;
+    padding: 6px 10px 6px 12px;
+    box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.sidebar-reopen-button:hover {
+    color: #1e293b;
+    border-color: #cbd5e1;
+    box-shadow: 0 8px 16px rgba(15, 23, 42, 0.12);
+}
+
+.app-layout.sidebar-collapsed .sidebar-reopen-button {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.sidebar-toggle-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.sidebar-toggle-label i {
+    font-size: 13px;
+}
+
+.sidebar-toggle-label span {
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.sidebar-toggle-arrow {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: 1px solid #dbe5f0;
+    border-radius: 999px;
+    background: #ffffff;
+    color: #475569;
+    flex: 0 0 auto;
+}
+
+.sidebar-toggle-arrow i {
+    font-size: 13px;
+}
+
 .app-layout.sidebar-collapsed .main-content {
     margin-left: 0;
     width: 100%;
+}
+
+.app-layout.sidebar-collapsed .main-content .content-wrapper {
+    padding-left: calc(
+        var(--env-sidebar-reopen-left) +
+        var(--env-sidebar-reopen-width) +
+        var(--env-sidebar-reopen-gap)
+    );
 }
 
 @media (max-width: 768px) {
@@ -170,6 +280,14 @@
     .main-content {
         margin-left: 0;
         width: 100%;
+    }
+
+    .app-layout.sidebar-collapsed .main-content .content-wrapper {
+        padding-left: 12px;
+    }
+
+    .sidebar-reopen-button {
+        display: none;
     }
 
     .app-layout.sidebar-open .sidebar {
