@@ -5,7 +5,7 @@
 {% block workspace_shell_title %}Environment Booking Form{% endblock %}
 {% block workspace_shell_subtitle %}Create a reservation and review the current TCS runtime before submitting.{% endblock %}
 {% block workspace_extra_head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/booking-grid.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/booking-grid.css', v='20260710-8') }}">
 {% endblock %}
 {% block workspace_content %}
 <div class="container-fluid px-0">
@@ -133,5 +133,5 @@ window.pageData = {
     currentDeploymentsApiUrl: {{ url_for('main.api_list_current_deployments')|tojson }}
 };
 </script>
-<script src="{{ url_for('static', filename='js/pages/booking-grid.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pages/booking-grid.js', v='20260712-1') }}"></script>
 {% endblock %}

@@ -14,7 +14,7 @@
 
     .admin-hero.card,
     .admin-panel.card {
-        border: 1px solid #e4ebf3;
+        border: 1px solid var(--app-theme-border);
         border-radius: 20px;
         box-shadow: 0 8px 24px rgba(16, 36, 71, 0.08) !important;
     }
@@ -38,13 +38,13 @@
         font-size: clamp(1.7rem, 2.4vw, 2.4rem);
         margin: 0;
         line-height: 1.08;
-        color: #1b2636;
+        color: var(--app-theme-primary-strong);
     }
 
     .admin-title-row p {
         margin: 0;
         max-width: 56rem;
-        color: #4e5d6e;
+        color: var(--app-theme-text-muted);
     }
 
     .admin-actions .btn {
@@ -63,52 +63,52 @@
     .admin-tabs .nav-link {
         background: transparent;
         border: 1px solid transparent;
-        color: #26384c;
+        color: var(--app-theme-primary-strong);
         font-weight: 600;
         padding: 0.52rem 0.82rem;
         white-space: nowrap;
     }
 
     .admin-tabs .nav-link:hover {
-        background: #f2f6fb;
-        border-color: #dce6f2;
-        color: #1f3144;
+        background: var(--app-theme-primary-soft);
+        border-color: var(--app-theme-border);
+        color: var(--app-theme-primary-strong);
     }
 
     .admin-tabs .nav-link.active {
-        background: #1f6feb;
+        background: var(--app-theme-primary);
         color: #ffffff;
         box-shadow: none;
     }
 
     .admin-panel h2 {
         margin-bottom: 0.3rem;
-        color: #1b2636;
+        color: var(--app-theme-primary-strong);
     }
 
     .admin-panel .form-label {
         font-size: 0.92rem;
         margin-bottom: 0.35rem;
-        color: #334559;
+        color: var(--app-theme-text);
     }
 
     .admin-panel .form-control,
     .admin-panel .form-select {
         border-radius: 10px;
-        border-color: #d8e2ef;
+        border-color: var(--app-theme-border);
         padding: 0.62rem 0.8rem;
         box-shadow: none;
     }
 
     .admin-panel .form-control:focus,
     .admin-panel .form-select:focus {
-        border-color: #76a9fa;
+        border-color: var(--app-theme-primary);
         box-shadow: 0 0 0 0.18rem rgba(31, 111, 235, 0.12);
     }
 
     .admin-panel .form-text,
     .admin-panel .form-check-label {
-        color: #536274;
+        color: var(--app-theme-text-muted);
     }
 
     .admin-table-wrap {
@@ -122,13 +122,13 @@
     .admin-table-wrap thead th {
         font-size: 0.84rem;
         letter-spacing: 0.01em;
-        color: #243548;
-        background: #f8fbff;
+        color: var(--app-theme-primary-strong);
+        background: var(--app-theme-surface);
     }
 
     .admin-table-wrap tbody td {
         vertical-align: middle;
-        color: #223245;
+        color: var(--app-theme-text);
     }
 
     .admin-action-cell {
@@ -558,7 +558,7 @@
                         <tbody>
                         {% for environment in environments %}
                             <tr>
-                                <td>{{ environment.env_id }}</td>
+                                <td><span class="app-env-label">{{ environment.env_id }}</span></td>
                                 <td>{{ environment.env_type }}</td>
                                 <td>{{ environment.domain or "-" }}</td>
                                 <td>{{ environment.description or "-" }}</td>
@@ -747,7 +747,7 @@
                         <tbody>
                         {% for mapping in environment_host_mappings %}
                             <tr>
-                                <td>{{ mapping.env_id }}</td>
+                                <td><span class="app-env-label">{{ mapping.env_id }}</span></td>
                                 <td>{{ mapping.env_type or "-" }}</td>
                                 <td>{{ mapping.server_type.server_type_key if mapping.server_type else "-" }}</td>
                                 <td>{% if mapping.host %}{{ mapping.host.hostname }}{% if mapping.host.ip_address %} ({{ mapping.host.ip_address }}){% endif %}{% else %}-{% endif %}</td>

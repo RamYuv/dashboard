@@ -78,7 +78,17 @@ def _preferred_tcs_version(versions):
     candidates = [value.strip() for value in (versions or []) if (value or "").strip()]
     if not candidates:
         return ""
-    return max(candidates, key=_version_sort_key)
+
+    best_version = candidates[0]
+    best_date = _extract_version_date(best_version)
+
+    for candidate in candidates[1:]:
+        candidate_date = _extract_version_date(candidate)
+        if candidate_date and (not best_date or candidate_date > best_date):
+            best_version = candidate
+            best_date = candidate_date
+
+    return best_version
 
 
 def _display_all_tcs_versions(versions):
@@ -134,10 +144,6 @@ def _display_tcs_runtime_version(runtime_rows):
 
     if not normalized_rows:
         return ""
-
-    for row in normalized_rows:
-        if _is_gateway_runtime(row.get("package_key"), row.get("package_name")):
-            return row["version"]
 
     return _display_tcs_version([row["version"] for row in normalized_rows])
 

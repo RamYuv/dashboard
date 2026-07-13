@@ -19,28 +19,6 @@ SCREENS = [
         "teams": ["access_admin"],
     },
     {
-        "endpoint": "manager_screen",
-        "title": "Manager Screen",
-        "description": "Team leads and admins can open this page.",
-        "roles": ["admin"],
-        "teams": [],
-        "requires_team_lead": True,
-    },
-    {
-        "endpoint": "alpha_screen",
-        "title": "Alpha Team Screen",
-        "description": "Only members of the Alpha team can open this page.",
-        "roles": ["admin"],
-        "teams": ["alpha"],
-    },
-    {
-        "endpoint": "general_screen",
-        "title": "General Screen",
-        "description": "Every logged-in user can open this page.",
-        "roles": [],
-        "teams": VALID_TEAMS,
-    },
-    {
         "endpoint": "booking_screen",
         "title": "Environment Booking",
         "description": "Book environments and manage your own reservations.",

@@ -1,16 +1,16 @@
         :root {
-            --shell-navy: #16244f;
+            --shell-navy: var(--app-theme-primary-strong);
             --shell-navy-deep: #0f1838;
-            --sidebar-start: #33496a;
-            --sidebar-end: #5b7291;
-            --canvas: #f4f7fb;
-            --panel: #ffffff;
-            --panel-line: #9aa9bc;
+            --sidebar-start: #6f859d;
+            --sidebar-end: #5f738a;
+            --canvas: linear-gradient(180deg, #f5f9ff 0%, #edf4fc 52%, #e4edf8 100%);
+            --panel: var(--app-theme-panel);
+            --panel-line: var(--app-theme-border-strong);
             --card-blue: #9ac4f2;
             --card-blue-dark: #79aee8;
-            --text-main: #152033;
-            --text-soft: #5f6d82;
-            --text-strong: #0f172a;
+            --text-main: var(--app-theme-text);
+            --text-soft: var(--app-theme-text-muted);
+            --text-strong: var(--app-theme-text-strong);
             --active-strip: #1a2140;
         }
 
@@ -33,9 +33,9 @@
             min-height: calc(100vh - var(--app-shell-header-height));
         }
 
-        .content-wrapper {
-            padding: 16px 20px 24px;
-        }
+.content-wrapper {
+    padding: 8px 20px 24px;
+}
 
         .page-intro {
             margin-bottom: 8px;
@@ -50,19 +50,19 @@
             letter-spacing: -0.02em;
         }
 
-        .toolbar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin-bottom: 4px;
-            position: sticky;
-            top: calc(var(--app-shell-header-height) + 8px);
-            z-index: 15;
-            background: rgba(244, 247, 251, 0.94);
-            padding: 6px 0;
-        }
+.toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 4px;
+    position: sticky;
+    top: calc(var(--app-shell-header-height) + 4px);
+    z-index: 15;
+            background: rgba(245, 249, 255, 0.96);
+    padding: 4px 0;
+}
 
         .toolbar-primary {
             display: flex;
@@ -72,7 +72,7 @@
         }
 
         .toolbar-page-title {
-            color: #0f172a;
+            color: var(--app-theme-primary);
             font-size: 20px;
             font-weight: 700;
             line-height: 1.1;
@@ -107,7 +107,7 @@
         }
 
         .summary-card {
-            background: #eaedee;
+            background: linear-gradient(180deg, #ffffff 0%, #eef4fb 100%);
             border: 1px solid var(--panel-line);
             border-radius: 10px;
             min-height: 48px;
@@ -162,7 +162,7 @@
             border-radius: 16px;
             margin-bottom: 12px;
             padding: 18px 18px 20px;
-            box-shadow: 0 10px 24px rgba(34, 51, 84, 0.07);
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
             position: relative;
             overflow: visible;
         }
@@ -197,12 +197,12 @@
 
         .env-card {
             background: #ffffff;
-            border: 1px solid #d7dbe1;
+            border: 1px solid var(--app-theme-border);
             border-radius: 14px;
             min-height: 46px;
             padding: 6px 12px;
             text-align: left;
-            color: #334155;
+            color: var(--app-theme-text);
             transition: 0.2s ease;
             cursor: pointer;
             display: inline-flex;
@@ -228,7 +228,7 @@
         .env-card:hover {
             transform: translateY(-1px);
             background: #ffffff;
-            border-color: #cfd6de;
+            border-color: var(--app-theme-border-strong);
             box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
             z-index: 40;
         }
@@ -327,11 +327,12 @@
             display: inline-flex;
             align-items: center;
             flex: 0 1 auto;
+            font-family: inherit;
             font-weight: 800;
-            font-size: 11px;
+            font-size: 13px;
             margin-bottom: 0;
             letter-spacing: 0.01em;
-            color: #000000;
+            color: var(--app-theme-text-strong);
             line-height: 1.1;
             white-space: nowrap;
             text-shadow: 0 0 0 transparent;
@@ -397,8 +398,8 @@
                 gap: 8px;
             }
 
-            .env-card-title {
-                font-size: 10px;
+             .env-card-title {
+                font-size: 11px;
             }
 
             .status-signal,
@@ -563,7 +564,7 @@
         }
 
         .about-modal .modal-header {
-            background: linear-gradient(180deg, #f8fbff 0%, #eef3f9 100%);
+            background: linear-gradient(180deg, #f5f9ff 0%, #edf4fc 52%, #e4edf8 100%);
             border-bottom: 1px solid rgba(154, 169, 188, 0.35);
             padding: 14px 18px;
         }
@@ -576,7 +577,7 @@
 
         .about-modal .modal-body {
             padding: 18px;
-            background: #fbfcfe;
+            background: #f8fbff;
         }
 
         .about-guide-card {
@@ -638,7 +639,7 @@
             padding: 10px 12px;
             border: 1px solid rgba(154, 169, 188, 0.8);
             border-radius: 14px;
-            background: #eaedee;
+            background: linear-gradient(180deg, #f8fbff 0%, #edf4fc 100%);
         }
 
         .guide-caption {

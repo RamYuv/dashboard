@@ -63,47 +63,10 @@
         });
     }
 
-    function versionSortKey(version) {
+    function extractVersionDate(version) {
         const value = String(version || "").trim();
-        if (!value) {
-            return { numbers: [], patch: -1, text: "" };
-        }
-
-        const numbers = (value.match(/\d+/g) || []).map(function (part) {
-            return Number(part);
-        });
-        const patchMatch = value.match(/_patch(\d+)/i);
-        return {
-            numbers: numbers,
-            patch: patchMatch ? Number(patchMatch[1]) : 0,
-            text: value.toLowerCase(),
-        };
-    }
-
-    function compareVersionKeys(left, right) {
-        const maxLength = Math.max(left.numbers.length, right.numbers.length);
-        let index = 0;
-
-        while (index < maxLength) {
-            const leftValue = left.numbers[index] || 0;
-            const rightValue = right.numbers[index] || 0;
-            if (leftValue !== rightValue) {
-                return leftValue - rightValue;
-            }
-            index += 1;
-        }
-
-        if (left.patch !== right.patch) {
-            return left.patch - right.patch;
-        }
-
-        if (left.text < right.text) {
-            return -1;
-        }
-        if (left.text > right.text) {
-            return 1;
-        }
-        return 0;
+        const match = value.match(/_(\d{8})$/);
+        return match ? match[1] : "";
     }
 
     function selectPreferredVersion(versions) {
@@ -113,13 +76,16 @@
         }
 
         return candidates.reduce(function (best, candidate) {
+            const bestDate = extractVersionDate(best);
+            const candidateDate = extractVersionDate(candidate);
+
             if (!best) {
                 return candidate;
             }
-            return compareVersionKeys(
-                versionSortKey(candidate),
-                versionSortKey(best)
-            ) > 0 ? candidate : best;
+            if (candidateDate && (!bestDate || candidateDate > bestDate)) {
+                return candidate;
+            }
+            return best;
         }, "");
     }
 

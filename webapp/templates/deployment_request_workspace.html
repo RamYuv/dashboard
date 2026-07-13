@@ -7,7 +7,7 @@
 {{ "Submit a tools deployment request against a logical tools environment." if deployment_mode == "tools" else "Create an environment deployment request with target, requested version, server selection, mode, and service details." }}
 {% endblock %}
 {% block workspace_extra_head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/deployment-request.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/deployment-request.css', v='20260710-8') }}">
 {% endblock %}
 {% block workspace_content %}
 <div class="container-fluid px-0">

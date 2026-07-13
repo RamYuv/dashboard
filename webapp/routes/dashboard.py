@@ -7,7 +7,7 @@ from ..helpers import can_user_access_environment
 from ..models import Environment
 
 from .blueprint import main_bp
-from ..auth_service import current_user, get_allowed_screens, login_required, screen_required
+from ..auth_service import current_user, get_allowed_screens, login_required
 
 
 @main_bp.route("/dashboard")
@@ -67,21 +67,3 @@ def environment_health():
         refresh_seconds=refresh_seconds,
         active_envs=dashboard_payload["active_envs"],
     )
-
-
-@main_bp.route("/screen/manager")
-@screen_required("manager_screen")
-def manager_screen():
-    return render_template("screen.html", title="Manager Screen")
-
-
-@main_bp.route("/screen/alpha")
-@screen_required("alpha_screen")
-def alpha_screen():
-    return render_template("screen.html", title="Alpha Team Screen")
-
-
-@main_bp.route("/screen/general")
-@screen_required("general_screen")
-def general_screen():
-    return render_template("screen.html", title="General Screen")

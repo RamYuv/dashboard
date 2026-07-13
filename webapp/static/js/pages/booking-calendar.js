@@ -191,7 +191,7 @@
         }
 
         activeHoverEventId = event.id;
-        hoverTitle.textContent = event.title || "Booking";
+        hoverTitle.innerHTML = '<span class="app-env-label">' + common.escapeHtml(event.title || "Booking") + "</span>";
         hoverMeta.innerHTML = hoverPreviewHtml(event);
         hoverCard.hidden = false;
         positionHoverCard(jsEvent);
@@ -214,7 +214,7 @@
         const localEnd = moment.utc(booking.end_time || booking.start_time).local().format("YYYY-MM-DD HH:mm");
         const detailRows = [
             buildDetailRow("Booking ID", booking.booking_id),
-            buildDetailRow("Environment", booking.env_id),
+            buildDetailRow("Environment", '<span class="app-env-label">' + common.escapeHtml(booking.env_id) + "</span>", true),
             buildDetailRow("Environment Type", event.extendedProps.env_type || "-"),
             buildDetailRow("Requested By", requesterDisplay(booking)),
             buildDetailRow("Booking Type", booking.booking_type || "-"),

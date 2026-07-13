@@ -184,7 +184,7 @@
 
             return '<tr>' +
                 '<td><div class="fw-semibold">' + common.escapeHtml(booking.booking_id) + "</div>" + note + "</td>" +
-                '<td><div class="fw-semibold">' + common.escapeHtml(environmentLabel) + '</div><div class="row-note">' + common.escapeHtml(environmentNote || "-") + "</div></td>" +
+                '<td><div><span class="app-env-label">' + common.escapeHtml(environmentLabel) + '</span></div><div class="row-note">' + common.escapeHtml(environmentNote || "-") + "</div></td>" +
                 "<td><div>" + common.escapeHtml(windowText) + "</div></td>" +
                 "<td>" + typePill(booking.booking_type) + "</td>" +
                 "<td>" + statusPill(booking) + "</td>" +

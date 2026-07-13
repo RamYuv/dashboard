@@ -167,33 +167,34 @@ class VersionFetcher:
         }
 
     def _parse_service_types(self, service_types_raw):
-        if not service_types_raw:
+        return self._split_unique_tokens(service_types_raw)
+
+    def _parse_deployed_num_service_types(self, deployed_num_raw):
+        return self._split_unique_tokens(
+            deployed_num_raw,
+            transform=self.DEPLOYED_NUM_SERVICE_TYPE_MAP.get,
+        )
+
+    def _split_unique_tokens(self, raw_value, transform=None):
+        if not raw_value:
             return []
 
         normalized = []
-        for token in re.split(r"[\s,]+", service_types_raw or ""):
+        for token in re.split(r"[\s,]+", raw_value):
             value = token.strip()
+            if not value:
+                continue
+            if transform:
+                value = transform(value)
             if value and value not in normalized:
                 normalized.append(value)
         return normalized
 
-    def _parse_deployed_num_service_types(self, deployed_num_raw):
-        if not deployed_num_raw:
-            return []
-
-        normalized = []
-        for token in re.split(r"[\s,]+", deployed_num_raw or ""):
-            value = token.strip()
-            service_type = self.DEPLOYED_NUM_SERVICE_TYPE_MAP.get(value)
-            if service_type and service_type not in normalized:
-                normalized.append(service_type)
-        return normalized
-
     def _select_preferred_version(self, versions_raw):
         candidates = [
-            token.strip().rstrip(",")
-            for token in re.split(r"\s+", versions_raw or "")
-            if token.strip().rstrip(",")
+            token.strip()
+            for token in re.split(r"[\s,]+", versions_raw or "")
+            if token.strip()
         ]
         if not candidates:
             return None

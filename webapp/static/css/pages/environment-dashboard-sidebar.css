@@ -1,35 +1,35 @@
 :root {
-    --env-dashboard-sidebar-width: 240px;
+    --env-dashboard-sidebar-width: 220px;
     --env-sidebar-reopen-left: 12px;
     --env-sidebar-reopen-width: 128px;
     --env-sidebar-reopen-gap: 14px;
-    --env-sidebar-panel: #3e5163;
-    --env-sidebar-submenu: rgba(28, 40, 60, 0.74);
-    --env-sidebar-active: linear-gradient(135deg, #16244f 0%, #1d2f66 100%);
-    --env-sidebar-hover: #f0f2f5;
+    --env-sidebar-panel: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+    --env-sidebar-submenu: linear-gradient(180deg, #f8fbff 0%, #f1f6fc 100%);
+    --env-sidebar-active: linear-gradient(135deg, var(--app-theme-primary-strong) 0%, var(--app-theme-primary) 100%);
+    --env-sidebar-hover: rgba(37, 99, 235, 0.08);
     --env-sidebar-active-text: #ffffff;
-    --env-sidebar-hover-text: #16243a;
-    --env-sidebar-text: #f8fbff;
+    --env-sidebar-hover-text: var(--app-theme-primary-strong);
+    --env-sidebar-text: #334155;
 }
 
 .sidebar {
-    width: var(--env-dashboard-sidebar-width);
+    width: var(--env-dashboard-sidebar-width) !important;
     background: var(--env-sidebar-panel);
-    border-right: 1px solid rgba(21, 32, 51, 0.18);
+    border-right: 1px solid rgba(148, 163, 184, 0.35);
     padding: 0 0 28px;
     position: fixed;
     left: 0;
-    top: calc(var(--app-shell-header-height) + 10px);
+    top: calc(var(--app-shell-header-height) + 4px);
     bottom: 0;
-    height: calc(100vh - var(--app-shell-header-height) - 10px);
+    height: calc(100vh - var(--app-shell-header-height) - 4px);
     z-index: 35;
     transition: transform 0.25s ease, box-shadow 0.25s ease;
 }
 
 .sidebar-header-bar {
     padding: 0.72rem 0.78rem;
-    border-bottom: 1px solid rgba(226, 232, 240, 0.22);
-    background: rgba(255, 255, 255, 0.04);
+    border-bottom: 1px solid rgba(148, 163, 184, 0.28);
+    background: rgba(248, 251, 255, 0.95);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -51,17 +51,17 @@
     justify-content: center;
     width: 2rem;
     height: 2rem;
-    border: 1px solid #dbe5f0;
+    border: 1px solid var(--app-theme-border);
     border-radius: 999px;
     background: #ffffff;
-    color: #475569;
+    color: var(--app-theme-primary);
     transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
 
 .sidebar-header-toggle:hover {
-    background: #f8fafc;
-    border-color: #cbd5e1;
-    color: #1e293b;
+    background: #f8fbff;
+    border-color: #bfd3ee;
+    color: var(--app-theme-primary-strong);
 }
 
 .sidebar-nav {
@@ -71,16 +71,16 @@
 .menu-item {
     display: block;
     color: var(--env-sidebar-text);
-    padding: 16px 22px;
+    padding: 0.66rem 0.78rem;
     text-decoration: none;
-    font-size: 1rem;
-    font-weight: 700;
-    background: var(--env-sidebar-panel);
+    font-size: 0.88rem;
+    font-weight: 600;
+    background: transparent;
     transition: background 0.2s ease, color 0.2s ease, padding-left 0.2s ease;
 }
 
 .menu-item.menu-item-light {
-    background: var(--env-sidebar-panel);
+    background: transparent;
     color: var(--env-sidebar-text);
 }
 
@@ -94,11 +94,12 @@
 .menu-item:hover {
     background: var(--env-sidebar-hover);
     color: var(--env-sidebar-hover-text);
-    padding-left: 26px;
+    padding-left: 1rem;
     text-decoration: none;
 }
 
 .menu-item.active:hover {
+    background: var(--env-sidebar-active);
     color: var(--env-sidebar-active-text);
 }
 
@@ -112,11 +113,11 @@
     align-items: center;
     justify-content: space-between;
     color: var(--env-sidebar-text);
-    padding: 16px 22px;
-    font-size: 1rem;
-    font-weight: 700;
+    padding: 0.66rem 0.78rem;
+    font-size: 0.88rem;
+    font-weight: 600;
     cursor: pointer;
-    background: var(--env-sidebar-panel);
+    background: transparent;
     border-left: 4px solid transparent;
     transition: background 0.2s ease, color 0.2s ease;
 }
@@ -145,14 +146,16 @@
 .menu-group-body {
     background: var(--env-sidebar-submenu);
     padding: 10px 0 12px;
+    border-top: 1px solid rgba(148, 163, 184, 0.14);
+    border-bottom: 1px solid rgba(148, 163, 184, 0.14);
 }
 
 .submenu-item {
     display: block;
     color: var(--env-sidebar-text);
     text-decoration: none;
-    padding: 14px 22px 14px 44px;
-    font-size: 0.95rem;
+    padding: 0.62rem 0.78rem 0.62rem 1.8rem;
+    font-size: 0.88rem;
     font-weight: 600;
     transition: background 0.2s ease, color 0.2s ease, padding-left 0.2s ease;
 }
@@ -160,11 +163,12 @@
 .submenu-item:hover {
     background: var(--env-sidebar-hover);
     color: var(--env-sidebar-hover-text);
-    padding-left: 48px;
+    padding-left: 2rem;
     text-decoration: none;
 }
 
 .submenu-item.active:hover {
+    background: var(--env-sidebar-active);
     color: var(--env-sidebar-active-text);
 }
 
@@ -172,7 +176,7 @@
     margin-left: var(--env-dashboard-sidebar-width);
     width: calc(100% - var(--env-dashboard-sidebar-width));
     min-height: calc(100vh - var(--app-shell-header-height));
-    background: linear-gradient(180deg, #fbfdff 0%, #eef3f9 100%);
+    background: linear-gradient(180deg, #f5f9ff 0%, #edf4fc 52%, #e4edf8 100%);
     position: relative;
     transition: margin-left 0.25s ease, width 0.25s ease;
 }
@@ -192,7 +196,7 @@
 .sidebar-reopen-button {
     position: fixed;
     left: var(--env-sidebar-reopen-left);
-    top: calc(var(--app-shell-header-height) + 20px);
+    top: calc(var(--app-shell-header-height) + 12px);
     z-index: 34;
     min-height: 42px;
     width: var(--env-sidebar-reopen-width);
@@ -200,10 +204,10 @@
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    border: 1px solid #dbe5f0;
+    border: 1px solid var(--app-theme-border);
     border-radius: 12px;
     background: #ffffff;
-    color: #475569;
+    color: var(--app-theme-primary);
     padding: 6px 10px 6px 12px;
     box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);
     opacity: 0;
@@ -212,8 +216,8 @@
 }
 
 .sidebar-reopen-button:hover {
-    color: #1e293b;
-    border-color: #cbd5e1;
+    color: var(--app-theme-primary-strong);
+    border-color: #bfd3ee;
     box-shadow: 0 8px 16px rgba(15, 23, 42, 0.12);
 }
 
@@ -247,10 +251,10 @@
     justify-content: center;
     width: 28px;
     height: 28px;
-    border: 1px solid #dbe5f0;
+    border: 1px solid var(--app-theme-border);
     border-radius: 999px;
     background: #ffffff;
-    color: #475569;
+    color: var(--app-theme-primary);
     flex: 0 0 auto;
 }
 
