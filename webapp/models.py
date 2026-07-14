@@ -276,11 +276,9 @@ class PayUi(db.Model):
     environment = db.relationship("Environment", backref="pay_ui_link", uselist=False)
 
     def get_url(self, access_type):
-        access_enum = PayUiAccessType.from_value(access_type)
-        normalized = access_enum.value if access_enum is not None else (access_type or "").strip().lower()
-        if normalized in {PayUiAccessType.PAY_URL.value, "user_pay_weblink", "user-pay-weblink"}:
+        if access_type == PayUiAccessType.PAY_URL.value:
             return (self.pay_url or "").strip()
-        if normalized in {PayUiAccessType.PAY_ADMIN.value, "pay_admin_url", "access_pay_admin_link", "access-pay-admin-link"}:
+        if access_type == PayUiAccessType.PAY_ADMIN.value:
             return (self.pay_adm_url or "").strip()
         return ""
 

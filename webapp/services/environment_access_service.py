@@ -156,25 +156,17 @@ class EnvironmentAccessService:
 
     @classmethod
     def _resolve_binary_path(cls, configured_value, default_name):
-        candidates = []
         if configured_value:
-            candidates.append(Path(configured_value))
+            configured_path = Path(configured_value)
+            return configured_path if configured_path.exists() else None
 
         project_root = current_app.config.get("PROJECT_ROOT")
-        if project_root:
-            root_path = Path(project_root)
-            candidates.extend(
-                [
-                    root_path / default_name,
-                    root_path / (default_name + ".exe"),
-                    root_path / "bin" / default_name,
-                    root_path / "bin" / (default_name + ".exe"),
-                ]
-            )
+        if not project_root:
+            return None
 
-        for candidate in candidates:
-            if candidate.exists():
-                return candidate
+        default_path = Path(project_root) / "bin" / (default_name + ".exe")
+        if default_path.exists():
+            return default_path
         return None
 
     @classmethod
