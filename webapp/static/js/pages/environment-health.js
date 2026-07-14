@@ -369,6 +369,20 @@
             return;
         }
 
+        const pendingWindow = window.open("", "_blank");
+        if (!pendingWindow) {
+            window.alert("Popup was blocked. Please allow popups for terminal access.");
+            hideContextMenu();
+            return;
+        }
+
+        try {
+            pendingWindow.document.write("<title>Opening terminal...</title><p>Opening terminal access...</p>");
+            pendingWindow.document.close();
+        } catch (_error) {
+            return null;
+        }
+
         fetch(ACCESS_SESSION_API_URL, {
             method: "POST",
             credentials: "include",
@@ -387,24 +401,16 @@
             })
             .then(function (result) {
                 if (!result.ok) {
+                    pendingWindow.close();
                     window.alert(result.data.error || "Failed to start terminal access.");
                     return;
                 }
 
-                const accessWindow = window.open(
-                    result.data.access_url,
-                    result.data.session_id
-                );
-
-                if (!accessWindow) {
-                    window.alert("Popup was blocked. Please allow popups for terminal access.");
-                    closeTerminalAccessSession(result.data.session_id);
-                    return;
-                }
-
-                terminalSessionWindows.set(result.data.session_id, accessWindow);
+                pendingWindow.location.replace(result.data.access_url);
+                terminalSessionWindows.set(result.data.session_id, pendingWindow);
             })
             .catch(function () {
+                pendingWindow.close();
                 window.alert("Failed to start terminal access.");
             })
             .finally(function () {
