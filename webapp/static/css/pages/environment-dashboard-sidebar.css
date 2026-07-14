@@ -8,8 +8,8 @@
     --env-sidebar-active: linear-gradient(135deg, var(--app-theme-primary-strong) 0%, var(--app-theme-primary) 100%);
     --env-sidebar-hover: rgba(37, 99, 235, 0.08);
     --env-sidebar-active-text: #ffffff;
-    --env-sidebar-hover-text: var(--app-theme-primary-strong);
-    --env-sidebar-text: #334155;
+    --env-sidebar-hover-text: #0f172a;
+    --env-sidebar-text: #111111;
 }
 
 .sidebar {
@@ -38,7 +38,7 @@
 
 .sidebar-menu-title {
     color: var(--env-sidebar-text);
-    font-size: 0.86rem;
+    font-size: 0.94rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -73,8 +73,8 @@
     color: var(--env-sidebar-text);
     padding: 0.66rem 0.78rem;
     text-decoration: none;
-    font-size: 0.88rem;
-    font-weight: 600;
+    font-size: 0.98rem;
+    font-weight: 700;
     background: transparent;
     transition: background 0.2s ease, color 0.2s ease, padding-left 0.2s ease;
 }
@@ -114,8 +114,8 @@
     justify-content: space-between;
     color: var(--env-sidebar-text);
     padding: 0.66rem 0.78rem;
-    font-size: 0.88rem;
-    font-weight: 600;
+    font-size: 0.98rem;
+    font-weight: 700;
     cursor: pointer;
     background: transparent;
     border-left: 4px solid transparent;
@@ -155,8 +155,8 @@
     color: var(--env-sidebar-text);
     text-decoration: none;
     padding: 0.62rem 0.78rem 0.62rem 1.8rem;
-    font-size: 0.88rem;
-    font-weight: 600;
+    font-size: 0.95rem;
+    font-weight: 700;
     transition: background 0.2s ease, color 0.2s ease, padding-left 0.2s ease;
 }
 

@@ -14,6 +14,7 @@ from ..helpers import (
 from ..models import CurrentDeploymentState
 from ..services.booking_service import BookingService
 from ..services.deployment_request_service import DeploymentRequestService
+from ..services.environment_access_service import EnvironmentAccessService
 
 
 @main_bp.route("/api/bookings", methods=["GET"])
@@ -221,3 +222,60 @@ def api_environment_health_logs(env_id):
 def api_environment_health_auto_remediate(env_id):
     _ = env_id
     return json_error("Feature is not available yet.", 501)
+
+
+@main_bp.route("/api/environment-access/session", methods=["POST"])
+@login_required
+def api_create_environment_access_session():
+    user = current_user()
+    data = request.get_json(silent=True) or {}
+    env_id = (data.get("env_id") or "").strip()
+    access_type = (data.get("access_type") or "").strip()
+
+    if not env_id:
+        return json_error("env_id is required.", 400)
+    if not access_type:
+        return json_error("access_type is required.", 400)
+
+    session_data, error = EnvironmentAccessService.start_terminal_session(
+        env_id,
+        access_type,
+        user=user,
+        request_host=request.host,
+    )
+    if error:
+        return json_error(error, 400)
+
+    return jsonify(session_data)
+
+
+@main_bp.route("/api/environment-access/session/close", methods=["POST"])
+@login_required
+def api_close_environment_access_session():
+    data = request.get_json(silent=True) or {}
+    session_id = (data.get("session_id") or "").strip()
+
+    closed, error = EnvironmentAccessService.close_terminal_session(session_id)
+    if error:
+        return json_error(error, 400 if session_id else 422)
+
+    return jsonify({"closed": bool(closed), "session_id": session_id})
+
+
+@main_bp.route("/api/environment-access/link", methods=["POST"])
+@login_required
+def api_get_environment_access_link():
+    data = request.get_json(silent=True) or {}
+    env_id = (data.get("env_id") or "").strip()
+    access_type = (data.get("access_type") or "").strip()
+
+    if not env_id:
+        return json_error("env_id is required.", 400)
+    if not access_type:
+        return json_error("access_type is required.", 400)
+
+    link_data, error = EnvironmentAccessService.get_pay_ui_link(env_id, access_type)
+    if error:
+        return json_error(error, 400)
+
+    return jsonify(link_data)

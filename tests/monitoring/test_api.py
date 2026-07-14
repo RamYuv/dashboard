@@ -31,9 +31,9 @@ class MonitoringApiVersionDisplayTests(unittest.TestCase):
                 "tcs_server-1.1.2.1_Patch2",
             ]
         )
-        self.assertEqual(result, "tcs_server-1.1.2.1_Patch2")
+        self.assertEqual(result, "tcs_server-1.1.2.1_Patch1")
 
-    def test_display_tcs_version_prefers_latest_build_date_across_core_and_getway(self):
+    def test_display_tcs_version_prefers_latest_build_date(self):
         result = monitoring_api._display_tcs_version(
             [
                 "tcs_server-1.1.2.1_Patch1_20260615",
@@ -45,38 +45,38 @@ class MonitoringApiVersionDisplayTests(unittest.TestCase):
             "tcs_server-mqm_PC-1020.1.1.2.1_Patch2_mqm_keept_20260623",
         )
 
-    def test_display_tcs_runtime_version_prefers_getway_row_for_tooltip(self):
+    def test_display_tcs_runtime_version_prefers_latest_build_date(self):
         result = monitoring_api._display_tcs_runtime_version(
             [
                 {
                     "package_key": "core",
                     "package_name": "core",
-                    "version": "tcs_server-1.1.2.1_Patch1_20260623",
+                    "version": "tcs_server-1.1.2.3_Patch7_20251022",
                 },
                 {
                     "package_key": "getway",
                     "package_name": "getway",
-                    "version": "tcs_server-mqm_PC-1020.1.1.2.1_Patch2_mqm_keept_20260623",
+                    "version": "tcs_server_1.1.2.3_Patch3_20250805",
                 },
             ]
         )
         self.assertEqual(
             result,
-            "tcs_server-mqm_PC-1020.1.1.2.1_Patch2_mqm_keept_20260623",
+            "tcs_server-1.1.2.3_Patch7_20251022",
         )
 
-    def test_display_tcs_runtime_version_falls_back_when_gateway_row_missing(self):
+    def test_display_tcs_runtime_version_returns_first_when_dates_are_equal(self):
         result = monitoring_api._display_tcs_runtime_version(
             [
                 {
                     "package_key": "core",
                     "package_name": "core",
-                    "version": "tcs_server-1.1.2.1_Patch1_20260623",
+                    "version": "tcs_server-1.1.2.1_Patch1_20260624",
                 },
                 {
                     "package_key": "cordb",
                     "package_name": "cordb",
-                    "version": "tcs_server-1.1.2.1_Patch1_20260624",
+                    "version": "tcs_server-1.1.2.1_Patch9_20260624",
                 },
             ]
         )

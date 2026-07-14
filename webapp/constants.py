@@ -2,8 +2,6 @@
 Application-wide constants and configuration values.
 """
 
-# Team Definitions
-VALID_TEAMS = ["alpha", "beta", "support", "qa", "env", "dev", "access_admin"]
 VALID_BOOKING_TYPES = ["RESERVATION"]
 
 BOOKING_STATUS = {

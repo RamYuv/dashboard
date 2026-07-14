@@ -5,7 +5,7 @@ Utility and helper functions for common operations.
 from datetime import datetime, timedelta, timezone
 from flask import current_app, has_app_context, jsonify
 
-from .models import ComponentBuild, DeploymentRequest, Environment, EnvironmentBooking, Role, format_datetime
+from .models import ComponentBuild, DeploymentRequest, Environment, EnvironmentBooking, Role, Team, format_datetime
 from .domain.deployment_targets import get_target_definition
 from .constants import (
     BOOKING_LIFECYCLE_STATUS,
@@ -13,7 +13,6 @@ from .constants import (
     BOOKING_STATUS_ALIASES,
     COMPONENT_VERSIONS,
     PACKAGE_VERSIONS,
-    VALID_TEAMS,
 )
 
 DEFAULT_ROLE_NAMES = ["user", "admin"]
@@ -34,13 +33,13 @@ def can_user_access_environment(user, environment):
     """Return whether the user may access/book the given environment."""
     if user is None or environment is None:
         return False
-    if getattr(user, "role", "") == "admin":
+    if getattr(user, "is_admin", False):
         return True
 
-    domain = (getattr(environment, "domain", "") or "").strip().lower()
-    if not domain:
+    team = (getattr(environment, "team", "") or "").strip().lower()
+    if not team:
         return False
-    return domain in get_user_team_names(user)
+    return team in get_user_team_names(user)
 
 def json_error(message, status_code):
     """Create a JSON error response."""
@@ -199,6 +198,23 @@ def get_valid_roles():
     return roles or list(DEFAULT_ROLE_NAMES)
 
 
+def get_valid_team_names():
+    """Return active team names from the database, with a startup-safe fallback."""
+    if not has_app_context():
+        return []
+
+    try:
+        teams = [
+            (team.team_name or "").strip().lower()
+            for team in Team.query.order_by(Team.team_name).all()
+            if (team.team_name or "").strip()
+        ]
+    except Exception:
+        teams = []
+
+    return teams
+
+
 def normalize_role(role):
     """Normalize role to valid value or default to 'user'."""
     role = (role or "user").strip().lower()
@@ -208,7 +224,8 @@ def normalize_role(role):
 def normalize_team(team):
     """Normalize team to valid value or default to 'support'."""
     team = (team or "support").strip().lower()
-    return team if team in VALID_TEAMS else "support"
+    valid_teams = get_valid_team_names()
+    return team if team in valid_teams else "support"
 
 
 def serialize_booking(booking):
@@ -401,7 +418,7 @@ def get_environments(user=None):
         {
             "env_id": environment.env_id,
             "env_type": environment.env_type,
-            "domain": environment.domain,
+            "team": environment.team,
             "description": environment.description,
         }
         for environment in environments

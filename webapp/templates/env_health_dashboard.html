@@ -128,7 +128,7 @@
 
                 <div class="summary-card">
                     <div>
-                        <div class="summary-title">Healthy</div>
+                        <div class="summary-title">Running</div>
                         <div class="summary-number" id="healthyCount">{{ summary.healthy }}</div>
                     </div>
                 </div>
@@ -160,6 +160,12 @@
             <div id="envContextMenu" class="env-context-menu" hidden>
                 <div id="envContextMenuTitle" class="env-context-menu-title">Environment</div>
                 <button type="button" data-action="booking" disabled><i class="fas fa-calendar-plus"></i> Booking</button>
+                <button type="button" data-action="access-core-server"><i class="fas fa-server"></i> Access Core Server</button>
+                <button type="button" data-action="access-gateway-server"><i class="fas fa-network-wired"></i> Access Gateway Server</button>
+                <button type="button" data-action="user-pay-weblink"><i class="fas fa-globe"></i> User Pay Weblink</button>
+                <button type="button" data-action="access-core-database"><i class="fas fa-database"></i> Access Core Database</button>
+                <button type="button" data-action="access-lg-database"><i class="fas fa-database"></i> Access LG Database</button>
+                <button type="button" data-action="access-pay-admin-link"><i class="fas fa-link"></i> Access Pay Admin link</button>
                 <button type="button" data-action="investigate-env" disabled><i class="fas fa-search"></i> Investigate Environment</button>
                 <button type="button" data-action="auto-remediate" disabled><i class="fas fa-tools"></i> Auto Remediate</button>
                 <button type="button" data-action="logs" disabled><i class="fas fa-file-alt"></i> Tail Logs</button>
@@ -258,6 +264,10 @@
     {{ {
         "apiUrl": url_for("monitoring.api_environment_health"),
         "bookingGridUrl": url_for("booking.booking_grid"),
+        "accessSessionApiUrl": url_for("main.api_create_environment_access_session"),
+        "closeAccessSessionApiUrl": url_for("main.api_close_environment_access_session"),
+        "accessLinkApiUrl": url_for("main.api_get_environment_access_link"),
+        "accessActions": access_actions,
         "refreshSeconds": refresh_seconds,
         "userRole": role,
         "userTeams": team_names | default([], true),
@@ -269,5 +279,5 @@
 </script>
 {% endblock %}
 {% block scripts %}
-    <script src="{{ url_for('static', filename='js/pages/environment-health.js', v='20260710-6') }}"></script>
+    <script src="{{ url_for('static', filename='js/pages/environment-health.js', v='20260714-1') }}"></script>
 {% endblock %}

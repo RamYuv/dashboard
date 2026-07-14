@@ -8,12 +8,17 @@
     const config = JSON.parse(configElement.textContent);
     const API_URL = config.apiUrl;
     const BOOKING_GRID_URL = config.bookingGridUrl;
+    const ACCESS_SESSION_API_URL = config.accessSessionApiUrl;
+    const CLOSE_ACCESS_SESSION_API_URL = config.closeAccessSessionApiUrl;
+    const ACCESS_LINK_API_URL = config.accessLinkApiUrl;
+    const ACCESS_ACTIONS = config.accessActions || {};
     const REFRESH_SECONDS = Number(config.refreshSeconds || 30);
     const SIDEBAR_STATE_KEY = "envDashboardSidebarCollapsed";
     const USER_ROLE = (config.userRole || "").toString().toLowerCase();
     const BOOKABLE_ENV_IDS = (config.bookableEnvIds || []).map(function (envId) {
         return (envId || "").toString().toUpperCase();
     });
+    const terminalSessionWindows = new Map();
 
     let latestStatuses = config.statuses || [];
     let activeEnvIds = config.activeEnvs || [];
@@ -87,19 +92,12 @@
         document.getElementById("lastUpdated").textContent = normalized.last_updated;
     }
 
-    function getEnvDisplayName(envType) {
-        const key = (envType || "").toUpperCase();
-        const names = {
-            DEV: "Development (DEV)",
-            ST: "System Testing (ST)",
-            PROD: "Production",
-            QA: "QA",
-            UAT: "UAT",
-            DR: "DR",
-            TOOLS: "Tools"
-        };
-
-        return names[key] || envType;
+    function getGroupDisplayName(teamName) {
+        const value = (teamName || "").toString().trim();
+        if (!value) {
+            return "Unassigned";
+        }
+        return value.toUpperCase();
     }
 
     function canBookEnvironment(envId) {
@@ -173,13 +171,13 @@
 
     function groupStatuses(statuses) {
         return (statuses || []).reduce(function (groups, status) {
-            const envType = status.env_type || "OTHER";
+            const groupKey = status.team || "unassigned";
 
-            if (!groups[envType]) {
-                groups[envType] = [];
+            if (!groups[groupKey]) {
+                groups[groupKey] = [];
             }
 
-            groups[envType].push(status);
+            groups[groupKey].push(status);
             return groups;
         }, {});
     }
@@ -253,7 +251,7 @@
         }
 
         return [
-            '<div class="env-card' + active + '" tabindex="0" data-tooltip="' + escapeAttribute(tooltip) + '" data-env-id="' + escapeAttribute(envId) + '" data-env-type="' + escapeAttribute(status.env_type || "") + '">',
+            '<div class="env-card' + active + '" tabindex="0" data-tooltip="' + escapeAttribute(tooltip) + '" data-env-id="' + escapeAttribute(envId) + '" data-env-type="' + escapeAttribute(status.env_type || "") + '" data-team="' + escapeAttribute(status.team || "") + '">',
             '<div class="env-card-row">',
             '<div class="status-signal">',
             '<span class="signal-dot ' + statusClass + '"></span>',
@@ -287,7 +285,7 @@
                 '<section class="group-card">',
                 '<div class="group-header">',
                 '<i class="' + getEnvIcon(envType) + '"></i>',
-                "<h3>" + getEnvDisplayName(envType) + "</h3>",
+                "<h3>" + getGroupDisplayName(envType) + "</h3>",
                 '<span class="group-count">- ' + servers.length + " Servers</span>",
                 "</div>",
                 '<div class="server-grid">',
@@ -332,6 +330,135 @@
             : "Booking is allowed only for environments assigned to your team.";
     }
 
+    function getAccessActionLabel(action) {
+        const actionConfig = ACCESS_ACTIONS[action] || {};
+        return actionConfig.label || "Access Link";
+    }
+
+    function getTerminalAccessType(action) {
+        const actionConfig = ACCESS_ACTIONS[action] || {};
+        return actionConfig.kind === "terminal" ? (actionConfig.access_type || "") : "";
+    }
+
+    function getLinkAccessType(action) {
+        const actionConfig = ACCESS_ACTIONS[action] || {};
+        return actionConfig.kind === "link" ? (actionConfig.access_type || "") : "";
+    }
+
+    function closeTerminalAccessSession(sessionId) {
+        if (!sessionId || !CLOSE_ACCESS_SESSION_API_URL) {
+            return;
+        }
+
+        fetch(CLOSE_ACCESS_SESSION_API_URL, {
+            method: "POST",
+            credentials: "include",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ session_id: sessionId }),
+        }).catch(function () {
+            return null;
+        });
+    }
+
+    function launchTerminalAccessSession(action) {
+        const accessType = getTerminalAccessType(action);
+        if (!accessType || !ACCESS_SESSION_API_URL || !activeContextEnv || !activeContextEnv.env_id) {
+            hideContextMenu();
+            return;
+        }
+
+        fetch(ACCESS_SESSION_API_URL, {
+            method: "POST",
+            credentials: "include",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                env_id: activeContextEnv.env_id,
+                access_type: accessType,
+            }),
+        })
+            .then(function (response) {
+                return response.json().then(function (data) {
+                    return { ok: response.ok, data: data };
+                });
+            })
+            .then(function (result) {
+                if (!result.ok) {
+                    window.alert(result.data.error || "Failed to start terminal access.");
+                    return;
+                }
+
+                const accessWindow = window.open(
+                    result.data.access_url,
+                    result.data.session_id
+                );
+
+                if (!accessWindow) {
+                    window.alert("Popup was blocked. Please allow popups for terminal access.");
+                    closeTerminalAccessSession(result.data.session_id);
+                    return;
+                }
+
+                terminalSessionWindows.set(result.data.session_id, accessWindow);
+            })
+            .catch(function () {
+                window.alert("Failed to start terminal access.");
+            })
+            .finally(function () {
+                hideContextMenu();
+            });
+    }
+
+    function monitorClosedTerminalWindows() {
+        terminalSessionWindows.forEach(function (accessWindow, sessionId) {
+            if (!accessWindow || accessWindow.closed) {
+                terminalSessionWindows.delete(sessionId);
+                closeTerminalAccessSession(sessionId);
+            }
+        });
+    }
+
+    function launchConfiguredLink(action) {
+        const accessType = getLinkAccessType(action);
+        if (!accessType || !ACCESS_LINK_API_URL || !activeContextEnv || !activeContextEnv.env_id) {
+            hideContextMenu();
+            return;
+        }
+
+        fetch(ACCESS_LINK_API_URL, {
+            method: "POST",
+            credentials: "include",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                env_id: activeContextEnv.env_id,
+                access_type: accessType,
+            }),
+        })
+            .then(function (response) {
+                return response.json().then(function (data) {
+                    return { ok: response.ok, data: data };
+                });
+            })
+            .then(function (result) {
+                if (!result.ok) {
+                    window.alert(result.data.error || "Failed to open configured link.");
+                    return;
+                }
+                window.open(result.data.access_url, "_blank");
+            })
+            .catch(function () {
+                window.alert("Failed to open configured link.");
+            })
+            .finally(function () {
+                hideContextMenu();
+            });
+    }
+
     function showContextMenu(event, card) {
         const elements = getContextMenuElements();
         if (!elements.menu || !card) {
@@ -340,9 +467,11 @@
 
         const envId = card.dataset.envId || "";
         const envType = card.dataset.envType || "";
+        const team = card.dataset.team || "";
         activeContextEnv = {
             env_id: envId,
             env_type: envType,
+            team: team,
         };
 
         elements.title.textContent = envId || "Environment";
@@ -393,6 +522,18 @@
                     window.alert("Feature is not available yet.");
                 });
             hideContextMenu();
+            return;
+        }
+
+        const actionConfig = ACCESS_ACTIONS[action] || {};
+
+        if (actionConfig.kind === "terminal") {
+            launchTerminalAccessSession(action);
+            return;
+        }
+
+        if (actionConfig.kind === "link") {
+            launchConfiguredLink(action);
             return;
         }
 
@@ -630,6 +771,12 @@
         updateSummary(currentSummary);
         renderDashboard();
         applyInitialSidebarState(layout, sidebarBackdrop, toggleSidebarButton, sidebarReopenButton);
+        window.setInterval(monitorClosedTerminalWindows, 4000);
+        window.addEventListener("beforeunload", function () {
+            terminalSessionWindows.forEach(function (_accessWindow, sessionId) {
+                closeTerminalAccessSession(sessionId);
+            });
+        });
 
         window.setInterval(function () {
             refreshHealth(false);

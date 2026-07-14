@@ -197,7 +197,7 @@
             </div>
             <div class="summary-card">
                 <div class="summary-label">Current Scope</div>
-                <div class="summary-value" id="summaryScope">{{ "All" if user.role == "admin" else "Mine" }}</div>
+                <div class="summary-value" id="summaryScope">{{ "All" if user.is_admin else "Mine" }}</div>
             </div>
         </div>
 

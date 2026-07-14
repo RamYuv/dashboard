@@ -4,7 +4,7 @@ from flask import current_app, render_template
 
 from monitoring.api import _build_environment_health_payload, _get_active_booking_env_ids
 from ..helpers import can_user_access_environment
-from ..models import Environment
+from ..models import Environment, PayUiAccessType, ServerTypeKey
 
 from .blueprint import main_bp
 from ..auth_service import current_user, get_allowed_screens, login_required
@@ -49,8 +49,40 @@ def environment_health():
 
     grouped_statuses = {}
     for status in statuses:
-        grouped_statuses.setdefault(status["env_type"], []).append(status)
-    grouped_statuses = {env_type: grouped_statuses[env_type] for env_type in sorted(grouped_statuses)}
+        grouped_statuses.setdefault(status["team"], []).append(status)
+    grouped_statuses = {team: grouped_statuses[team] for team in sorted(grouped_statuses)}
+    access_actions = {
+        "access-core-server": {
+            "kind": "terminal",
+            "access_type": ServerTypeKey.CORE.value,
+            "label": "Access Core Server",
+        },
+        "access-gateway-server": {
+            "kind": "terminal",
+            "access_type": ServerTypeKey.GATEWAY.value,
+            "label": "Access Gateway Server",
+        },
+        "access-core-database": {
+            "kind": "terminal",
+            "access_type": ServerTypeKey.COREDB.value,
+            "label": "Access Core Database",
+        },
+        "access-lg-database": {
+            "kind": "terminal",
+            "access_type": ServerTypeKey.LGDB.value,
+            "label": "Access LG Database",
+        },
+        "user-pay-weblink": {
+            "kind": "link",
+            "access_type": PayUiAccessType.PAY_URL.value,
+            "label": "User Pay Weblink",
+        },
+        "access-pay-admin-link": {
+            "kind": "link",
+            "access_type": PayUiAccessType.PAY_ADMIN.value,
+            "label": "Access Pay Admin link",
+        },
+    }
 
     return render_template(
         "env_health_dashboard.html",
@@ -59,11 +91,12 @@ def environment_health():
         app_version=current_app.config.get("APP_VERSION", "1.0"),
         grouped_statuses=grouped_statuses,
         id=user.id,
-        role=user.role,
+        role=user.normalized_role,
         team_names=getattr(user, "team_names", []) or [],
         bookable_env_ids=bookable_env_ids,
         statuses=statuses,
         summary=summary,
         refresh_seconds=refresh_seconds,
         active_envs=dashboard_payload["active_envs"],
+        access_actions=access_actions,
     )

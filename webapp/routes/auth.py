@@ -8,7 +8,6 @@ from werkzeug.security import check_password_hash, generate_password_hash as gen
 
 from .blueprint import main_bp
 from ..auth_service import current_user, login_required
-from ..constants import VALID_TEAMS
 from ..helpers import normalize_role, normalize_team
 from ..models import PasswordChangeRequest, Team, TeamMember, User, db
 from ..services.email_service import EmailDeliveryError, SendmailEmailService
@@ -24,7 +23,7 @@ def _registration_team_choices():
     teams = Team.query.order_by(Team.team_name).all()
     if teams:
         return teams
-    return [Team(team_name=team_name) for team_name in VALID_TEAMS]
+    return [Team(team_name="support")]
 
 
 def _render_register_page(team_choices):

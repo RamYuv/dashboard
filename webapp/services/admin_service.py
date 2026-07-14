@@ -206,7 +206,7 @@ def delete_role_record(form):
 def create_environment(form):
     env_id = (form.get("env_id") or "").strip().upper()
     env_type = (form.get("env_type") or "").strip().upper()
-    domain = (form.get("domain") or "").strip().lower() or None
+    team = (form.get("team") or "").strip().lower() or None
     description = (form.get("description") or "").strip() or None
     is_active = normalize_checkbox(form.get("is_active"))
     if not env_id or not env_type:
@@ -217,7 +217,7 @@ def create_environment(form):
         Environment(
             env_id=env_id,
             env_type=env_type,
-            domain=domain,
+            team=team,
             description=description,
             is_active=is_active,
         )
@@ -239,7 +239,7 @@ def update_environment(form):
         return "Environment type is required."
 
     environment.env_type = env_type
-    environment.domain = (form.get("domain") or "").strip().lower() or None
+    environment.team = (form.get("team") or "").strip().lower() or None
     environment.description = (form.get("description") or "").strip() or None
     environment.is_active = normalize_checkbox(form.get("is_active"))
 

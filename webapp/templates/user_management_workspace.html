@@ -1018,7 +1018,7 @@
                                         {% for team in teams %}
                                             <label class="team-option">
                                                 <span class="team-option-main">
-                                                    <input type="checkbox" name="team_ids" value="{{ team.team_id }}" {% if team.team_name in user.team_names %}checked{% endif %}>
+                                                    <input type="checkbox" name="team_ids" value="{{ team.team_id }}" {% if team.team_name|lower in user.normalized_team_names %}checked{% endif %}>
                                                     <span>{{ team.team_name|upper }}</span>
                                                 </span>
                                                 <span class="team-option-lead">

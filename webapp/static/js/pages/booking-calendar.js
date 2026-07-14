@@ -60,25 +60,6 @@
             String(item.booking.requested_by_display || "").toLowerCase().includes(requestedBy);
     }
 
-    function mapBookingToEvent(item) {
-        const booking = item.booking;
-        return {
-            id: booking.booking_id,
-            title: booking.env_id + (booking.booking_type === "DEPLOYMENT" ? " | DEPLOY" : ""),
-            start: item.start.toDate(),
-            end: item.end.toDate(),
-            classNames: [
-                "booking-" + item.computedStatus,
-                booking.booking_type === "DEPLOYMENT" ? "booking-deployment" : "",
-            ].filter(Boolean),
-            extendedProps: {
-                booking: booking,
-                env_type: inferEnvType(booking.env_id),
-                computed_status: item.computedStatus,
-            },
-        };
-    }
-
     function updateStats(visibleBookings) {
         const computed = getComputedBookings();
         const active = computed.filter(function (item) {
@@ -135,6 +116,61 @@
         }
 
         return String(booking.requested_by_name || "").trim() || "-";
+    }
+
+    function requesterChipLabel(booking) {
+        const userId = String(booking.requested_by || "").trim();
+        if (userId) {
+            return userId;
+        }
+
+        const displayName = String(booking.requested_by_name || "").trim();
+        if (displayName) {
+            return displayName;
+        }
+
+        const explicitDisplay = String(booking.requested_by_display || "").trim();
+        if (explicitDisplay) {
+            return explicitDisplay.split(" (")[0];
+        }
+
+        return "";
+    }
+
+    function eventTitle(booking) {
+        const titleParts = [];
+        const requester = requesterChipLabel(booking);
+
+        if (requester) {
+            titleParts.push(requester);
+        }
+        if (booking.env_id) {
+            titleParts.push(booking.env_id);
+        }
+        if (booking.booking_type === "DEPLOYMENT") {
+            titleParts.push("DEPLOY");
+        }
+
+        return titleParts.join(" ") || (booking.env_id || "Booking");
+    }
+
+    function mapBookingToEvent(item) {
+        const booking = item.booking;
+        return {
+            id: booking.booking_id,
+            title: eventTitle(booking),
+            start: item.start.toDate(),
+            end: item.end.toDate(),
+            classNames: [
+                "booking-" + item.computedStatus,
+                booking.booking_type === "DEPLOYMENT" ? "booking-deployment" : "",
+            ].filter(Boolean),
+            extendedProps: {
+                booking: booking,
+                env_type: inferEnvType(booking.env_id),
+                computed_status: item.computedStatus,
+            },
+        };
     }
 
     function formatHoverRow(label, value) {
@@ -393,6 +429,11 @@
             height: "auto",
             nowIndicator: true,
             editable: false,
+            eventTimeFormat: {
+                hour: "numeric",
+                minute: "2-digit",
+                meridiem: "short",
+            },
             selectable: true,
             slotMinTime: "00:00:00",
             slotMaxTime: "24:00:00",

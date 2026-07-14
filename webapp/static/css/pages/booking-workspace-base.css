@@ -7,7 +7,7 @@
     --workspace-sidebar-gap: 8px;
     --workspace-sidebar-panel: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
     --workspace-sidebar-header: rgba(248, 251, 255, 0.95);
-    --workspace-sidebar-text: #334155;
+    --workspace-sidebar-text: #111111;
     --workspace-sidebar-hover: rgba(37, 99, 235, 0.08);
     --workspace-sidebar-border: rgba(148, 163, 184, 0.35);
     --workspace-sidebar-divider: rgba(148, 163, 184, 0.28);
@@ -56,7 +56,7 @@
     margin: 0;
     font-weight: 600;
     color: var(--workspace-sidebar-text);
-    font-size: 0.86rem;
+    font-size: 0.94rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
 }
@@ -95,13 +95,13 @@
     background: transparent;
     width: 100%;
     text-align: left;
-    font-size: 0.88rem;
-    font-weight: 500;
+    font-size: 0.98rem;
+    font-weight: 700;
 }
 
 .sidebar-link:hover {
     background: var(--workspace-sidebar-hover) !important;
-    color: var(--app-theme-primary-strong);
+    color: #0f172a;
     text-decoration: none;
 }
 

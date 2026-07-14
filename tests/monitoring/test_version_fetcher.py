@@ -159,6 +159,25 @@ versions = tcs_server-mqm_PC-1020.1.1.2.1_Patch2_mqm_keept_20260626, tcs_server-
             {"core": "tcs_server-mqm_PC-1020.1.1.2.1_Patch2_mqm_keept_20260626"},
         )
 
+    def test_parse_output_splits_mixed_comma_and_space_delimited_versions(self):
+        fetcher = VersionFetcher(executor=SimpleExecutor(''))
+        parsed = fetcher.parse_output(
+            """
+[Deployment Info]
+environment_name = dev01
+server = getway
+install_user = dev01app
+env_file = path/env/env_file.xml
+deployed_num = 21
+mode = TFT
+versions = tcs_server-mqm_PC-1020.1.1.2.1_Patch2_mqm_keept_20260623,tcs_server-1.1.2.1_Patch1_20260623 tcs_server-1.1.2.1_20260623
+""".strip()
+        )
+        self.assertEqual(
+            parsed["versions"],
+            {"getway": "tcs_server-mqm_PC-1020.1.1.2.1_Patch2_mqm_keept_20260623"},
+        )
+
     def test_fetch_versions_returns_mapping_and_raw_output(self):
         executor = SimpleExecutor('core: 1.2.3')
         fetcher = VersionFetcher(executor=executor)

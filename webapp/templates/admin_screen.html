@@ -376,7 +376,7 @@
                                         <input type="hidden" name="user_id" value="{{ user.user_id }}">
                                         <select class="form-select" name="team_ids" multiple size="4" aria-label="Teams for {{ user.user_id }}">
                                             {% for team in teams %}
-                                                <option value="{{ team.team_id }}" {% if team.team_name in user.team_names %}selected{% endif %}>
+                                                <option value="{{ team.team_id }}" {% if team.team_name|lower in user.normalized_team_names %}selected{% endif %}>
                                                     {{ team.team_name|upper }}
                                                 </option>
                                             {% endfor %}
@@ -532,8 +532,8 @@
                         <input class="form-control" id="env_type" name="env_type" required>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label" for="env_domain">Domain Team</label>
-                        <input class="form-control" id="env_domain" name="domain" placeholder="env, dev, qa">
+                        <label class="form-label" for="env_team">Team</label>
+                        <input class="form-control" id="env_team" name="team" placeholder="env, dev, qa">
                     </div>
                     <div class="mb-3">
                         <label class="form-label" for="env_description">Description</label>
@@ -554,13 +554,13 @@
                 <h2 class="h5 mb-3">Existing Environments</h2>
                 <div class="table-responsive admin-table-wrap">
                     <table class="table align-middle">
-                        <thead><tr><th>Env ID</th><th>Type</th><th>Domain</th><th>Description</th><th>Active</th></tr></thead>
+                        <thead><tr><th>Env ID</th><th>Type</th><th>Team</th><th>Description</th><th>Active</th></tr></thead>
                         <tbody>
                         {% for environment in environments %}
                             <tr>
                                 <td><span class="app-env-label">{{ environment.env_id }}</span></td>
                                 <td>{{ environment.env_type }}</td>
-                                <td>{{ environment.domain or "-" }}</td>
+                                <td>{{ environment.team or "-" }}</td>
                                 <td>{{ environment.description or "-" }}</td>
                                 <td>{{ "Yes" if environment.is_active else "No" }}</td>
                             </tr>

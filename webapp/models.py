@@ -1,6 +1,7 @@
 import json
 import uuid
 from datetime import datetime
+from enum import Enum
 from flask_sqlalchemy import SQLAlchemy
 
 from .component_build_catalog import build_package_entries
@@ -12,6 +13,39 @@ from .constants import (
 )
 
 db = SQLAlchemy()
+
+
+class ServerTypeKey(str, Enum):
+    CORE = "core"
+    GATEWAY = "gateway"
+    COREDB = "coredb"
+    LGDB = "lgdb"
+    PAYAPP = "payapp"
+
+    @classmethod
+    def from_value(cls, value):
+        normalized = (value or "").strip().lower()
+        if not normalized:
+            return None
+        for item in cls:
+            if item.value == normalized:
+                return item
+        return None
+
+
+class PayUiAccessType(str, Enum):
+    PAY_URL = "pay_url"
+    PAY_ADMIN = "pay_admin"
+
+    @classmethod
+    def from_value(cls, value):
+        normalized = (value or "").strip().lower()
+        if not normalized:
+            return None
+        for item in cls:
+            if item.value == normalized:
+                return item
+        return None
 
 def generate_id(prefix):
     return "{}-{}".format(prefix, uuid.uuid4().hex[:12])
@@ -99,12 +133,28 @@ class User(db.Model):
         return self.full_name
 
     @property
+    def normalized_role(self):
+        return (self.role or "").strip().lower()
+
+    @property
+    def is_admin(self):
+        return self.normalized_role == "admin"
+
+    @property
     def team_names(self):
         names = []
         for membership in getattr(self, "team_memberships", []) or []:
             if membership.team and membership.team.team_name:
                 names.append(membership.team.team_name)
         return names
+
+    @property
+    def normalized_team_names(self):
+        return [
+            (team_name or "").strip().lower()
+            for team_name in self.team_names
+            if (team_name or "").strip()
+        ]
 
     @property
     def team_name(self):
@@ -203,11 +253,36 @@ class Environment(db.Model):
 
     env_id = db.Column(db.String(16), primary_key=True)  # DEV01, ST01
     env_type = db.Column(db.String(16), nullable=False)  # DEV / ST / QA / PROD
-    domain = db.Column(db.String(24))
+    team = db.Column("domain", db.String(24))
     description = db.Column(db.Text)
 
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    domain = db.synonym("team")
+
+
+class PayUi(db.Model):
+    __tablename__ = "pay_ui"
+
+    env_id = db.Column(
+        db.String(16),
+        db.ForeignKey("environments.env_id"),
+        primary_key=True,
+    )
+    pay_url = db.Column(db.Text)
+    pay_adm_url = db.Column(db.Text)
+
+    environment = db.relationship("Environment", backref="pay_ui_link", uselist=False)
+
+    def get_url(self, access_type):
+        access_enum = PayUiAccessType.from_value(access_type)
+        normalized = access_enum.value if access_enum is not None else (access_type or "").strip().lower()
+        if normalized in {PayUiAccessType.PAY_URL.value, "user_pay_weblink", "user-pay-weblink"}:
+            return (self.pay_url or "").strip()
+        if normalized in {PayUiAccessType.PAY_ADMIN.value, "pay_admin_url", "access_pay_admin_link", "access-pay-admin-link"}:
+            return (self.pay_adm_url or "").strip()
+        return ""
 
 
 # ==========================================================
@@ -238,7 +313,7 @@ class ServerType(db.Model):
     server_type_id = db.Column(db.Integer, primary_key=True)
 
     server_type_key = db.Column(db.String(100), nullable=False)
-    # Server type, e.g. Core, Getway, LGDB, CoreDb, PAYApp.
+    # Server type, e.g. core, gateway, lgdb, coredb, payapp.
 
     target_type = db.Column(db.String(50), nullable=False)
     # TCS_APP / DB / PAYAPP / TOOLS
@@ -282,7 +357,7 @@ class EnvironmentHostMapping(db.Model):
         db.ForeignKey("hosts.host_id"),
         nullable=False
     )
-    # Maps a server type such as Core to the actual target host machine.
+    # Maps a server type such as core to the actual target host machine.
 
     deployment_user = db.Column(db.String(100))
     deploy_user_hzn = db.Column(db.String(255))
@@ -302,6 +377,75 @@ class EnvironmentHostMapping(db.Model):
     @property
     def server_type_key(self):
         return self.server_type.server_type_key if self.server_type else None
+
+    def matches_access_server_type(self, server_type_key):
+        enum_value = ServerTypeKey.from_value(server_type_key)
+        expected_value = enum_value.value if enum_value is not None else (server_type_key or "").strip().lower()
+        return ((self.server_type_key or "").strip().lower() == expected_value)
+
+    def terminal_access_payload(self):
+        host = self.host
+        return {
+            "env_id": self.env_id,
+            "server_type_key": self.server_type_key,
+            "host_id": host.host_id if host else None,
+            "hostname": host.hostname if host else None,
+            "ip_address": host.ip_address if host else None,
+            "deployment_user": self.deployment_user,
+            "deploy_user_hzn": self.deploy_user_hzn,
+        }
+
+    @classmethod
+    def get_core_vm(cls, env_id):
+        return cls.find_terminal_access_mapping(env_id, ServerTypeKey.CORE)
+
+    @classmethod
+    def get_gateway_vm(cls, env_id):
+        return cls.find_terminal_access_mapping(env_id, ServerTypeKey.GATEWAY)
+
+    @classmethod
+    def get_core_db_vm(cls, env_id):
+        return cls.find_terminal_access_mapping(env_id, ServerTypeKey.COREDB)
+
+    @classmethod
+    def get_lg_db_vm(cls, env_id):
+        return cls.find_terminal_access_mapping(env_id, ServerTypeKey.LGDB)
+
+    @classmethod
+    def get_core_vm_payload(cls, env_id):
+        mapping = cls.get_core_vm(env_id)
+        return mapping.terminal_access_payload() if mapping is not None else None
+
+    @classmethod
+    def get_gateway_vm_payload(cls, env_id):
+        mapping = cls.get_gateway_vm(env_id)
+        return mapping.terminal_access_payload() if mapping is not None else None
+
+    @classmethod
+    def get_core_db_vm_payload(cls, env_id):
+        mapping = cls.get_core_db_vm(env_id)
+        return mapping.terminal_access_payload() if mapping is not None else None
+
+    @classmethod
+    def get_lg_db_vm_payload(cls, env_id):
+        mapping = cls.get_lg_db_vm(env_id)
+        return mapping.terminal_access_payload() if mapping is not None else None
+
+    @classmethod
+    def find_terminal_access_mapping(cls, env_id, server_type_key):
+        normalized_env_id = (env_id or "").strip()
+        enum_value = ServerTypeKey.from_value(server_type_key)
+        normalized_server_type = (
+            enum_value.value if enum_value is not None else (server_type_key or "").strip().lower()
+        )
+        if not normalized_env_id or not normalized_server_type:
+            return None
+
+        mappings = cls.query.filter_by(env_id=normalized_env_id).all()
+        for mapping in mappings:
+            if mapping.matches_access_server_type(normalized_server_type):
+                return mapping
+        return None
 
     def to_dict(self):
         return {

@@ -6,7 +6,7 @@ import re
 
 from flask import Blueprint, current_app, jsonify
 
-from webapp.models import CurrentDeploymentState, EnvironmentBooking, EnvironmentHostMapping, ServerType
+from webapp.models import CurrentDeploymentState, Environment, EnvironmentBooking, EnvironmentHostMapping, ServerType
 from webapp.helpers import get_booking_lifecycle_status
 
 monitoring_bp = Blueprint("monitoring", __name__)
@@ -235,6 +235,21 @@ def _build_tcs_runtime_map(env_ids):
     return runtime_map
 
 
+def _build_environment_team_map(env_ids):
+    team_map = {env_id: "" for env_id in env_ids}
+    if not env_ids:
+        return team_map
+
+    rows = (
+        Environment.query
+        .filter(Environment.env_id.in_(env_ids))
+        .all()
+    )
+    for environment in rows:
+        team_map[environment.env_id] = (environment.team or "").strip()
+    return team_map
+
+
 def _collect_not_running_components(vm_details):
     names = []
     for vm_status in (vm_details or {}).values():
@@ -258,6 +273,7 @@ def _build_environment_health_payload(env_statuses, last_update, active_booking_
     )
     env_server_types = _build_server_type_map(env_ids)
     tcs_runtime = _build_tcs_runtime_map(env_ids)
+    env_team_map = _build_environment_team_map(env_ids)
     statuses = []
     summary = {
         "total": 0,
@@ -280,6 +296,7 @@ def _build_environment_health_payload(env_statuses, last_update, active_booking_
         status_item = {
             "env_id": env_id,
             "env_type": env_type,
+            "team": env_team_map.get(env_id) or "unassigned",
             "status": normalized_status,
             "status_label": _status_label(normalized_status),
             "host": status_data.get("host", ""),

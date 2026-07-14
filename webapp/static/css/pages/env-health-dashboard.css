@@ -106,17 +106,23 @@
             margin-bottom: 10px;
         }
 
-        .summary-card {
-            background: linear-gradient(180deg, #ffffff 0%, #eef4fb 100%);
-            border: 1px solid var(--panel-line);
-            border-radius: 10px;
-            min-height: 48px;
-            padding: 5px 10px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            box-shadow: 0 4px 10px rgba(34, 51, 84, 0.06);
-        }
+.summary-card {
+    background: linear-gradient(180deg, #ffffff 0%, #eef4fb 100%);
+    border: 1px solid var(--panel-line);
+    border-radius: 10px;
+    min-height: 48px;
+    padding: 5px 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 4px 10px rgba(34, 51, 84, 0.06);
+}
+
+.summary-card > div {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
 
         .summary-icon {
             width: 40px;
@@ -134,20 +140,20 @@
         .summary-icon.critical { background: rgba(239, 68, 68, 0.22); color: #ef4444; }
         .summary-icon.maintenance { background: rgba(59, 130, 246, 0.22); color: #3b82f6; }
 
-        .summary-title {
-            font-size: 11px;
-            color: var(--text-strong);
-            margin-bottom: 0;
-            font-weight: 700;
-            line-height: 1.15;
-        }
+.summary-title {
+    font-size: 13px;
+    color: var(--text-strong);
+    margin-bottom: 0;
+    font-weight: 700;
+    line-height: 1.15;
+}
 
-        .summary-number {
-            font-size: 14px;
-            font-weight: 700;
-            color: var(--text-strong);
-            line-height: 1;
-        }
+.summary-number {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-strong);
+    line-height: 1;
+}
 
         .summary-subtitle {
             color: #475569;
@@ -763,11 +769,11 @@
             }
 
             .summary-title {
-                font-size: 17px;
+                font-size: 18px;
             }
 
             .summary-number {
-                font-size: 30px;
+                font-size: 32px;
             }
 
             .group-card {
@@ -848,11 +854,11 @@
             }
 
             .summary-title {
-                font-size: 20px;
+                font-size: 22px;
             }
 
             .summary-number {
-                font-size: 38px;
+                font-size: 40px;
             }
 
             .group-card {

@@ -17,6 +17,7 @@ from .models import (
     Environment,
     EnvironmentHostMapping,
     Host,
+    PayUi,
     Role,
     ServerType,
     Team,
@@ -32,6 +33,7 @@ BOOTSTRAP_SEED_MODELS = (
     Host,
     ServerType,
     EnvironmentHostMapping,
+    PayUi,
     ComponentBuild,
 )
 
@@ -52,6 +54,7 @@ EMPTY_SEED_DATA = {
     "server_types": [],
     "hosts": [],
     "environment_host_mappings": [],
+    "pay_ui": [],
     "component_builds": [],
 }
 
@@ -147,6 +150,7 @@ def load_host_seed_data():
         "server_types": data.get("server_types") or [],
         "hosts": normalized_hosts,
         "environment_host_mappings": normalized_mappings,
+        "pay_ui": data.get("pay_ui") or [],
         "component_builds": data.get("component_builds") or [],
     }
 
@@ -162,6 +166,7 @@ def _seeders():
         seed_default_hosts,
         seed_default_server_types,
         seed_default_environment_host_mappings,
+        seed_default_pay_ui,
         seed_default_component_builds,
     )
 
@@ -245,16 +250,16 @@ def seed_default_environments():
     for environment_data in seed_data["environments"]:
         env_id = environment_data["env_id"]
         env_type = environment_data["env_type"]
-        domain = (environment_data.get("domain") or "").strip().lower() or None
+        team = (environment_data.get("team") or "").strip().lower() or None
         _create_if_missing(
             Environment,
             env_id=env_id,
-            defaults={"env_type": env_type, "domain": domain},
+            defaults={"env_type": env_type, "team": team},
         )
         environment = _first(Environment, env_id=env_id)
         if environment is not None:
             environment.env_type = env_type
-            environment.domain = domain
+            environment.team = team
     db.session.commit()
 
 
@@ -372,6 +377,24 @@ def seed_default_environment_host_mappings():
                     deploy_user_hzn=mapping_data["deploy_user_hzn"],
                 )
             )
+    db.session.commit()
+
+
+def seed_default_pay_ui():
+    """Seed default Pay UI access links."""
+    seed_data = load_host_seed_data()
+    for pay_ui_data in seed_data["pay_ui"]:
+        env_id = (pay_ui_data.get("env_id") or "").strip()
+        if not env_id:
+            continue
+
+        environment = _first(Environment, env_id=env_id)
+        if environment is None:
+            continue
+
+        record = _create_if_missing(PayUi, env_id=env_id)
+        record.pay_url = (pay_ui_data.get("pay_url") or "").strip() or None
+        record.pay_adm_url = (pay_ui_data.get("pay_adm_url") or "").strip() or None
     db.session.commit()
 
 

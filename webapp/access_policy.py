@@ -1,6 +1,6 @@
 """Centralized authorization policy rules."""
 
-from .constants import VALID_TEAMS
+from .helpers import get_valid_team_names
 
 
 SCREENS = [
@@ -23,7 +23,8 @@ SCREENS = [
         "title": "Environment Booking",
         "description": "Book environments and manage your own reservations.",
         "roles": [],
-        "teams": VALID_TEAMS,
+        "allow_all_teams": True,
+        "teams": [],
     },
     {
         "endpoint": "environment_health",
@@ -48,16 +49,19 @@ def can_access_screen(user, screen):
         return False
 
     user_team_names = _normalized_team_names(user)
-    screen_team_names = {
-        (team_name or "").strip().lower()
-        for team_name in screen["teams"]
-    }
+    if screen.get("allow_all_teams"):
+        screen_team_names = set(get_valid_team_names())
+    else:
+        screen_team_names = {
+            (team_name or "").strip().lower()
+            for team_name in screen["teams"]
+        }
     required_roles = {
         (role or "").strip().lower()
         for role in screen.get("roles", [])
     }
 
-    if user.role == "admin":
+    if getattr(user, "is_admin", False):
         if screen.get("endpoint") == "user_management_screen":
             return "access_admin" in user_team_names
         return True
@@ -65,7 +69,7 @@ def can_access_screen(user, screen):
     if screen.get("requires_team_lead") and getattr(user, "is_team_lead", False):
         return True
 
-    return user.role in required_roles or bool(user_team_names & screen_team_names)
+    return getattr(user, "normalized_role", (user.role or "").strip().lower()) in required_roles or bool(user_team_names & screen_team_names)
 
 
 def get_allowed_screens(user):
@@ -79,7 +83,7 @@ def can_access_env_team_screen(user):
     """Return whether the user can access ENV-team deployment operations."""
     if user is None:
         return False
-    if user.role == "admin":
+    if getattr(user, "is_admin", False):
         return True
     return "env" in _normalized_team_names(user)
 

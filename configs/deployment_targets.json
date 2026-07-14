@@ -2,17 +2,17 @@
   "TCS_APP": {
     "display_name": "TCS Application",
     "build_name": "tcs_service",
-    "server_types": ["Core", "Getway"]
+    "server_types": ["core", "gateway"]
   },
   "PAYAPP": {
     "display_name": "PayApp",
     "build_name": "payapp",
-    "server_types": ["PAYApp"]
+    "server_types": ["payapp"]
   },
   "DB": {
     "display_name": "Database",
     "build_name": "tcs_db",
-    "server_types": ["CoreDb", "LGDB"]
+    "server_types": ["coredb", "lgdb"]
   },
   "TOOLS": {
     "display_name": "Tools",

@@ -70,7 +70,7 @@
         <a href="{{ url_for('booking.tool_deployment_request') }}" class="sidebar-link{% if workspace_nav == 'tool_deployment' %} active{% endif %}">
             <i class="fas fa-toolbox"></i> Tool Deployment
         </a>
-        {% if user is defined and (user.role == "admin" or user.is_env_member) %}
+        {% if user is defined and (user.is_admin or user.is_env_member) %}
         <a href="{{ url_for('booking.manage_deployment_requests') }}" class="sidebar-link{% if workspace_nav == 'deployment_manage' %} active{% endif %}">
             <i class="fas fa-diagram-project"></i> Environment Operations
         </a>

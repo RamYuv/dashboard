@@ -73,6 +73,18 @@ class Config:
     DEPLOYMENT_LAUNCHER_WORKDIR = os.environ.get('DEPLOYMENT_LAUNCHER_WORKDIR', AUTO_DEPLOY_WORKDIR)
     DEPLOYMENT_PAYLOAD_DIR = os.environ.get('DEPLOYMENT_PAYLOAD_DIR', AUTO_DEPLOY_PAYLOAD_DIR)
 
+    TTYD_BINARY = os.environ.get('TTYD_BINARY', '')
+    SSHPASS_BINARY = os.environ.get('SSHPASS_BINARY', '')
+    TTYD_PUBLIC_HOST = os.environ.get('TTYD_PUBLIC_HOST', '')
+    TTYD_PUBLIC_SCHEME = os.environ.get('TTYD_PUBLIC_SCHEME', 'http')
+    TTYD_PORT_START = int(os.environ.get('TTYD_PORT_START', 46000))
+    TTYD_PORT_END = int(os.environ.get('TTYD_PORT_END', 49000))
+    TTYD_MAX_CONNECTIONS = int(os.environ.get('TTYD_MAX_CONNECTIONS', 100))
+    TTYD_PASS_FILE_DIR = os.environ.get(
+        'TTYD_PASS_FILE_DIR',
+        os.path.join(PROJECT_ROOT, 'pass_files')
+    )
+
     RESET_DB_ON_INIT = _read_bool(os.environ.get('RESET_DB_ON_INIT', 'false'))
     SEED_BOOTSTRAP_ONLY = _read_bool(os.environ.get('SEED_BOOTSTRAP_ONLY', 'true'), default=True)
     MUTUAL_ENV_RESERVATION_ENABLED = _read_bool(

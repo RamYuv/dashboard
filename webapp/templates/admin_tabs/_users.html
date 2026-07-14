@@ -66,7 +66,7 @@
                                         <input type="hidden" name="user_id" value="{{ user.user_id }}">
                                         <select class="form-select" name="team_ids" multiple size="4" aria-label="Teams for {{ user.user_id }}">
                                             {% for team in teams %}
-                                                <option value="{{ team.team_id }}" {% if team.team_name in user.team_names %}selected{% endif %}>
+                                                <option value="{{ team.team_id }}" {% if team.team_name|lower in user.normalized_team_names %}selected{% endif %}>
                                                     {{ team.team_name|upper }}
                                                 </option>
                                             {% endfor %}
