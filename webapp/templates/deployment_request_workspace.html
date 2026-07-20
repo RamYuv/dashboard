@@ -139,7 +139,7 @@
                                 <label for="formTestingMode"><i class="fas fa-flask"></i> Deployment Mode</label>
                                 <select id="formTestingMode" class="form-select" required>
                                     <option value="">Select mode...</option>
-                                    {% for mode in deployment_form_options.testing_modes | default([], true) %}
+                                    {% for mode in deployment_form_options.tcs_deployment_modes | default([], true) %}
                                     <option value="{{ mode.value }}">{{ mode.label }}</option>
                                     {% endfor %}
                                 </select>
@@ -147,14 +147,14 @@
                         </div>
                         <div>
                             <div class="form-group">
-                                <label for="formServiceTypes"><i class="fas fa-network-wired"></i> Service Type</label>
-                                <select id="formServiceTypes" class="form-select">
-                                    <option value="">Select service type...</option>
-                                    {% for service in deployment_form_options.service_types | default([], true) %}
+                                <label for="formTcsService"><i class="fas fa-network-wired"></i> TCS Service</label>
+                                <select id="formTcsService" class="form-select">
+                                    <option value="">Select TCS service...</option>
+                                    {% for service in deployment_form_options.tcs_services | default([], true) %}
                                     <option value="{{ service.value }}">{{ service.label }}</option>
                                     {% endfor %}
                                 </select>
-                                <small class="form-text text-muted">Only required for TCS Application deployments</small>
+                                <small class="form-text text-muted">Required for TCS Application deployments</small>
                             </div>
                         </div>
                     </div>

@@ -118,25 +118,25 @@
         }
 
         setRuntimeField("currentTcsRuntimeVersion", runtime.version);
-        setRuntimeField("currentTcsRuntimeService", runtime.serviceTypes);
-        setRuntimeField("currentTcsRuntimeMode", runtime.testingModes);
+        setRuntimeField("currentTcsRuntimeService", runtime.tcsServiceNames);
+        setRuntimeField("currentTcsRuntimeMode", runtime.tcsDeploymentModes);
     }
 
     function aggregateTcsRuntime(rows) {
         const versions = uniqueValues(rows.map(function (row) {
             return (row.current_version || "").trim();
         }).filter(Boolean));
-        const serviceTypes = uniqueValues([].concat.apply([], rows.map(function (row) {
-            return Array.isArray(row.service_types) ? row.service_types : [];
-        })));
+        const serviceTypes = uniqueValues(rows.map(function (row) {
+            return (row.tcs_service_name || "").trim();
+        }).filter(Boolean));
         const testingModes = uniqueValues(rows.map(function (row) {
-            return (row.testing_mode || "").trim();
+            return (row.tcs_deployment_mode || "").trim();
         }).filter(Boolean));
 
         return {
             version: selectPreferredVersion(versions) || "-",
-            serviceTypes: serviceTypes[0] || "-",
-            testingModes: testingModes.join(", ") || "-",
+            tcsServiceNames: serviceTypes[0] || "-",
+            tcsDeploymentModes: testingModes.join(", ") || "-",
         };
     }
 

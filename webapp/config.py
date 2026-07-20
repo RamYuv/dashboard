@@ -12,6 +12,11 @@ class Config:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     PROJECT_ROOT = os.path.dirname(BASE_DIR)
     DEFAULT_DB_PATH = Path(PROJECT_ROOT, "envbooking_app.db").as_posix()
+    DEFAULT_BOOTSTRAP_SEED_PATH = Path(
+        PROJECT_ROOT,
+        "configs",
+        "default_bootstrap_data.json",
+    ).as_posix()
 
     SECRET_KEY = os.environ.get('SECRET_KEY', 'change-this-secret-key')
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL', f"sqlite:///{DEFAULT_DB_PATH}")
@@ -87,6 +92,10 @@ class Config:
 
     RESET_DB_ON_INIT = _read_bool(os.environ.get('RESET_DB_ON_INIT', 'false'))
     SEED_BOOTSTRAP_ONLY = _read_bool(os.environ.get('SEED_BOOTSTRAP_ONLY', 'true'), default=True)
+    BOOTSTRAP_SEED_PATH = os.environ.get(
+        'BOOTSTRAP_SEED_PATH',
+        DEFAULT_BOOTSTRAP_SEED_PATH,
+    )
     MUTUAL_ENV_RESERVATION_ENABLED = _read_bool(
         os.environ.get('MUTUAL_ENV_RESERVATION_ENABLED', 'false')
     )

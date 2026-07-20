@@ -246,6 +246,50 @@ class TeamMember(db.Model):
 
 
 # ==========================================================
+# EMAIL DOMAIN
+# ==========================================================
+class EmailDomain(db.Model):
+    __tablename__ = "email_domains"
+
+    email_domain_id = db.Column(db.String(50), primary_key=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+
+# ==========================================================
+# DEFAULT PASSWORD
+# ==========================================================
+class DefaultPassword(db.Model):
+    __tablename__ = "default_passwords"
+
+    default_password_id = db.Column(db.String(20), primary_key=True)
+    password_value = db.Column(db.String(255), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(
+        db.DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        nullable=False,
+    )
+
+
+# ==========================================================
+# ORBIT
+# ==========================================================
+class Orbit(db.Model):
+    __tablename__ = "orbits"
+
+    orbit_id = db.Column(db.String(20), primary_key=True)
+    orb_value = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(
+        db.DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        nullable=False,
+    )
+
+
+# ==========================================================
 # ENVIRONMENT
 # ==========================================================
 class Environment(db.Model):
@@ -533,6 +577,45 @@ class ComponentBuild(db.Model):
 
 
 # ==========================================================
+# TCS SERVICE
+# ==========================================================
+class TcsService(db.Model):
+    __tablename__ = "tcs_services"
+
+    tcs_service_id = db.Column(db.String(16), primary_key=True)
+    service_name = db.Column(db.String(128), nullable=False)
+    bit_id = db.Column(db.Integer)
+    description = db.Column(db.String(255))
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(
+        db.DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        nullable=False,
+    )
+
+
+# ==========================================================
+# TCS DEPLOYMENT MODE
+# ==========================================================
+class TCSDeploymentMode(db.Model):
+    __tablename__ = "tcs_deployment_modes"
+
+    tcs_deployment_mode_id = db.Column(db.String(16), primary_key=True)
+    mode_name = db.Column(db.String(128), nullable=False)
+    description = db.Column(db.String(255))
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(
+        db.DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        nullable=False,
+    )
+
+
+# ==========================================================
 # ENVIRONMENT BOOKING
 # ==========================================================
 class EnvironmentBooking(db.Model):
@@ -664,6 +747,84 @@ class EnvironmentBooking(db.Model):
 
 
 # ==========================================================
+# ENV BOOKING SYSTEM SNAPSHOT
+# ==========================================================
+class EnvBookingSystemSnapshot(db.Model):
+    __tablename__ = "env_booking_system_snapshots"
+
+    env_booking_system_snapshot_id = db.Column(db.Integer, primary_key=True)
+    booking_id = db.Column(
+        db.String(50),
+        db.ForeignKey("environment_bookings.booking_id"),
+        nullable=False,
+        index=True,
+    )
+    environment_host_mapping_id = db.Column(
+        db.Integer,
+        db.ForeignKey("environment_host_mappings.environment_host_mapping_id"),
+        nullable=False,
+    )
+    env_id = db.Column(
+        db.String(50),
+        db.ForeignKey("environments.env_id"),
+        nullable=False,
+    )
+    host_id = db.Column(
+        db.String(50),
+        db.ForeignKey("hosts.host_id"),
+        nullable=False,
+    )
+    server_type_id = db.Column(
+        db.Integer,
+        db.ForeignKey("server_types.server_type_id"),
+        nullable=False,
+    )
+    target_key = db.Column(db.String(50), nullable=False, default="TCS_APP")
+    package_key = db.Column(db.String(100))
+    tcs_service_id = db.Column(
+        db.String(16),
+        db.ForeignKey("tcs_services.tcs_service_id"),
+        nullable=True,
+    )
+    tcs_deployment_mode_id = db.Column(
+        db.String(16),
+        db.ForeignKey("tcs_deployment_modes.tcs_deployment_mode_id"),
+    )
+    package_name = db.Column(db.String(150))
+    current_version = db.Column(db.String(50))
+    source = db.Column(db.String(30), nullable=False, default="CURRENT_DEPLOYMENT_STATE")
+    status = db.Column(db.String(30), nullable=False, default="CURRENT")
+    captured_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    notes = db.Column(db.Text)
+
+    booking = db.relationship("EnvironmentBooking", backref="system_snapshots")
+    environment = db.relationship("Environment")
+    host = db.relationship("Host")
+    server_type = db.relationship("ServerType")
+    environment_host_mapping = db.relationship("EnvironmentHostMapping")
+    tcs_service = db.relationship("TcsService")
+    tcs_deployment_mode = db.relationship("TCSDeploymentMode")
+
+    __table_args__ = (
+        db.Index(
+            "idx_booking_snapshot_lookup",
+            "booking_id",
+            "environment_host_mapping_id",
+            "server_type_id",
+            "tcs_service_id",
+        ),
+        db.UniqueConstraint(
+            "booking_id",
+            "environment_host_mapping_id",
+            "target_key",
+            "package_key",
+            "tcs_service_id",
+            name="uq_booking_snapshot_server_service",
+        ),
+    )
+
+
+# ==========================================================
 # DEPLOYMENT REQUEST
 # ==========================================================
 class DeploymentRequest(db.Model):
@@ -707,9 +868,10 @@ class DeploymentRequest(db.Model):
     selected_server_mapping_ids_raw = db.Column("selected_server_mapping_ids", db.Text, nullable=False, default="[]")
     # JSON list of selected EnvironmentHostMapping ids for deployment execution.
 
-    testing_mode = db.Column(db.String(50), nullable=False, default="")
-    service_types = db.Column(db.Text, nullable=False, default="[]")
-    # JSON list of selected service types for TCS_APP requests.
+    tcs_deployment_mode_id = db.Column(
+        db.String(16),
+        db.ForeignKey("tcs_deployment_modes.tcs_deployment_mode_id"),
+    )
     jira_id = db.Column(db.String(50))
     description = db.Column(db.Text)
     remarks = db.Column(db.Text)
@@ -754,6 +916,7 @@ class DeploymentRequest(db.Model):
     requester = db.relationship("User", foreign_keys=[requested_by], backref="deployment_requests")
     approver = db.relationship("User", foreign_keys=[approved_by], backref="approved_deployment_requests")
     build = db.relationship("ComponentBuild", backref="deployment_requests")
+    tcs_deployment_mode = db.relationship("TCSDeploymentMode")
 
     __table_args__ = (
         db.Index("idx_dreq_status_created", "status", "created_at"),
@@ -790,11 +953,48 @@ class DeploymentRequest(db.Model):
                 continue
         self.selected_server_mapping_ids_raw = json_dumps(normalized)
 
-    def get_service_types(self):
-        return parse_json_list(self.service_types)
+    def get_service_ids(self):
+        service_ids = []
+        for item in self.request_services or []:
+            if item.tcs_service_id and item.tcs_service_id not in service_ids:
+                service_ids.append(item.tcs_service_id)
+        return service_ids
 
-    def set_service_types(self, service_types):
-        self.service_types = json_dumps(service_types)
+    def get_service_names(self):
+        service_names = []
+        for item in self.request_services or []:
+            service = item.tcs_service
+            service_name = (
+                service.service_name if service is not None else item.tcs_service_id
+            )
+            if service_name and service_name not in service_names:
+                service_names.append(service_name)
+        return service_names
+
+    def set_service_ids(self, service_ids):
+        normalized_ids = []
+        for value in service_ids or []:
+            normalized_value = (value or "").strip()
+            if normalized_value and normalized_value not in normalized_ids:
+                normalized_ids.append(normalized_value)
+
+        existing_by_service_id = {
+            item.tcs_service_id: item
+            for item in self.request_services or []
+            if item.tcs_service_id
+        }
+        updated_items = []
+        for service_id in normalized_ids:
+            existing = existing_by_service_id.get(service_id)
+            if existing is not None:
+                updated_items.append(existing)
+            else:
+                updated_items.append(
+                    DeploymentRequestService(
+                        tcs_service_id=service_id,
+                    )
+                )
+        self.request_services = updated_items
 
     @property
     def target_definition(self):
@@ -942,8 +1142,14 @@ class DeploymentRequest(db.Model):
             "selected_server_mapping_ids": self.selected_server_mapping_ids,
             "selected_servers": self.selected_servers,
             "selected_servers_summary": self.selected_servers_summary,
-            "testing_mode": self.testing_mode,
-            "service_types": self.get_service_types(),
+            "tcs_deployment_mode_id": self.tcs_deployment_mode_id,
+            "tcs_deployment_mode": (
+                self.tcs_deployment_mode.mode_name
+                if self.tcs_deployment_mode else
+                None
+            ),
+            "tcs_service_ids": self.get_service_ids(),
+            "tcs_service_names": self.get_service_names(),
             "jira_id": self.jira_id,
             "description": self.description,
             "remarks": self.remarks,
@@ -961,6 +1167,38 @@ class DeploymentRequest(db.Model):
             "created_at": format_datetime(self.created_at),
             "updated_at": format_datetime(self.updated_at),
         }
+
+
+# ==========================================================
+# DEPLOYMENT REQUEST -> TCS SERVICE
+# ==========================================================
+class DeploymentRequestService(db.Model):
+    __tablename__ = "deployment_request_services"
+
+    deployment_request_service_id = db.Column(db.Integer, primary_key=True)
+    deployment_request_id = db.Column(
+        db.String(50),
+        db.ForeignKey("deployment_requests.deployment_request_id"),
+        nullable=False,
+        index=True,
+    )
+    tcs_service_id = db.Column(
+        db.String(16),
+        db.ForeignKey("tcs_services.tcs_service_id"),
+        nullable=True,
+    )
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    deployment_request = db.relationship("DeploymentRequest", backref="request_services")
+    tcs_service = db.relationship("TcsService")
+
+    __table_args__ = (
+        db.UniqueConstraint(
+            "deployment_request_id",
+            "tcs_service_id",
+            name="uq_deployment_request_service",
+        ),
+    )
 
 
 # ==========================================================
@@ -1104,8 +1342,15 @@ class CurrentDeploymentState(db.Model):
     package_key = db.Column(db.String(100), nullable=False)
     package_name = db.Column(db.String(150), nullable=False)
     current_version = db.Column(db.String(50))
-    testing_mode = db.Column(db.String(50), nullable=False, default="")
-    service_types = db.Column(db.Text, nullable=False, default="[]")
+    tcs_service_id = db.Column(
+        db.String(16),
+        db.ForeignKey("tcs_services.tcs_service_id"),
+        nullable=False,
+    )
+    tcs_deployment_mode_id = db.Column(
+        db.String(16),
+        db.ForeignKey("tcs_deployment_modes.tcs_deployment_mode_id"),
+    )
     source = db.Column(db.String(30), nullable=False, default="DEPLOYMENT")
     status = db.Column(db.String(30), nullable=False, default="CURRENT")
     updated_by = db.Column(
@@ -1136,6 +1381,8 @@ class CurrentDeploymentState(db.Model):
     deployment_request = db.relationship("DeploymentRequest", backref="current_state_updates")
     deployment = db.relationship("Deployment", backref="current_state_updates")
     updated_by_user = db.relationship("User")
+    tcs_service = db.relationship("TcsService")
+    tcs_deployment_mode = db.relationship("TCSDeploymentMode")
 
     __table_args__ = (
         db.UniqueConstraint(
@@ -1144,6 +1391,7 @@ class CurrentDeploymentState(db.Model):
             "env_type",
             "environment_host_mapping_id",
             "package_key",
+            "tcs_service_id",
             name="uq_current_deployment_state",
         ),
         db.Index(
@@ -1153,14 +1401,9 @@ class CurrentDeploymentState(db.Model):
             "env_type",
             "target_key",
             "package_key",
+            "tcs_service_id",
         ),
     )
-
-    def get_service_types(self):
-        return parse_json_list(self.service_types)
-
-    def set_service_types(self, service_types):
-        self.service_types = json_dumps(service_types)
 
     def to_dict(self):
         mapping = self.environment_host_mapping
@@ -1182,8 +1425,14 @@ class CurrentDeploymentState(db.Model):
             "app_name": self.package_name,
             "package_name": self.package_name,
             "current_version": self.current_version,
-            "testing_mode": self.testing_mode,
-            "service_types": self.get_service_types(),
+            "tcs_service_id": self.tcs_service_id,
+            "tcs_service_name": self.tcs_service.service_name if self.tcs_service else None,
+            "tcs_deployment_mode_id": self.tcs_deployment_mode_id,
+            "tcs_deployment_mode": (
+                self.tcs_deployment_mode.mode_name
+                if self.tcs_deployment_mode else
+                None
+            ),
             "source": self.source,
             "status": self.status,
             "updated_by": self.updated_by,

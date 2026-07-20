@@ -182,11 +182,11 @@
     }
 
     function resetServiceSelections() {
-        const serviceTypes = document.getElementById("formServiceTypes");
-        if (!serviceTypes) {
+        const tcsService = document.getElementById("formTcsService");
+        if (!tcsService) {
             return;
         }
-        serviceTypes.value = "";
+        tcsService.value = "";
     }
 
     function getServerMappingsForSelection() {
@@ -235,7 +235,7 @@
         const targetKey = getSelectedTargetKey();
         const target = getTargetByKey(targetKey);
         const versionSelect = document.getElementById("formVersion");
-        const serviceTypesGroup = document.getElementById("formServiceTypesGroup");
+        const serviceTypesGroup = document.getElementById("formTcsServicesGroup");
         const testingMode = document.getElementById("formTestingMode");
 
         versionSelect.innerHTML = '<option value="">Select version...</option>';
@@ -333,10 +333,10 @@
                 env_scope_type: "ENV",
                 requested_version: document.getElementById("formVersion").value.trim(),
                 package_keys: deploymentMode === "tools" && toolKey ? [toolKey] : [],
-                testing_mode: targetKey === "TCS_APP" ? document.getElementById("formTestingMode").value : "",
+                tcs_deployment_mode_id: targetKey === "TCS_APP" ? document.getElementById("formTestingMode").value : "",
                 selected_server_mapping_ids: selectedServerMappingIds,
-                service_types: targetKey === "TCS_APP"
-                    ? document.getElementById("formServiceTypes").value
+                tcs_service_ids: targetKey === "TCS_APP" && document.getElementById("formTcsService").value
+                    ? [document.getElementById("formTcsService").value]
                     : [],
             },
         };
@@ -377,8 +377,11 @@
         if (!deployment.requested_version) {
             return "Requested version is required.";
         }
-        if (deployment.target_key === "TCS_APP" && !deployment.testing_mode) {
-            return "Testing mode is required.";
+        if (deployment.target_key === "TCS_APP" && !deployment.tcs_deployment_mode_id) {
+            return "Deployment mode is required.";
+        }
+        if (deployment.target_key === "TCS_APP" && (!deployment.tcs_service_ids || !deployment.tcs_service_ids.length)) {
+            return "TCS service is required.";
         }
         return null;
     }
@@ -417,7 +420,7 @@
 
     function resetFormState() {
         document.getElementById("deploymentRequestForm").reset();
-        const serviceTypesGroup = document.getElementById("formServiceTypesGroup");
+        const serviceTypesGroup = document.getElementById("formTcsServicesGroup");
         const testingMode = document.getElementById("formTestingMode");
         if (serviceTypesGroup) {
             serviceTypesGroup.style.display = "none";
@@ -539,7 +542,7 @@
         if (deploymentMode === "tools") {
             populateToolOptions();
         }
-        const serviceTypesGroup = document.getElementById("formServiceTypesGroup");
+        const serviceTypesGroup = document.getElementById("formTcsServicesGroup");
         const testingMode = document.getElementById("formTestingMode");
         if (serviceTypesGroup) {
             serviceTypesGroup.style.display = "none";

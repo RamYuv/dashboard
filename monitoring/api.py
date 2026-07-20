@@ -188,8 +188,8 @@ def _build_tcs_runtime_map(env_ids):
         env_id: {
             "versions": [],
             "runtime_rows": [],
-            "service_types": [],
-            "testing_modes": [],
+            "tcs_service_names": [],
+            "tcs_deployment_modes": [],
         }
         for env_id in env_ids
     }
@@ -209,7 +209,7 @@ def _build_tcs_runtime_map(env_ids):
     for row in rows:
         bucket = runtime_map.setdefault(
             row.env_id,
-            {"versions": [], "runtime_rows": [], "service_types": [], "testing_modes": []},
+            {"versions": [], "runtime_rows": [], "tcs_service_names": [], "tcs_deployment_modes": []},
         )
         version = (row.current_version or "").strip()
         if version and version not in bucket["versions"]:
@@ -223,14 +223,13 @@ def _build_tcs_runtime_map(env_ids):
                 }
             )
 
-        testing_mode = (row.testing_mode or "").strip()
-        if testing_mode and testing_mode not in bucket["testing_modes"]:
-            bucket["testing_modes"].append(testing_mode)
+        deployment_mode = (row.tcs_deployment_mode.mode_name if row.tcs_deployment_mode else "").strip()
+        if deployment_mode and deployment_mode not in bucket["tcs_deployment_modes"]:
+            bucket["tcs_deployment_modes"].append(deployment_mode)
 
-        for service_type in row.get_service_types():
-            value = (service_type or "").strip()
-            if value and value not in bucket["service_types"]:
-                bucket["service_types"].append(value)
+        service_name = (row.tcs_service.service_name if row.tcs_service else "").strip()
+        if service_name and service_name not in bucket["tcs_service_names"]:
+            bucket["tcs_service_names"].append(service_name)
 
     return runtime_map
 
@@ -312,8 +311,8 @@ def _build_environment_health_payload(env_statuses, last_update, active_booking_
                 "versions": runtime_details.get("versions", []),
                 "display_version": _display_tcs_runtime_version(runtime_details.get("runtime_rows", [])),
                 "has_mixed_versions": len(runtime_details.get("versions", [])) > 1,
-                "service_types": runtime_details.get("service_types", []),
-                "testing_modes": runtime_details.get("testing_modes", []),
+                "tcs_service_names": runtime_details.get("tcs_service_names", []),
+                "tcs_deployment_modes": runtime_details.get("tcs_deployment_modes", []),
             },
             "not_running_components": not_running_components,
         }

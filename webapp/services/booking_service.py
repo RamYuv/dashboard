@@ -17,6 +17,8 @@ except ImportError:
 from flask import current_app
 
 from ..models import (
+    CurrentDeploymentState,
+    EnvBookingSystemSnapshot,
     EnvironmentBooking,
     Environment,
     db,
@@ -84,6 +86,48 @@ class BookingConflictChecker:
 
 class BookingService:
     """Service for managing booking operations."""
+
+    @staticmethod
+    def _capture_system_snapshot(booking):
+        if booking is None or not booking.env_id:
+            return
+
+        current_rows = (
+            CurrentDeploymentState.query
+            .filter(
+                CurrentDeploymentState.env_scope_type == "ENV",
+                CurrentDeploymentState.env_id == booking.env_id,
+                CurrentDeploymentState.target_key == "TCS_APP",
+            )
+            .all()
+        )
+        for current_row in current_rows:
+            mapping = current_row.environment_host_mapping
+            if mapping is None or current_row.tcs_service_id is None:
+                continue
+            server_type = mapping.server_type
+            host = mapping.host
+            if server_type is None or host is None:
+                continue
+
+            db.session.add(
+                EnvBookingSystemSnapshot(
+                    booking_id=booking.booking_id,
+                    environment_host_mapping_id=current_row.environment_host_mapping_id,
+                    env_id=current_row.env_id,
+                    host_id=host.host_id,
+                    server_type_id=server_type.server_type_id,
+                    target_key=current_row.target_key,
+                    package_key=current_row.package_key,
+                    tcs_service_id=current_row.tcs_service_id,
+                    tcs_deployment_mode_id=current_row.tcs_deployment_mode_id,
+                    package_name=current_row.package_name,
+                    current_version=current_row.current_version,
+                    source=current_row.source or "CURRENT_DEPLOYMENT_STATE",
+                    status=current_row.status or "CURRENT",
+                    notes=current_row.notes,
+                )
+            )
 
     @staticmethod
     def _resolve_display_timezone(booking):
@@ -239,6 +283,7 @@ class BookingService:
         )
         db.session.add(booking)
         db.session.flush()
+        BookingService._capture_system_snapshot(booking)
 
         db.session.commit()
         BookingService._send_booking_confirmation(booking)

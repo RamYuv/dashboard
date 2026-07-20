@@ -4,6 +4,7 @@ Booking routes: environment booking calendar and booking management UI.
 from flask import Blueprint, current_app, render_template, session
 
 from webapp.auth_service import can_access_env_team_screen, current_user, login_required
+from webapp.domain.deployment_targets import get_deployment_target_options
 from webapp.domain.workspace_options import (
     get_workspace_deployment_form_options,
     get_workspace_status_options,
@@ -139,9 +140,14 @@ def _render_deployment_request_page(deployment_mode):
     )
     deployment_form_options = get_workspace_deployment_form_options()
     is_tools_mode = deployment_mode == "tools"
+    target_source = (
+        get_deployment_target_options()
+        if is_tools_mode else
+        deployment_form_options["targets"]
+    )
     deployment_targets = [
         target
-        for target in deployment_form_options["targets"]
+        for target in target_source
         if (target.get("target_key") == "TOOLS") == is_tools_mode
     ]
     return render_template(

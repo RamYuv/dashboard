@@ -268,9 +268,9 @@
         if (deployment) {
             detailRows.push(buildDetailRow("Target", deployment.target_key || "-"));
             detailRows.push(buildDetailRow("Requested Version", deployment.requested_version || "-"));
-            detailRows.push(buildDetailRow("Testing Mode", deployment.testing_mode || "-"));
+            detailRows.push(buildDetailRow("Deployment Mode", deployment.tcs_deployment_mode || "-"));
             detailRows.push(buildDetailRow("Servers", deployment.selected_servers_summary || "-"));
-            detailRows.push(buildDetailRow("Service Types", (deployment.service_types || []).join(", ") || "-"));
+            detailRows.push(buildDetailRow("TCS Services", (deployment.tcs_service_names || []).join(", ") || "-"));
         }
 
         detailsHost.className = "detail-list";

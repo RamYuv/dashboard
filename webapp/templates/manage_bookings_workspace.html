@@ -1,9 +1,9 @@
 {% extends "booking_workspace_base.html" %}
 {% from "components/_datetime_fields.html" import datetime_input_group %}
 {% set workspace_nav = "manage" %}
-{% block workspace_title %}Manage Requests{% endblock %}
-{% block workspace_shell_title %}Manage Booking Requests{% endblock %}
-{% block workspace_shell_subtitle %}See your reservations and deployment requests, then update or cancel the ones that are still scheduled.{% endblock %}
+{% block workspace_title %}Request History{% endblock %}
+{% block workspace_shell_title %}Request History{% endblock %}
+{% block workspace_shell_subtitle %}View booking and deployment requests available to your access level, and update or cancel the ones that are still scheduled.{% endblock %}
 {% block workspace_styles %}
 .page-card {
     background: #ffffff;
@@ -247,6 +247,7 @@
                     <thead>
                         <tr>
                             <th>Booking ID</th>
+                            <th>Owner</th>
                             <th>Env</th>
                             <th>Window</th>
                             <th>Type</th>
@@ -256,7 +257,7 @@
                     </thead>
                     <tbody id="bookingTableBody">
                         <tr>
-                            <td colspan="6" class="empty-state">Loading booking requests...</td>
+                            <td colspan="7" class="empty-state">Loading booking requests...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -322,7 +323,7 @@
                                 <input type="text" id="editVersion" class="form-control" readonly>
                             </div>
                             <div class="col-md-4">
-                                <label for="editTestingMode" class="form-label">Testing Mode</label>
+                                <label for="editTestingMode" class="form-label">Deployment Mode</label>
                                 <input type="text" id="editTestingMode" class="form-control" readonly>
                             </div>
                             <div class="col-md-6">
@@ -330,7 +331,7 @@
                                 <textarea id="editComponentNames" class="form-control" rows="4" readonly></textarea>
                             </div>
                             <div class="col-md-6" id="editServiceTypesGroup" style="display: none;">
-                                <label for="editServiceTypes" class="form-label">Service Types</label>
+                                <label for="editServiceTypes" class="form-label">TCS Services</label>
                                 <textarea id="editServiceTypes" class="form-control" rows="4" readonly></textarea>
                             </div>
                         </div>

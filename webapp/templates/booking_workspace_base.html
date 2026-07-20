@@ -5,10 +5,9 @@
 {% set nav_labels = {
     "grid": {"icon": "fas fa-calendar-plus", "label": "Environment Booking Form"},
     "deployment": {"icon": "fas fa-rocket", "label": "Deployment Request Form"},
-    "tool_deployment": {"icon": "fas fa-toolbox", "label": "Tool Deployment"},
     "deployment_manage": {"icon": "fas fa-diagram-project", "label": "Environment Operations"},
     "calendar": {"icon": "fas fa-calendar", "label": "View Calendar"},
-    "manage": {"icon": "fas fa-list", "label": "My Requests"},
+    "manage": {"icon": "fas fa-list", "label": "Request History"},
 } %}
 {% set current_nav = nav_labels.get(workspace_nav) %}
 <div class="workspace-shell-context">
@@ -67,9 +66,6 @@
         <a href="{{ url_for('booking.deployment_request') }}" class="sidebar-link{% if workspace_nav == 'deployment' %} active{% endif %}">
             <i class="fas fa-rocket"></i> Deployment Request
         </a>
-        <a href="{{ url_for('booking.tool_deployment_request') }}" class="sidebar-link{% if workspace_nav == 'tool_deployment' %} active{% endif %}">
-            <i class="fas fa-toolbox"></i> Tool Deployment
-        </a>
         {% if user is defined and (user.is_admin or user.is_env_member) %}
         <a href="{{ url_for('booking.manage_deployment_requests') }}" class="sidebar-link{% if workspace_nav == 'deployment_manage' %} active{% endif %}">
             <i class="fas fa-diagram-project"></i> Environment Operations
@@ -79,7 +75,7 @@
             <i class="fas fa-calendar"></i> View Calendar
         </a>
         <a href="{{ url_for('booking.manage_bookings') }}" class="sidebar-link{% if workspace_nav == 'manage' %} active{% endif %}">
-            <i class="fas fa-list"></i> My Requests
+            <i class="fas fa-list"></i> Request History
         </a>
         <a href="{{ url_for('main.dashboard') }}" class="sidebar-link">
             <i class="fas fa-tachometer-alt"></i> Monitoring Dashboard

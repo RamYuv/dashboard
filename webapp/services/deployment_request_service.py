@@ -19,8 +19,10 @@ from ..models import (
     DeploymentRequest,
     Environment,
     EnvironmentHostMapping,
+    TCSDeploymentMode,
     Team,
     TeamMember,
+    TcsService,
     User,
     db,
 )
@@ -68,20 +70,59 @@ class DeploymentRequestService:
         )
 
     @staticmethod
-    def _normalize_service_types(target_key, deployment_data):
+    def _normalize_tcs_service_ids(target_key, deployment_data):
         if target_key != "TCS_APP":
             return []
 
-        service_types = deployment_data.get("service_types") or []
-        if isinstance(service_types, str):
-            service_types = [service_types]
+        service_ids = deployment_data.get("tcs_service_ids") or []
+        if isinstance(service_ids, str):
+            service_ids = [service_ids]
 
         normalized = []
-        for service_type in service_types:
-            value = (service_type or "").strip()
+        for service_id in service_ids:
+            value = (service_id or "").strip()
             if value and value not in normalized:
                 normalized.append(value)
-        return normalized[:1]
+        return normalized
+
+    @staticmethod
+    def _normalize_tcs_deployment_mode_id(target_key, deployment_data):
+        if target_key != "TCS_APP":
+            return None
+        value = (deployment_data.get("tcs_deployment_mode_id") or "").strip()
+        return value or None
+
+    @staticmethod
+    def _get_or_create_tcs_service(service_id):
+        normalized_service_id = (service_id or "").strip()
+        if not normalized_service_id:
+            return None
+        service = TcsService.query.get(normalized_service_id)
+        if service is None:
+            service = TcsService(
+                tcs_service_id=normalized_service_id,
+                service_name=normalized_service_id,
+                is_active=True,
+            )
+            db.session.add(service)
+            db.session.flush()
+        return service
+
+    @staticmethod
+    def _get_or_create_tcs_deployment_mode(mode_id):
+        normalized_mode_id = (mode_id or "").strip()
+        if not normalized_mode_id:
+            return None
+        mode = TCSDeploymentMode.query.get(normalized_mode_id)
+        if mode is None:
+            mode = TCSDeploymentMode(
+                tcs_deployment_mode_id=normalized_mode_id,
+                mode_name=normalized_mode_id,
+                is_active=True,
+            )
+            db.session.add(mode)
+            db.session.flush()
+        return mode
 
     @staticmethod
     def _find_or_create_build(target_key, deployment_data):
@@ -276,8 +317,10 @@ class DeploymentRequestService:
             return mapping_error
         if not selected_mappings:
             return "Target server selection is required."
-        if target_key == "TCS_APP" and not deployment.get("testing_mode"):
-            return "Testing mode is required."
+        if target_key == "TCS_APP" and not deployment.get("tcs_deployment_mode_id"):
+            return "Deployment mode is required."
+        if target_key == "TCS_APP" and not DeploymentRequestService._normalize_tcs_service_ids(target_key, deployment):
+            return "TCS service selection is required."
 
         return None
 
@@ -357,6 +400,8 @@ class DeploymentRequestService:
             "App Name: {}".format(deployment_request.build_name or "Not provided"),
             "Requested Version: {}".format(deployment_request.requested_version or "Not provided"),
             "Selected Servers: {}".format(deployment_request.selected_servers_summary or "Not provided"),
+            "Deployment Mode: {}".format(deployment_request.tcs_deployment_mode.mode_name if deployment_request.tcs_deployment_mode else "Not provided"),
+            "TCS Services: {}".format(", ".join(deployment_request.get_service_names()) or "Not provided"),
             "Planned start: {}".format(planned_start),
             "Jira ID: {}".format(deployment_request.jira_id or "Not provided"),
             "Description: {}".format(deployment_request.description or "Not provided"),
@@ -459,7 +504,10 @@ class DeploymentRequestService:
             requested_version=deployment_data.get("requested_version"),
             package_keys_raw="[]",
             selected_server_mapping_ids_raw="[]",
-            testing_mode=deployment_data.get("testing_mode") if target_key == "TCS_APP" else "",
+            tcs_deployment_mode_id=DeploymentRequestService._normalize_tcs_deployment_mode_id(
+                target_key,
+                deployment_data,
+            ),
             jira_id=deployment_data.get("jira_id"),
             description=data.get("description"),
             remarks=deployment_data.get("remarks") or data.get("description"),
@@ -469,9 +517,13 @@ class DeploymentRequestService:
         if target_key == "TOOLS" and selected_tool_key:
             deployment_request.package_keys = [selected_tool_key]
         deployment_request.selected_server_mapping_ids = selected_server_mapping_ids
-        deployment_request.set_service_types(
-            DeploymentRequestService._normalize_service_types(target_key, deployment_data)
-        )
+        mode_id = deployment_request.tcs_deployment_mode_id
+        if mode_id:
+            DeploymentRequestService._get_or_create_tcs_deployment_mode(mode_id)
+        service_ids = DeploymentRequestService._normalize_tcs_service_ids(target_key, deployment_data)
+        for service_id in service_ids:
+            DeploymentRequestService._get_or_create_tcs_service(service_id)
+        deployment_request.set_service_ids(service_ids)
         db.session.add(deployment_request)
         db.session.flush()
 
@@ -499,15 +551,15 @@ class DeploymentRequestService:
 
     @staticmethod
     def _update_current_deployment_state(deployment_request, user):
-        service_types = (
-            deployment_request.get_service_types()
+        service_ids = (
+            deployment_request.get_service_ids()
             if deployment_request.target_key == "TCS_APP" else
             []
         )
-        testing_mode = (
-            (deployment_request.testing_mode or "").strip()
+        mode_id = (
+            deployment_request.tcs_deployment_mode_id
             if deployment_request.target_key == "TCS_APP" else
-            ""
+            None
         )
         for deployment in deployment_request.deployments:
             if deployment.deployment_status != "SUCCESS":
@@ -516,34 +568,37 @@ class DeploymentRequestService:
             if mapping is None:
                 continue
 
-            state = CurrentDeploymentState.query.filter_by(
-                env_scope_type=deployment_request.env_scope_type,
-                env_id=deployment_request.env_id,
-                env_type=deployment_request.requested_env_type,
-                environment_host_mapping_id=deployment.environment_host_mapping_id,
-                package_key=deployment.package_key,
-            ).first()
-            if state is None:
-                state = CurrentDeploymentState(
+            state_service_ids = service_ids if service_ids else [None]
+            for service_id in state_service_ids:
+                state = CurrentDeploymentState.query.filter_by(
                     env_scope_type=deployment_request.env_scope_type,
                     env_id=deployment_request.env_id,
                     env_type=deployment_request.requested_env_type,
                     environment_host_mapping_id=deployment.environment_host_mapping_id,
                     package_key=deployment.package_key,
-                )
-                db.session.add(state)
+                    tcs_service_id=service_id,
+                ).first()
+                if state is None:
+                    state = CurrentDeploymentState(
+                        env_scope_type=deployment_request.env_scope_type,
+                        env_id=deployment_request.env_id,
+                        env_type=deployment_request.requested_env_type,
+                        environment_host_mapping_id=deployment.environment_host_mapping_id,
+                        package_key=deployment.package_key,
+                        tcs_service_id=service_id,
+                    )
+                    db.session.add(state)
 
-            state.target_key = deployment_request.target_key
-            state.package_name = deployment.package_name
-            state.current_version = deployment.deployed_version
-            state.testing_mode = testing_mode
-            state.set_service_types(service_types)
-            state.source = "DEPLOYMENT"
-            state.status = "CURRENT"
-            state.updated_by = user.username if user else None
-            state.deployment_request_id = deployment_request.deployment_request_id
-            state.deployment_id = deployment.deployment_id
-            state.notes = None
+                state.target_key = deployment_request.target_key
+                state.package_name = deployment.package_name
+                state.current_version = deployment.deployed_version
+                state.tcs_deployment_mode_id = mode_id
+                state.source = "DEPLOYMENT"
+                state.status = "CURRENT"
+                state.updated_by = user.username if user else None
+                state.deployment_request_id = deployment_request.deployment_request_id
+                state.deployment_id = deployment.deployment_id
+                state.notes = None
 
     @staticmethod
     def _get_request_for_action(deployment_request_id):

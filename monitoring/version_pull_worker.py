@@ -14,7 +14,12 @@ rows were created/updated.
 
 import logging
 
-from webapp.models import EnvironmentHostMapping, CurrentDeploymentState
+from webapp.models import (
+    CurrentDeploymentState,
+    EnvironmentHostMapping,
+    TCSDeploymentMode,
+    TcsService,
+)
 from sqlalchemy.orm import joinedload
 from .services.version_fetcher import VersionFetcher
 from webapp.domain.deployment_targets import get_target_definition
@@ -120,8 +125,27 @@ class VersionPullWorker:
         target_key = target_info["target_key"]
         lookup = target_info["lookup"]
         packages = target_info["packages"]
-        testing_mode = (deployment_details.get("mode") or "").strip()
-        service_types = deployment_details.get("service_types") or []
+        deployment_mode_id = (deployment_details.get("mode") or "").strip() or None
+        tcs_service_ids = deployment_details.get("service_types") or []
+
+        if deployment_mode_id:
+            deployment_mode = TCSDeploymentMode.query.get(deployment_mode_id)
+            if deployment_mode is None:
+                deployment_mode = TCSDeploymentMode(
+                    tcs_deployment_mode_id=deployment_mode_id,
+                    mode_name=deployment_mode_id,
+                    is_active=True,
+                )
+                db.session.add(deployment_mode)
+        for tcs_service_id in tcs_service_ids:
+            service = TcsService.query.get(tcs_service_id)
+            if service is None:
+                service = TcsService(
+                    tcs_service_id=tcs_service_id,
+                    service_name=tcs_service_id,
+                    is_active=True,
+                )
+                db.session.add(service)
 
         for comp_name, comp_version in (versions_map or {}).items():
             normalized_name = (comp_name or "").strip()
@@ -135,54 +159,55 @@ class VersionPullWorker:
                 continue
 
             package_name = packages.get(package_key, {}).get("package_name") or package_key
-            state = CurrentDeploymentState.query.filter_by(
-                env_scope_type="ENV",
-                env_id=mapping.env_id,
-                env_type=mapping.env_type,
-                environment_host_mapping_id=mapping.environment_host_mapping_id,
-                package_key=package_key,
-            ).first()
+            resolved_mode_id = deployment_mode_id if target_key == "TCS_APP" else None
+            resolved_service_ids = tcs_service_ids if target_key == "TCS_APP" else [None]
+            if not resolved_service_ids:
+                resolved_service_ids = [None]
 
-            resolved_mode = testing_mode if target_key == "TCS_APP" else ""
-            resolved_service_types = service_types if target_key == "TCS_APP" else []
-
-            if state is None:
-                state = CurrentDeploymentState(
+            for resolved_service_id in resolved_service_ids:
+                state = CurrentDeploymentState.query.filter_by(
                     env_scope_type="ENV",
                     env_id=mapping.env_id,
                     env_type=mapping.env_type,
                     environment_host_mapping_id=mapping.environment_host_mapping_id,
-                    target_key=target_key,
                     package_key=package_key,
-                    package_name=package_name,
-                    current_version=comp_version,
-                    testing_mode=resolved_mode,
-                    source="PULL",
-                    status="CURRENT",
-                    notes=(raw_output or "")[:4000],
-                )
-                state.set_service_types(resolved_service_types)
-                db.session.add(state)
-                created += 1
-                continue
+                    tcs_service_id=resolved_service_id,
+                ).first()
 
-            mode_changed = (state.testing_mode or "") != resolved_mode
-            service_types_changed = state.get_service_types() != resolved_service_types
-            if (
-                (state.current_version or "") != (comp_version or "") or
-                (state.source or "") != "PULL" or
-                mode_changed or
-                service_types_changed
-            ):
-                state.current_version = comp_version
-                state.testing_mode = resolved_mode
-                state.set_service_types(resolved_service_types)
-                state.source = "PULL"
-                state.package_name = package_name
-                state.deployment_request_id = None
-                state.updated_by = None
-                state.notes = (raw_output or "")[:4000]
-                updated += 1
+                if state is None:
+                    state = CurrentDeploymentState(
+                        env_scope_type="ENV",
+                        env_id=mapping.env_id,
+                        env_type=mapping.env_type,
+                        environment_host_mapping_id=mapping.environment_host_mapping_id,
+                        target_key=target_key,
+                        package_key=package_key,
+                        package_name=package_name,
+                        current_version=comp_version,
+                        tcs_service_id=resolved_service_id,
+                        tcs_deployment_mode_id=resolved_mode_id,
+                        source="PULL",
+                        status="CURRENT",
+                        notes=(raw_output or "")[:4000],
+                    )
+                    db.session.add(state)
+                    created += 1
+                    continue
+
+                if (
+                    (state.current_version or "") != (comp_version or "") or
+                    (state.source or "") != "PULL" or
+                    (state.tcs_deployment_mode_id or None) != resolved_mode_id or
+                    (state.tcs_service_id or None) != resolved_service_id
+                ):
+                    state.current_version = comp_version
+                    state.tcs_deployment_mode_id = resolved_mode_id
+                    state.source = "PULL"
+                    state.package_name = package_name
+                    state.deployment_request_id = None
+                    state.updated_by = None
+                    state.notes = (raw_output or "")[:4000]
+                    updated += 1
 
         return {"created": created, "updated": updated, "skipped": skipped}
 

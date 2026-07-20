@@ -74,6 +74,20 @@
         return deployment.resolved_hosts_summary || "";
     }
 
+    function bookingOwnerLabel(booking) {
+        const ownerValue =
+            String(booking.requested_by_name || "").trim() ||
+            String(booking.requested_by || "").trim() ||
+            String(booking.requested_by_display || "").trim() ||
+            "";
+
+        if (!ownerValue) {
+            return "-";
+        }
+
+        return ownerValue.replace(/\s*\([^)]*\)\s*$/, "").trim() || ownerValue;
+    }
+
     function userCanSeeBooking(booking) {
         return userRole === "admin" || booking.requested_by === currentUser;
     }
@@ -156,7 +170,7 @@
         updateSummary();
 
         if (!visibleBookings.length) {
-            tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No booking requests match the current filters.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No booking requests match the current filters.</td></tr>';
             return;
         }
 
@@ -169,6 +183,7 @@
             const environmentType = bookingEnvironmentTypeLabel(booking);
             const resolvedHosts = bookingResolvedHostsLabel(booking);
             const environmentNote = resolvedHosts || environmentType;
+            const ownerLabel = bookingOwnerLabel(booking);
             const actions = canModify
                 ? '<div class="action-group">' +
                     '<button class="btn btn-sm btn-outline-primary" data-action="edit" data-id="' + common.escapeHtml(booking.booking_id) + '">Edit</button>' +
@@ -184,6 +199,7 @@
 
             return '<tr>' +
                 '<td><div class="fw-semibold">' + common.escapeHtml(booking.booking_id) + "</div>" + note + "</td>" +
+                '<td><div class="fw-semibold">' + common.escapeHtml(ownerLabel) + "</div></td>" +
                 '<td><div><span class="app-env-label">' + common.escapeHtml(environmentLabel) + '</span></div><div class="row-note">' + common.escapeHtml(environmentNote || "-") + "</div></td>" +
                 "<td><div>" + common.escapeHtml(windowText) + "</div></td>" +
                 "<td>" + typePill(booking.booking_type) + "</td>" +
@@ -272,10 +288,10 @@
             document.getElementById("deploymentSection").style.display = "block";
             document.getElementById("editComponentType").value = deployment.target_key || "";
             document.getElementById("editVersion").value = deployment.requested_version || "";
-            document.getElementById("editTestingMode").value = deployment.testing_mode || "";
+            document.getElementById("editTestingMode").value = deployment.tcs_deployment_mode || "";
             document.getElementById("editComponentNames").value = deployment.selected_servers_summary || "";
             document.getElementById("editServiceTypesGroup").style.display = deployment.target_key === "TCS_APP" ? "block" : "none";
-            document.getElementById("editServiceTypes").value = (deployment.service_types || []).join(", ");
+            document.getElementById("editServiceTypes").value = (deployment.tcs_service_names || []).join(", ");
         } else {
             document.getElementById("deploymentSection").style.display = "none";
             document.getElementById("editComponentType").value = "";
@@ -318,10 +334,10 @@
             document.getElementById("deploymentSection").style.display = "block";
             document.getElementById("editComponentType").value = deployment.target_key || "";
             document.getElementById("editVersion").value = deployment.requested_version || "";
-            document.getElementById("editTestingMode").value = deployment.testing_mode || "";
+            document.getElementById("editTestingMode").value = deployment.tcs_deployment_mode || "";
             document.getElementById("editComponentNames").value = deployment.selected_servers_summary || "";
             document.getElementById("editServiceTypesGroup").style.display = deployment.target_key === "TCS_APP" ? "block" : "none";
-            document.getElementById("editServiceTypes").value = (deployment.service_types || []).join(", ");
+            document.getElementById("editServiceTypes").value = (deployment.tcs_service_names || []).join(", ");
 
             setModalMode("view");
             editModal.show();

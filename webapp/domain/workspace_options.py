@@ -2,18 +2,20 @@
 Shared workspace/page configuration used by booking and deployment templates.
 """
 
+from flask import has_app_context
+
 from .deployment_targets import get_deployment_target_options
+from ..models import TCSDeploymentMode, TcsService
 
 
-DEPLOYMENT_TESTING_MODES = [
-    {"value": "TFT", "label": "TFT"},
+DEPLOYMENT_TCS_DEPLOYMENT_MODES = [
     {"value": "RT", "label": "RT"},
+    {"value": "TFT", "label": "TFT"},
 ]
 
-DEPLOYMENT_SERVICE_TYPES = [
-    {"value": "domplus", "label": "DOMPLUS"},
-    {"value": "dom", "label": "DOM"},
-    {"value": "conv", "label": "CONV"},
+DEPLOYMENT_TCS_SERVICES = [
+    {"value": "STL", "label": "STL"},
+    {"value": "NOW", "label": "NOW"},
 ]
 
 WORKSPACE_STATUS_DEFINITIONS = [
@@ -40,12 +42,49 @@ DEPLOYMENT_QUEUE_STATUS_OPTIONS = [
     {"value": "REJECTED", "label": "Rejected"},
 ]
 
+
+def _visible_deployment_targets():
+    return [
+        target
+        for target in (get_deployment_target_options() or [])
+        if (target.get("target_key") or "").strip().upper() != "TOOLS"
+    ]
+
+
 def get_workspace_deployment_form_options():
     """Return shared deployment-form choices for workspace templates."""
+    tcs_deployment_modes = []
+    tcs_services = []
+    if has_app_context():
+        try:
+            tcs_deployment_modes = [
+                {
+                    "value": item.tcs_deployment_mode_id,
+                    "label": item.mode_name,
+                }
+                for item in TCSDeploymentMode.query.filter_by(is_active=True).order_by(
+                    TCSDeploymentMode.tcs_deployment_mode_id
+                ).all()
+            ]
+        except Exception:
+            tcs_deployment_modes = []
+        try:
+            tcs_services = [
+                {
+                    "value": item.tcs_service_id,
+                    "label": item.service_name,
+                }
+                for item in TcsService.query.filter_by(is_active=True).order_by(
+                    TcsService.tcs_service_id
+                ).all()
+            ]
+        except Exception:
+            tcs_services = []
+
     return {
-        "targets": get_deployment_target_options() or [],
-        "testing_modes": DEPLOYMENT_TESTING_MODES,
-        "service_types": DEPLOYMENT_SERVICE_TYPES,
+        "targets": _visible_deployment_targets(),
+        "tcs_deployment_modes": tcs_deployment_modes or DEPLOYMENT_TCS_DEPLOYMENT_MODES,
+        "tcs_services": tcs_services or DEPLOYMENT_TCS_SERVICES,
     }
 
 

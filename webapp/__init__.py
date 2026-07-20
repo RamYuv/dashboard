@@ -47,6 +47,9 @@ def _recover_sqlite_database_uri(app):
     try:
         connection = sqlite3.connect(str(db_path))
         connection.execute("PRAGMA schema_version")
+        connection.execute("PRAGMA integrity_check")
+        connection.execute("BEGIN IMMEDIATE")
+        connection.rollback()
         connection.close()
     except sqlite3.Error as exc:
         recovery_path = _project_sqlite_recovery_path(app)
@@ -59,6 +62,28 @@ def _recover_sqlite_database_uri(app):
         app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///{}".format(
             recovery_path.as_posix()
         )
+
+
+def _should_initialize_database():
+    return os.environ.get("SKIP_APP_INIT_DB", "").strip().lower() != "true"
+
+
+def _register_blueprints(app):
+    from .routes import main_bp
+    from booking.routes.booking import booking_bp
+    from monitoring.api import monitoring_bp
+
+    app.register_blueprint(main_bp)
+    app.register_blueprint(booking_bp, url_prefix="/booking")
+    app.register_blueprint(monitoring_bp, url_prefix="/monitoring")
+
+
+def _initialize_runtime(app):
+    with app.app_context():
+        if _should_initialize_database():
+            init_db()
+        app.monitor_state.load_persisted()
+
 
 def create_app(config_class=Config):
     app = Flask(__name__)
@@ -78,22 +103,12 @@ def create_app(config_class=Config):
     # Initialize container with shared monitor state and app context
     app.container = AppContainer(app, app.monitor_state)
 
-    # Register blueprints
-    from .routes import main_bp
-    from booking.routes.booking import booking_bp
-    from monitoring.api import monitoring_bp
-
-    app.register_blueprint(main_bp)
-    app.register_blueprint(booking_bp, url_prefix='/booking')
-    app.register_blueprint(monitoring_bp, url_prefix='/monitoring')
+    _register_blueprints(app)
 
     @app.context_processor
     def inject_current_user():
         return {"current_user": current_user()}
 
-    with app.app_context():
-        if os.environ.get("SKIP_APP_INIT_DB", "").strip().lower() != "true":
-            init_db()
-        app.monitor_state.load_persisted()
+    _initialize_runtime(app)
 
     return app

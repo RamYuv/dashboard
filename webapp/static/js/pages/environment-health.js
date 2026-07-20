@@ -218,8 +218,8 @@
         const active = activeEnvIds.includes(envId) ? " active-booking" : "";
         const runtime = status.tcs_runtime || {};
         const versions = runtime.display_version || "";
-        const serviceTypes = (runtime.service_types || []).join(", ");
-        const testingModes = (runtime.testing_modes || []).join(", ");
+        const serviceTypes = (runtime.tcs_service_names || []).join(", ");
+        const testingModes = (runtime.tcs_deployment_modes || []).join(", ");
         const notRunningComponents = status.not_running_components || [];
         const serverStatus = safeLower(status.status);
         const statusLine = getTooltipStatusLine(serverStatus);

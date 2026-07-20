@@ -55,11 +55,11 @@
 
         const target = item.target_key || "-";
         const details = [];
-        if (item.testing_mode) {
-            details.push("Mode: " + item.testing_mode);
+        if (item.tcs_deployment_mode) {
+            details.push("Mode: " + item.tcs_deployment_mode);
         }
-        if ((item.service_types || []).length) {
-            details.push("Service: " + item.service_types.join(", "));
+        if ((item.tcs_service_names || []).length) {
+            details.push("Service: " + item.tcs_service_names.join(", "));
         }
         if (item.selected_servers_summary) {
             details.push("Servers: " + item.selected_servers_summary);
@@ -98,8 +98,8 @@
                 item.requested_version,
                 item.selected_servers_summary,
                 item.status,
-                item.testing_mode,
-                (item.service_types || []).join(" "),
+                item.tcs_deployment_mode,
+                (item.tcs_service_names || []).join(" "),
                 item.resolved_hosts_summary,
                 item.description,
             ].join(" ").toLowerCase();
