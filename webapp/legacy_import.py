@@ -9,6 +9,7 @@ import re
 from .models import (
     ComponentBuild,
     DefaultPassword,
+    EnvBookingSystemSnapshot,
     TCSDeploymentMode,
     TcsService,
     DeploymentRequest,
@@ -62,6 +63,11 @@ LEGACY_SERVER_TYPE_ALIASES = {
     "tools": ("tool_server", "TOOLS"),
 }
 
+LEGACY_SERVICE_BIT_ID_MAP = {
+    "STL": 20,
+    "NOW": 21,
+}
+
 
 def _get_first_present(payload, *keys):
     for key in keys:
@@ -104,12 +110,31 @@ def _parse_datetime(value):
     if cleaned is None:
         return None
     normalized = cleaned.replace("Z", "+00:00")
-    for candidate in (normalized, normalized.replace("T", " ")):
-        try:
-            parsed = datetime.fromisoformat(candidate)
-            return parsed.replace(tzinfo=None)
-        except ValueError:
-            continue
+    candidates = [normalized, normalized.replace("T", " ")]
+
+    if len(normalized) > 6 and normalized[-6] in ("+", "-") and normalized[-3] == ":":
+        compact_offset = normalized[:-3] + normalized[-2:]
+        candidates.append(compact_offset)
+        candidates.append(compact_offset.replace("T", " "))
+
+    formats = (
+        "%Y-%m-%dT%H:%M:%S.%f%z",
+        "%Y-%m-%d %H:%M:%S.%f%z",
+        "%Y-%m-%dT%H:%M:%S%z",
+        "%Y-%m-%d %H:%M:%S%z",
+        "%Y-%m-%dT%H:%M:%S.%f",
+        "%Y-%m-%d %H:%M:%S.%f",
+        "%Y-%m-%dT%H:%M:%S",
+        "%Y-%m-%d %H:%M:%S",
+    )
+
+    for candidate in candidates:
+        for date_format in formats:
+            try:
+                parsed = datetime.strptime(candidate, date_format)
+                return parsed.replace(tzinfo=None)
+            except ValueError:
+                continue
     raise ValueError("Unsupported datetime value '{}'".format(cleaned))
 
 
@@ -117,6 +142,10 @@ def _guess_env_type(env_id):
     normalized = _upper(env_id) or ""
     prefix = re.split(r"[_0-9-]", normalized, maxsplit=1)[0]
     return prefix or "ENV"
+
+
+def _derive_host_domain_from_env_id(env_id):
+    return _guess_env_type(env_id)
 
 
 def _resolve_or_create_role(role_name, description=None):
@@ -272,23 +301,47 @@ def _resolve_or_create_host(host_id, hostname, ip_address, domain, description):
     if not normalized_host_id:
         return None, False
 
+    normalized_hostname = _clean(hostname) or normalized_host_id
+    normalized_ip_address = _clean(ip_address)
+    normalized_domain = _clean(domain)
+
+    duplicate_host = Host.query.filter_by(
+        hostname=normalized_hostname,
+        ip_address=normalized_ip_address,
+        domain=normalized_domain,
+    ).first()
+
     host = Host.query.get(normalized_host_id)
     created = False
+    if host is None and duplicate_host is not None:
+        host = duplicate_host
     if host is None:
         host = Host(
             host_id=normalized_host_id,
-            hostname=_clean(hostname) or normalized_host_id,
-            ip_address=_clean(ip_address),
-            domain=_clean(domain),
+            hostname=normalized_hostname,
+            ip_address=normalized_ip_address,
+            domain=normalized_domain,
             description=_clean(description),
             is_active=True,
         )
         db.session.add(host)
         created = True
     else:
-        host.hostname = _clean(hostname) or host.hostname
-        host.ip_address = _clean(ip_address) or host.ip_address
-        host.domain = _clean(domain) or host.domain
+        conflicting_host = None
+        if host.host_id != normalized_host_id:
+            conflicting_host = host
+        elif (
+            duplicate_host is not None and
+            duplicate_host.host_id != host.host_id
+        ):
+            conflicting_host = duplicate_host
+
+        if conflicting_host is not None:
+            host = conflicting_host
+        else:
+            host.hostname = normalized_hostname or host.hostname
+            host.ip_address = normalized_ip_address or host.ip_address
+            host.domain = normalized_domain or host.domain
         if description:
             host.description = _clean(description)
     return host, created
@@ -350,6 +403,121 @@ def _resolve_or_create_component_build(version_data):
         db.session.add(build)
         created = True
     return build, created
+
+
+def _resolve_or_create_tcs_service_from_combo(service_combo):
+    normalized_combo = _upper(service_combo)
+    if not normalized_combo:
+        return None
+
+    record = TcsService.query.get(normalized_combo)
+    bit_id = LEGACY_SERVICE_BIT_ID_MAP.get(normalized_combo)
+    if record is None:
+        record = TcsService(
+            tcs_service_id=normalized_combo,
+            service_name=normalized_combo,
+            bit_id=bit_id,
+            is_active=True,
+        )
+        db.session.add(record)
+        db.session.flush()
+        return record
+
+    if not record.service_name:
+        record.service_name = normalized_combo
+    if record.bit_id is None and bit_id is not None:
+        record.bit_id = bit_id
+    return record
+
+
+def _resolve_or_create_tcs_deployment_mode_from_event(mode_id):
+    normalized_mode_id = _clean(mode_id)
+    if not normalized_mode_id:
+        return None
+
+    record = TCSDeploymentMode.query.get(normalized_mode_id)
+    if record is None:
+        record = TCSDeploymentMode(
+            tcs_deployment_mode_id=normalized_mode_id,
+            mode_name=normalized_mode_id,
+            is_active=True,
+        )
+        db.session.add(record)
+        db.session.flush()
+    return record
+
+
+def _resolve_booking_snapshot_service(event_data):
+    service_combo = _clean(event_data.get("tcs_service_combo"))
+    if service_combo:
+        return _resolve_or_create_tcs_service_from_combo(service_combo)
+    service_id = _clean(event_data.get("tcs_service_id"))
+    if service_id:
+        return _resolve_or_create_tcs_service_from_combo(service_id)
+    return None
+
+
+def _sync_booking_system_snapshots(booking, event_data):
+    if booking is None:
+        return
+
+    service = _resolve_booking_snapshot_service(event_data)
+    deployment_mode = _resolve_or_create_tcs_deployment_mode_from_event(
+        event_data.get("testing_mode_id")
+    )
+    current_version = _clean(event_data.get("tcs_version_id"))
+
+    mappings = (
+        EnvironmentHostMapping.query.join(ServerType)
+        .filter(EnvironmentHostMapping.env_id == booking.env_id)
+        .filter(ServerType.target_type == "TCS_APP")
+        .filter(ServerType.server_type_key.in_(["core", "gateway"]))
+        .order_by(EnvironmentHostMapping.environment_host_mapping_id.asc())
+        .all()
+    )
+
+    desired_mapping_ids = []
+    for mapping in mappings:
+        desired_mapping_ids.append(mapping.environment_host_mapping_id)
+        snapshot = EnvBookingSystemSnapshot.query.filter_by(
+            booking_id=booking.booking_id,
+            environment_host_mapping_id=mapping.environment_host_mapping_id,
+            target_key="TCS_APP",
+            package_key=None,
+            tcs_service_id=service.tcs_service_id if service is not None else None,
+        ).first()
+        if snapshot is None:
+            snapshot = EnvBookingSystemSnapshot(
+                booking_id=booking.booking_id,
+                environment_host_mapping_id=mapping.environment_host_mapping_id,
+                env_id=booking.env_id,
+                host_id=mapping.host_id,
+                server_type_id=mapping.server_type_id,
+                target_key="TCS_APP",
+                package_key=None,
+                tcs_service_id=service.tcs_service_id if service is not None else None,
+            )
+            db.session.add(snapshot)
+
+        snapshot.env_id = booking.env_id
+        snapshot.host_id = mapping.host_id
+        snapshot.server_type_id = mapping.server_type_id
+        snapshot.tcs_service_id = service.tcs_service_id if service is not None else None
+        snapshot.tcs_deployment_mode_id = (
+            deployment_mode.tcs_deployment_mode_id if deployment_mode is not None else None
+        )
+        snapshot.current_version = current_version
+        snapshot.package_name = None
+        snapshot.source = "LEGACY_EVENT_IMPORT"
+        snapshot.status = "CURRENT"
+        snapshot.notes = "Migrated from legacy booking event."
+
+    existing_snapshots = EnvBookingSystemSnapshot.query.filter_by(
+        booking_id=booking.booking_id
+    ).all()
+    for snapshot in existing_snapshots:
+        if snapshot.environment_host_mapping_id not in desired_mapping_ids:
+            db.session.delete(snapshot)
 
 
 def _resolve_or_create_default_password(default_password_data):
@@ -528,6 +696,7 @@ def _import_booking_event(event_data):
     )
     booking.description = _build_legacy_metadata_description(event_data)
     booking.user_timezone = "UTC"
+    _sync_booking_system_snapshots(booking, event_data)
     return created
 
 
@@ -679,11 +848,13 @@ def import_legacy_payload(payload, event_mode="booking", commit=True):
         server_type, server_type_created = _resolve_server_type(vm_data.get("tcs_usage"))
         summary["server_types_created"] += int(server_type_created)
 
+        host_domain = _derive_host_domain_from_env_id(vm_data.get("env_id"))
+
         host, host_created = _resolve_or_create_host(
             vm_data.get("id"),
             vm_data.get("hostname"),
             vm_data.get("ip_address"),
-            server_type.target_type if server_type is not None else "APP",
+            host_domain,
             "Legacy VM import ({})".format(_clean(vm_data.get("tcs_usage")) or "unknown"),
         )
         summary["hosts_created"] += int(host_created)
@@ -699,13 +870,13 @@ def import_legacy_payload(payload, event_mode="booking", commit=True):
 
         db_host_specs = [
             (
-                vm_data.get("db_instance_id") or "{}-coredb".format(_clean(vm_data.get("id")) or "host"),
-                vm_data.get("db_instance_id") or vm_data.get("hostname"),
+                vm_data.get("core_db_hostname") or vm_data.get("db_instance_id"),
+                vm_data.get("core_db_hostname") or vm_data.get("db_instance_id"),
                 vm_data.get("core_db_ip_address"),
                 "coredb",
             ),
             (
-                vm_data.get("lg_db_hostname") or "{}-lgdb".format(_clean(vm_data.get("id")) or "host"),
+                vm_data.get("lg_db_hostname"),
                 vm_data.get("lg_db_hostname"),
                 vm_data.get("lg_db_ip_address"),
                 "lgdb",
@@ -720,7 +891,7 @@ def import_legacy_payload(payload, event_mode="booking", commit=True):
                 derived_host_id,
                 derived_hostname or derived_host_id,
                 derived_ip,
-                "DB",
+                host_domain,
                 "Legacy derived DB host ({})".format(derived_usage),
             )
             summary["hosts_created"] += int(derived_host_created)
@@ -728,7 +899,7 @@ def import_legacy_payload(payload, event_mode="booking", commit=True):
                 environment,
                 derived_server_type,
                 derived_host,
-                vm_data.get("usr"),
+                vm_data.get("db_instance_id") or vm_data.get("usr"),
                 vm_data.get("hzn"),
             )
             summary["environment_mappings_created"] += int(derived_mapping_created)
