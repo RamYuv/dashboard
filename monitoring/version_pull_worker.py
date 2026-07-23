@@ -20,6 +20,7 @@ from webapp.models import (
     TCSDeploymentMode,
     TcsService,
 )
+from webapp.orbit_crypto import OrbitCryptoError
 from sqlalchemy.orm import joinedload
 from .services.version_fetcher import VersionFetcher
 from webapp.domain.deployment_targets import get_target_definition
@@ -220,10 +221,22 @@ class VersionPullWorker:
         if not target_info:
             return {"created": 0, "updated": 0, "skipped": 1}
 
+        try:
+            password = mapping.get_decrypted_deployment_password() or ""
+        except OrbitCryptoError as exc:
+            logger.warning(
+                "Skipping version pull auth for env_id=%s server_type=%s host=%s because the stored password could not be decrypted: %s",
+                mapping.env_id,
+                target_info["server_type_key"],
+                host_label or hostname,
+                exc,
+            )
+            return {"created": 0, "updated": 0, "skipped": 1}
+
         parsed_output = self.version_fetcher.fetch_version_details(
             hostname,
             mapping.deployment_user or "",
-            mapping.deploy_user_hzn or "",
+            password,
             server_type=target_info["server_type_key"],
             host_label=host_label,
         )

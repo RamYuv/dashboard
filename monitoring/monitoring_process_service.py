@@ -1,4 +1,4 @@
-"""Dedicated monitoring worker and web-owned process helpers."""
+"""Dedicated monitoring runner and web-owned process helpers."""
 
 import logging
 import os
@@ -102,7 +102,7 @@ class MonitoringProcessService(object):
             logger.info("Monitoring process is already running. pid=%s", self._process.pid)
             return
 
-        command = [sys.executable, "-m", "monitoring.worker_main"]
+        command = [sys.executable, "-m", "monitoring.monitoring_process_service"]
         self._process = subprocess.Popen(command, cwd=PROJECT_ROOT)
         logger.info("Started monitoring child process. pid=%s", self._process.pid)
 

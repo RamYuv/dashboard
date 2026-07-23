@@ -2,7 +2,7 @@
 
 This script can be invoked from cron or another scheduler and will perform one
 version-pull pass and exit with status code 0 on success. It mirrors the
-structure of the existing `monitoring/worker_main.py` entrypoint but executes
+structure of the existing `monitoring/monitoring_process_service.py` entrypoint but executes
 only a single run.
 """
 

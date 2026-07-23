@@ -5,7 +5,7 @@ import logging
 import signal
 
 from webapp import create_app
-from monitoring.worker_main import MonitoringProcessService
+from monitoring.monitoring_process_service import MonitoringProcessService
 
 logger = logging.getLogger(__name__)
 

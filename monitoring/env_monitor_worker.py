@@ -12,9 +12,13 @@ worker process.
 """
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import logging
 
 from webapp.models import EnvironmentHostMapping
+from webapp.orbit_crypto import OrbitCryptoError
 from sqlalchemy.orm import joinedload
+
+logger = logging.getLogger(__name__)
 
 
 class EnvMonitorWorker:
@@ -89,7 +93,17 @@ class EnvMonitorWorker:
                 host = (mapping.host.ip_address or "").strip() or (mapping.host.hostname or "").strip() or None
                 host_label = (mapping.host.hostname or "").strip() or host
             username = mapping.deployment_user or ""
-            password = mapping.deploy_user_hzn or ""
+            try:
+                password = mapping.get_decrypted_deployment_password() or ""
+            except OrbitCryptoError as exc:
+                logger.warning(
+                    "Skipping monitoring auth for env_id=%s server_type=%s host=%s because the stored password could not be decrypted: %s",
+                    env_id,
+                    server_type,
+                    host_label or host or "n/a",
+                    exc,
+                )
+                password = ""
             fetch_key = (host, username, password, server_type)
             fetch_targets.setdefault(fetch_key, {
                 "host": host,

@@ -12,7 +12,7 @@ class AppContainer:
         from monitoring.services.remote_executor import FabricRemoteExecutor
         from monitoring.services.status_aggregator import EnvStatusAggregator
         from monitoring.services.status_fetcher import VmStatusFetcher
-        from monitoring.worker import EnvMonitorWorker
+        from monitoring.env_monitor_worker import EnvMonitorWorker
         from monitoring.services.version_fetcher import VersionFetcher
         from monitoring.version_pull_worker import VersionPullWorker
 
