@@ -37,6 +37,12 @@ def _table_exists(connection, table_name):
     return row is not None
 
 
+def _json_safe_value(value):
+    if isinstance(value, bytes):
+        return value.hex()
+    return value
+
+
 def _read_table_rows(connection, table_name):
     cursor = connection.execute('SELECT * FROM "{}"'.format(table_name))
     column_names = [description[0] for description in cursor.description or []]
@@ -44,7 +50,7 @@ def _read_table_rows(connection, table_name):
     for record in cursor.fetchall():
         rows.append(
             {
-                column_name: record[index]
+                column_name: _json_safe_value(record[index])
                 for index, column_name in enumerate(column_names)
             }
         )

@@ -4,12 +4,22 @@ from datetime import datetime, timedelta
 
 from flask import flash, jsonify, redirect, render_template, request, session, url_for
 from sqlalchemy.exc import IntegrityError
-from werkzeug.security import check_password_hash, generate_password_hash as generate_hzn_hash
 
 from .blueprint import main_bp
-from ..auth_service import current_user, login_required
+from ..auth_service import (
+    current_user,
+    login_required,
+    password_change_required,
+    should_redirect_to_password_change,
+)
 from ..helpers import normalize_role, normalize_team
 from ..models import PasswordChangeRequest, Team, TeamMember, User, db
+from ..password_utils import (
+    hash_password,
+    should_force_password_change,
+    sync_password_change_requirement,
+    verify_password,
+)
 from ..services.email_service import EmailDeliveryError, SendmailEmailService
 
 
@@ -112,7 +122,7 @@ def _clear_pending_hzn_change_requests(user_id):
     if not user_id:
         return
 
-    PasswordChangeRequest.query.filter_by(user_id=user_id).delete()
+    PasswordChangeRequest.for_user(user_id).delete()
 
 
 def _store_hzn_change_session(request_id):
@@ -150,21 +160,18 @@ def _load_pending_hzn_change_request():
     request_id = session.get(HZN_CHANGE_SESSION_KEY)
     if not request_id:
         return None
-    return db.session.get(PasswordChangeRequest, request_id)
+    return PasswordChangeRequest.find_by_id(request_id)
 
 
 def _load_pending_forgot_hzn_request():
     request_id = session.get(FORGOT_HZN_SESSION_KEY)
     if not request_id:
         return None
-    return db.session.get(PasswordChangeRequest, request_id)
+    return PasswordChangeRequest.find_by_id(request_id)
 
 
 def _find_user_by_username(username):
-    normalized_username = (username or "").strip().lower()
-    if not normalized_username:
-        return None
-    return User.query.filter_by(username=normalized_username).first()
+    return User.find_by_username(username)
 
 
 def _normalize_registration_form():
@@ -181,12 +188,55 @@ def _normalize_registration_form():
 
 
 def _find_existing_registration_user(username, email_id):
-    return (
-        User.query.filter(
-            (User.user_id == username) | (User.email_id == email_id)
-        )
-        .first()
+    return User.find_by_user_id(username) or User.find_by_email(email_id)
+
+
+def _find_or_create_registration_team(team_name):
+    team_record = Team.find_by_name(team_name)
+    if team_record is None:
+        team_record = Team(team_name=team_name)
+        db.session.add(team_record)
+        db.session.flush()
+    return team_record
+
+
+def _build_registration_user(form_data):
+    return User(
+        username=form_data["username"],
+        email_id=form_data["email_id"],
+        first_name=form_data["first_name"],
+        last_name=form_data["last_name"],
+        name="{} {}".format(
+            form_data["first_name"],
+            form_data["last_name"],
+        ).strip(),
+        hzn_hash=hash_password(form_data["password"]),
+        role=form_data["role"],
     )
+
+
+def _finalize_successful_login(user, entered_password):
+    should_change_password = sync_password_change_requirement(user, entered_password)
+    if should_change_password and db.session.is_modified(user):
+        db.session.commit()
+
+    session.clear()
+    session["user_id"] = user.user_id
+    if should_force_password_change(user, entered_password):
+        logger.info("User %s must change password before accessing the app", user.username)
+        flash("Please change your temporary password before continuing.", "warning")
+        return redirect(url_for("main.change_hzn"))
+
+    logger.info("User %s logged in successfully", user.username)
+    return redirect(url_for("main.environment_health"))
+
+
+@main_bp.before_app_request
+def enforce_required_password_change():
+    if not should_redirect_to_password_change():
+        return None
+    flash("Please change your temporary password before continuing.", "warning")
+    return redirect(url_for("main.change_hzn"))
 
 
 @main_bp.route("/")
@@ -230,24 +280,8 @@ def register():
             flash("That {} is already registered.".format(duplicate_field), "danger")
             return _render_register_page(team_choices)
 
-        team_record = Team.query.filter_by(team_name=form_data["team"]).first()
-        if team_record is None:
-            team_record = Team(team_name=form_data["team"])
-            db.session.add(team_record)
-            db.session.flush()
-
-        user = User(
-            username=form_data["username"],
-            email_id=form_data["email_id"],
-            first_name=form_data["first_name"],
-            last_name=form_data["last_name"],
-            name="{} {}".format(
-                form_data["first_name"],
-                form_data["last_name"],
-            ).strip(),
-            hzn_hash=generate_hzn_hash(form_data["password"]),
-            role=form_data["role"],
-        )
+        team_record = _find_or_create_registration_team(form_data["team"])
+        user = _build_registration_user(form_data)
         db.session.add(user)
         db.session.flush()
         db.session.add(
@@ -287,15 +321,12 @@ def login():
         password = request.form.get("password", "")
 
         user = _find_user_by_username(username)
-        if user is None or not check_password_hash(user.hzn_hash, password):
+        if user is None or not verify_password(user.hzn_hash, password):
             logger.warning("Login failed for username %s", username or "unknown")
             flash("Invalid username or password.", "danger")
             return render_template("login.html")
 
-        session.clear()
-        session["user_id"] = user.user_id
-        logger.info("User %s logged in successfully", user.username)
-        return redirect(url_for("main.environment_health"))
+        return _finalize_successful_login(user, password)
 
     return render_template("login.html")
 
@@ -346,7 +377,7 @@ def forgot_hzn():
 
         pending_request = _create_hzn_change_request(
             user,
-            generate_hzn_hash(new_hzn),
+            hash_password(new_hzn),
             verification_code,
         )
         _store_forgot_hzn_session(pending_request.id)
@@ -354,7 +385,7 @@ def forgot_hzn():
         return jsonify(success=True)
 
     request_id = session.get(FORGOT_HZN_SESSION_KEY)
-    pending_request = db.session.get(PasswordChangeRequest, request_id) if request_id else None
+    pending_request = PasswordChangeRequest.find_by_id(request_id) if request_id else None
     _clear_forgot_hzn_session()
     if pending_request is not None:
         _clear_pending_hzn_change_requests(pending_request.user_id)
@@ -391,7 +422,7 @@ def change_hzn():
         new_hzn = request.form.get("new_hzn", "")
         confirm_hzn = request.form.get("confirm_hzn", "")
 
-        if not check_password_hash(user.hzn_hash, current_password):
+        if not verify_password(user.hzn_hash, current_password):
             return jsonify(success=False, error="Current password is incorrect."), 400
 
         policy_error = _validate_hzn_policy(new_hzn)
@@ -429,7 +460,7 @@ def change_hzn():
 
         pending_request = _create_hzn_change_request(
             user,
-            generate_hzn_hash(new_hzn),
+            hash_password(new_hzn),
             verification_code,
         )
         _store_hzn_change_session(pending_request.id)
@@ -467,6 +498,7 @@ def verify_hzn_change():
         return jsonify(success=False, error="Invalid verification code."), 400
 
     user.hzn_hash = pending_change.new_hzn_hash or user.hzn_hash
+    user.must_change_password = False
     db.session.delete(pending_change)
     db.session.commit()
     _clear_hzn_change_session()
@@ -491,13 +523,14 @@ def verify_forgot_hzn():
     if submitted_code != str(pending_change.verification_code):
         return jsonify(success=False, error="Invalid verification code."), 400
 
-    user = db.session.get(User, pending_change.user_id)
+    user = User.find_by_user_id(pending_change.user_id)
     if user is None:
         _delete_pending_hzn_change_request(pending_change)
         _clear_forgot_hzn_session()
         return jsonify(success=False, error="User account was not found."), 400
 
     user.hzn_hash = pending_change.new_hzn_hash or user.hzn_hash
+    user.must_change_password = False
     db.session.delete(pending_change)
     db.session.commit()
     _clear_forgot_hzn_session()

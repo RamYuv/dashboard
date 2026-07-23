@@ -2,7 +2,7 @@
 
 import logging
 from functools import wraps
-from flask import session, redirect, url_for, flash
+from flask import session, redirect, url_for, flash, request
 
 from .models import User
 from .access_policy import (
@@ -13,6 +13,12 @@ from .access_policy import (
 )
 
 logger = logging.getLogger(__name__)
+PASSWORD_CHANGE_ALLOWED_ENDPOINTS = {
+    "main.change_hzn",
+    "main.verify_hzn_change",
+    "main.logout",
+    "static",
+}
 
 
 def current_user():
@@ -21,6 +27,21 @@ def current_user():
     if not user_id:
         return None
     return User.query.get(user_id)
+
+
+def password_change_required(user=None):
+    """Return whether the current user must change their password before proceeding."""
+    target_user = user if user is not None else current_user()
+    return bool(getattr(target_user, "must_change_password", False))
+
+
+def should_redirect_to_password_change():
+    """Return whether the current request should be limited to password-change pages."""
+    user = current_user()
+    endpoint = request.endpoint or ""
+    if user is None or not password_change_required(user):
+        return False
+    return endpoint not in PASSWORD_CHANGE_ALLOWED_ENDPOINTS
 
 
 def login_required(view):

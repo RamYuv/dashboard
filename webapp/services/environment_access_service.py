@@ -10,6 +10,7 @@ from pathlib import Path
 from flask import current_app
 
 from ..models import EnvironmentHostMapping, PayUi, PayUiAccessType, ServerTypeKey
+from ..orbit_crypto import OrbitCryptoError
 
 
 class EnvironmentAccessService:
@@ -38,6 +39,10 @@ class EnvironmentAccessService:
             return None, "Mapped host is missing a deployment user."
         if not password_value:
             return None, "Mapped host is missing an access password."
+        try:
+            password_value = mapping.get_decrypted_deployment_password()
+        except OrbitCryptoError as exc:
+            return None, str(exc)
 
         ttyd_path = cls._resolve_binary_path(
             current_app.config.get("TTYD_BINARY"),
@@ -164,9 +169,10 @@ class EnvironmentAccessService:
         if not project_root:
             return None
 
-        default_path = Path(project_root) / "bin" / (default_name + ".exe")
-        if default_path.exists():
-            return default_path
+        bin_dir = Path(project_root) / "bin"
+        for candidate in (bin_dir / default_name, bin_dir / (default_name + ".exe")):
+            if candidate.exists():
+                return candidate
         return None
 
     @classmethod

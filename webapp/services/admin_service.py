@@ -3,7 +3,6 @@
 from datetime import datetime
 
 from flask import current_app
-from werkzeug.security import generate_password_hash as generate_hzn_hash
 
 from ..auth_service import get_allowed_screens
 from ..component_build_catalog import (
@@ -13,6 +12,8 @@ from ..component_build_catalog import (
 from ..domain.deployment_targets import get_deployment_target_options, get_target_definition
 from ..helpers import DEFAULT_ROLE_NAMES, get_valid_roles, normalize_role
 from ..db_init import get_seed_runtime_summary
+from ..orbit_crypto import encrypt_server_password
+from ..password_utils import hash_password
 from ..models import (
     ComponentBuild,
     CurrentDeploymentState,
@@ -423,6 +424,8 @@ def create_environment_host_mapping(form):
     env_id = (form.get("env_id") or "").strip().upper()
     deployment_user = (form.get("deployment_user") or "").strip() or None
     deploy_user_hzn = (form.get("deploy_user_hzn") or "").strip() or None
+    if deploy_user_hzn:
+        deploy_user_hzn = encrypt_server_password(deploy_user_hzn)
 
     try:
         server_type_id = int(form.get("server_type_id") or "")
@@ -482,6 +485,8 @@ def update_environment_host_mapping(form):
     env_id = (form.get("env_id") or "").strip().upper()
     deployment_user = (form.get("deployment_user") or "").strip() or None
     deploy_user_hzn = (form.get("deploy_user_hzn") or "").strip() or None
+    if deploy_user_hzn:
+        deploy_user_hzn = encrypt_server_password(deploy_user_hzn)
 
     try:
         server_type_id = int(form.get("server_type_id") or "")
@@ -737,8 +742,9 @@ def create_user(form):
         first_name=first_name or None,
         last_name=last_name or None,
         name="{} {}".format(first_name, last_name).strip() or user_id,
-        hzn_hash=generate_hzn_hash(hzn),
+        hzn_hash=hash_password(hzn),
         role=role,
+        must_change_password=True,
     )
     db.session.add(user)
     db.session.flush()

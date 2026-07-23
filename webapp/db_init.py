@@ -5,13 +5,13 @@ from pathlib import Path
 
 from flask import current_app, has_app_context
 from sqlalchemy import inspect, text
-from werkzeug.security import generate_password_hash as generate_hzn_hash
 
 from .component_build_catalog import (
     build_package_entries,
     canonical_build_name,
 )
 from .domain.deployment_targets import get_target_definition
+from .password_utils import hash_password, verify_password
 from .models import (
     ComponentBuild,
     DeploymentRequestService,
@@ -476,9 +476,48 @@ def _upgrade_env_booking_system_snapshot_schema():
     )
 
 
+def _upgrade_user_schema():
+    columns = _get_table_columns("users")
+    if not columns:
+        return
+    _add_column_if_missing(
+        "users",
+        "must_change_password BOOLEAN NOT NULL DEFAULT 0",
+    )
+    _backfill_default_password_flags()
+
+
+def _backfill_default_password_flags():
+    """Mark users that still appear to use a known plaintext default password."""
+    default_password_table_exists = bool(_get_table_columns("default_passwords"))
+    if not default_password_table_exists:
+        return
+
+    from .models import DefaultPassword
+
+    default_password_values = []
+    for record in DefaultPassword.query.all():
+        value = (record.password_value or "").strip()
+        if not value or "$" in value or ":" in value:
+            continue
+        default_password_values.append(value)
+
+    if not default_password_values:
+        return
+
+    for user in User.query.all():
+        if getattr(user, "must_change_password", False):
+            continue
+        if any(verify_password(user.hzn_hash, default_value) for default_value in default_password_values):
+            user.must_change_password = True
+
+    db.session.commit()
+
+
 def upgrade_existing_schema():
     """Apply lightweight SQLite-safe schema upgrades for evolving local models."""
     db.create_all()
+    _upgrade_user_schema()
     _upgrade_deployment_request_schema()
     _upgrade_current_deployment_state_schema()
     _upgrade_env_booking_system_snapshot_schema()
@@ -592,7 +631,7 @@ def seed_default_users():
             defaults={
                 "email_id": user_data["email_id"],
                 "name": user_data["name"],
-                "hzn_hash": generate_hzn_hash(user_data["password"]),
+                "hzn_hash": hash_password(user_data["password"]),
                 "role": user_data["role"],
             },
         )

@@ -111,12 +111,50 @@ class User(db.Model):
 
     # Self-registered accounts start as "user"; admins can promote them later.
     role = db.Column(db.String(20), nullable=False, default="user")
+    must_change_password = db.Column(db.Boolean, nullable=False, default=False)
 
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     username = db.synonym("user_id")
     id = db.synonym("user_id")
+
+    @classmethod
+    def find_by_user_id(cls, user_id):
+        normalized_user_id = (user_id or "").strip().lower()
+        if not normalized_user_id:
+            return None
+        return cls.query.filter_by(user_id=normalized_user_id).first()
+
+    @classmethod
+    def find_by_username(cls, username):
+        return cls.find_by_user_id(username)
+
+    @classmethod
+    def find_by_email(cls, email_id):
+        normalized_email_id = (email_id or "").strip().lower()
+        if not normalized_email_id:
+            return None
+        return cls.query.filter_by(email_id=normalized_email_id).first()
+
+    @classmethod
+    def ordered(cls):
+        return cls.query.order_by(cls.user_id)
+
+    @classmethod
+    def active(cls):
+        return cls.query.filter_by(is_active=True).order_by(cls.user_id)
+
+    @classmethod
+    def by_role(cls, role_name):
+        normalized_role_name = (role_name or "").strip().lower()
+        if not normalized_role_name:
+            return cls.query.filter(db.text("1 = 0"))
+        return cls.query.filter_by(role=normalized_role_name).order_by(cls.user_id)
+
+    @classmethod
+    def requiring_password_change(cls):
+        return cls.query.filter_by(must_change_password=True).order_by(cls.user_id)
 
     @property
     def full_name(self):
@@ -198,6 +236,23 @@ class PasswordChangeRequest(db.Model):
 
     user = db.relationship("User", backref="password_change_requests")
 
+    @classmethod
+    def find_by_id(cls, request_id):
+        if request_id in (None, ""):
+            return None
+        return cls.query.get(request_id)
+
+    @classmethod
+    def for_user(cls, user_id):
+        normalized_user_id = (user_id or "").strip().lower()
+        if not normalized_user_id:
+            return cls.query.filter(db.text("1 = 0"))
+        return cls.query.filter_by(user_id=normalized_user_id).order_by(cls.created_at.desc())
+
+    @classmethod
+    def latest_for_user(cls, user_id):
+        return cls.for_user(user_id).first()
+
 
 # ==========================================================
 # TEAM
@@ -210,6 +265,23 @@ class Team(db.Model):
     description = db.Column(db.Text)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    @classmethod
+    def find_by_id(cls, team_id):
+        if team_id in (None, ""):
+            return None
+        return cls.query.get(team_id)
+
+    @classmethod
+    def find_by_name(cls, team_name):
+        normalized_team_name = (team_name or "").strip().lower()
+        if not normalized_team_name:
+            return None
+        return cls.query.filter_by(team_name=normalized_team_name).first()
+
+    @classmethod
+    def ordered(cls):
+        return cls.query.order_by(cls.team_name)
 
 
 # ==========================================================
@@ -271,6 +343,21 @@ class DefaultPassword(db.Model):
         nullable=False,
     )
 
+    @classmethod
+    def find_by_id(cls, default_password_id):
+        normalized_id = (default_password_id or "").strip()
+        if not normalized_id:
+            return None
+        return cls.query.get(normalized_id)
+
+    @classmethod
+    def ordered(cls):
+        return cls.query.order_by(cls.default_password_id)
+
+    @classmethod
+    def values(cls):
+        return [record.password_value for record in cls.ordered().all()]
+
 
 # ==========================================================
 # ORBIT
@@ -287,6 +374,17 @@ class Orbit(db.Model):
         onupdate=datetime.utcnow,
         nullable=False,
     )
+
+    @classmethod
+    def find_by_id(cls, orbit_id):
+        normalized_id = (orbit_id or "").strip()
+        if not normalized_id:
+            return None
+        return cls.query.get(normalized_id)
+
+    @classmethod
+    def primary(cls):
+        return cls.find_by_id("orb")
 
 
 # ==========================================================
@@ -436,6 +534,11 @@ class EnvironmentHostMapping(db.Model):
             "deployment_user": self.deployment_user,
             "deploy_user_hzn": self.deploy_user_hzn,
         }
+
+    def get_decrypted_deployment_password(self):
+        from .orbit_crypto import decrypt_server_password
+
+        return decrypt_server_password(self.deploy_user_hzn)
 
     @classmethod
     def get_core_vm(cls, env_id):
