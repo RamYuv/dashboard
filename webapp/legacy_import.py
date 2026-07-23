@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 import json
 import re
+import sqlite3
 
 from .models import (
     ComponentBuild,
@@ -75,6 +76,14 @@ def _get_first_present(payload, *keys):
         if value:
             return value
     return []
+
+
+def _sqlite_table_exists(connection, table_name):
+    row = connection.execute(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+        (table_name,),
+    ).fetchone()
+    return row is not None
 
 
 def _clean(value):
@@ -934,6 +943,89 @@ def import_legacy_payload(payload, event_mode="booking", commit=True):
     else:
         db.session.flush()
     return summary
+
+
+def import_legacy_sensitive_values_from_sqlite(db_path, commit=True):
+    """Import sensitive legacy values directly from SQLite without using JSON."""
+    summary = {
+        "users_updated": 0,
+        "orbits_updated": 0,
+        "environment_mappings_updated": 0,
+        "missing_users": [],
+        "missing_mappings": [],
+    }
+
+    connection = sqlite3.connect(str(db_path))
+    try:
+        if _sqlite_table_exists(connection, "tuser"):
+            for user_id, password_value in connection.execute("SELECT id, password FROM tuser").fetchall():
+                normalized_user_id = _clean(user_id)
+                normalized_password = _clean(password_value)
+                if not normalized_user_id or normalized_password is None:
+                    continue
+                user = User.query.get(normalized_user_id)
+                if user is None:
+                    summary["missing_users"].append(normalized_user_id)
+                    continue
+                user.hzn_hash = normalized_password
+                summary["users_updated"] += 1
+
+        if _sqlite_table_exists(connection, "orbit"):
+            for orbit_id, orbit_value in connection.execute("SELECT id, orb FROM orbit").fetchall():
+                normalized_orbit_id = _clean(orbit_id)
+                normalized_orbit_value = _clean(orbit_value)
+                if not normalized_orbit_id or normalized_orbit_value is None:
+                    continue
+                orbit = Orbit.query.get(normalized_orbit_id)
+                if orbit is None:
+                    orbit = Orbit(orbit_id=normalized_orbit_id, orb_value=normalized_orbit_value)
+                    db.session.add(orbit)
+                else:
+                    orbit.orb_value = normalized_orbit_value
+                summary["orbits_updated"] += 1
+
+        if _sqlite_table_exists(connection, "vm"):
+            vm_rows = connection.execute(
+                "SELECT env_id, tcs_usage, hzn, usr, db_instance_id FROM vm"
+            ).fetchall()
+            for env_id, tcs_usage, hzn_value, usr_value, db_instance_id in vm_rows:
+                normalized_env_id = _upper(env_id)
+                normalized_hzn_value = _clean(hzn_value)
+                if not normalized_env_id or normalized_hzn_value is None:
+                    continue
+
+                try:
+                    server_type, _ = _resolve_server_type(tcs_usage)
+                except ValueError:
+                    summary["missing_mappings"].append(
+                        "{}:{}".format(normalized_env_id, _clean(tcs_usage) or "unknown")
+                    )
+                    continue
+
+                mapping = EnvironmentHostMapping.query.filter_by(
+                    env_id=normalized_env_id,
+                    server_type_id=server_type.server_type_id,
+                ).first()
+                if mapping is None:
+                    summary["missing_mappings"].append(
+                        "{}:{}".format(normalized_env_id, server_type.server_type_key)
+                    )
+                    continue
+
+                mapping.deploy_user_hzn = normalized_hzn_value
+                if _clean(usr_value):
+                    mapping.deployment_user = _clean(usr_value)
+                elif server_type.server_type_key in {"coredb", "lgdb"} and _clean(db_instance_id):
+                    mapping.deployment_user = _clean(db_instance_id)
+                summary["environment_mappings_updated"] += 1
+
+        if commit:
+            db.session.commit()
+        else:
+            db.session.flush()
+        return summary
+    finally:
+        connection.close()
 
 
 def load_legacy_payload_from_json(path):

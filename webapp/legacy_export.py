@@ -28,6 +28,12 @@ LEGACY_EXPORT_TABLES = (
     ("environment", "environment"),
 )
 
+SENSITIVE_LEGACY_FIELDS = {
+    "orbit": {"orb"},
+    "tuser": {"password"},
+    "vm": {"hzn"},
+}
+
 
 def _table_exists(connection, table_name):
     row = connection.execute(
@@ -43,21 +49,23 @@ def _json_safe_value(value):
     return value
 
 
-def _read_table_rows(connection, table_name):
+def _read_table_rows(connection, table_name, include_sensitive=False):
     cursor = connection.execute('SELECT * FROM "{}"'.format(table_name))
     column_names = [description[0] for description in cursor.description or []]
+    sensitive_fields = set() if include_sensitive else SENSITIVE_LEGACY_FIELDS.get(table_name, set())
     rows = []
     for record in cursor.fetchall():
         rows.append(
             {
                 column_name: _json_safe_value(record[index])
                 for index, column_name in enumerate(column_names)
+                if column_name not in sensitive_fields
             }
         )
     return rows
 
 
-def export_legacy_sqlite_to_payload(db_path):
+def export_legacy_sqlite_to_payload(db_path, include_sensitive=False):
     """Return a structured payload from a legacy SQLite database file."""
     database_path = Path(db_path)
     if not database_path.exists():
@@ -68,7 +76,7 @@ def export_legacy_sqlite_to_payload(db_path):
         payload = {}
         for output_key, table_name in LEGACY_EXPORT_TABLES:
             payload[output_key] = (
-                _read_table_rows(connection, table_name)
+                _read_table_rows(connection, table_name, include_sensitive=include_sensitive)
                 if _table_exists(connection, table_name)
                 else []
             )
