@@ -253,6 +253,13 @@ class PasswordChangeRequest(db.Model):
     def latest_for_user(cls, user_id):
         return cls.for_user(user_id).first()
 
+    @classmethod
+    def delete_for_user(cls, user_id):
+        normalized_user_id = (user_id or "").strip().lower()
+        if not normalized_user_id:
+            return 0
+        return cls.query.filter_by(user_id=normalized_user_id).delete()
+
 
 # ==========================================================
 # TEAM
@@ -518,6 +525,29 @@ class EnvironmentHostMapping(db.Model):
     def server_type_key(self):
         return self.server_type.server_type_key if self.server_type else None
 
+    def _apply_temporary_deployment_user_override(self, deployment_user):
+        """Temporary runtime override for DB access users without changing stored data."""
+        normalized_server_type = (self.server_type_key or "").strip().lower()
+        normalized_deployment_user = (deployment_user or "").strip()
+
+        # Temporary fix for DB access until the source data is corrected.
+        if (
+            normalized_server_type in {"coredb", "lgdb"} and
+            normalized_deployment_user.lower().endswith("dbm")
+        ):
+            return normalized_deployment_user[:-3] + "ktm"
+
+        return deployment_user
+
+    def __getattribute__(self, name):
+        if name == "deployment_user":
+            raw_value = object.__getattribute__(self, name)
+            return object.__getattribute__(
+                self,
+                "_apply_temporary_deployment_user_override",
+            )(raw_value)
+        return object.__getattribute__(self, name)
+
     def matches_access_server_type(self, server_type_key):
         enum_value = ServerTypeKey.from_value(server_type_key)
         expected_value = enum_value.value if enum_value is not None else (server_type_key or "").strip().lower()
@@ -685,9 +715,16 @@ class ComponentBuild(db.Model):
 class TcsService(db.Model):
     __tablename__ = "tcs_services"
 
+    LOGICAL_BIT_ID_MAP = {
+        "DOM": "21",
+        "MON": "22",
+        "CPM": "2,3",
+        "DOM_MON": "21,22",
+    }
+
     tcs_service_id = db.Column(db.String(16), primary_key=True)
     service_name = db.Column(db.String(128), nullable=False)
-    bit_id = db.Column(db.Integer)
+    bit_id = db.Column(db.String(32))
     description = db.Column(db.String(255))
     is_active = db.Column(db.Boolean, nullable=False, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
@@ -697,6 +734,85 @@ class TcsService(db.Model):
         onupdate=datetime.utcnow,
         nullable=False,
     )
+
+    @classmethod
+    def normalize_service_id(cls, value):
+        normalized = (value or "").strip().upper()
+        return normalized or None
+
+    @classmethod
+    def normalize_bit_id(cls, value):
+        raw_value = (value or "").strip()
+        if not raw_value:
+            return None
+        tokens = []
+        for token in raw_value.replace(":", ",").split(","):
+            normalized_token = token.strip()
+            if normalized_token and normalized_token not in tokens:
+                tokens.append(normalized_token)
+        if not tokens:
+            return None
+        if len(tokens) == 1:
+            return tokens[0]
+        try:
+            tokens = sorted(tokens, key=lambda item: int(item))
+        except ValueError:
+            tokens = sorted(tokens)
+        return ",".join(tokens)
+
+    @classmethod
+    def default_bit_id_for_service_id(cls, service_id):
+        normalized_service_id = cls.normalize_service_id(service_id)
+        if not normalized_service_id:
+            return None
+        return cls.LOGICAL_BIT_ID_MAP.get(normalized_service_id)
+
+    @classmethod
+    def default_service_id_for_bit_id(cls, bit_id):
+        normalized_bit_id = cls.normalize_bit_id(bit_id)
+        if not normalized_bit_id:
+            return None
+        for service_id, candidate_bit_id in cls.LOGICAL_BIT_ID_MAP.items():
+            if cls.normalize_bit_id(candidate_bit_id) == normalized_bit_id:
+                return service_id
+        return None
+
+    @classmethod
+    def resolve_logical_service_ids(cls, values):
+        resolved_ids = []
+        for value in values or []:
+            normalized_service_id = cls.normalize_service_id(value)
+            if normalized_service_id:
+                service = cls.query.get(normalized_service_id)
+                if service is not None:
+                    if service.tcs_service_id not in resolved_ids:
+                        resolved_ids.append(service.tcs_service_id)
+                    continue
+
+            normalized_bit_id = cls.normalize_bit_id(value)
+            if normalized_bit_id:
+                default_service_id = cls.default_service_id_for_bit_id(normalized_bit_id)
+                if default_service_id and default_service_id not in resolved_ids:
+                    resolved_ids.append(default_service_id)
+                    continue
+
+                service = cls.query.filter_by(bit_id=normalized_bit_id).first()
+                if service is not None:
+                    if service.tcs_service_id not in resolved_ids:
+                        resolved_ids.append(service.tcs_service_id)
+                    continue
+
+                bit_id_tokens = normalized_bit_id.split(",")
+                if len(bit_id_tokens) > 1:
+                    for token in bit_id_tokens:
+                        fallback_service = cls.query.filter_by(bit_id=token).first()
+                        if fallback_service is not None and fallback_service.tcs_service_id not in resolved_ids:
+                            resolved_ids.append(fallback_service.tcs_service_id)
+                    continue
+
+            if normalized_service_id and normalized_service_id not in resolved_ids:
+                resolved_ids.append(normalized_service_id)
+        return resolved_ids
 
 
 # ==========================================================

@@ -122,7 +122,7 @@ def _clear_pending_hzn_change_requests(user_id):
     if not user_id:
         return
 
-    PasswordChangeRequest.for_user(user_id).delete()
+    PasswordChangeRequest.delete_for_user(user_id)
 
 
 def _store_hzn_change_session(request_id):

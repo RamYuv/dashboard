@@ -293,7 +293,10 @@ def _normalize_service_ids(raw_value):
 
 
 def _ensure_tcs_service(service_id):
-    normalized_id = (service_id or "").strip()
+    normalized_id = TcsService.normalize_service_id(service_id)
+    normalized_bit_id = TcsService.normalize_bit_id(service_id)
+    if not normalized_id and normalized_bit_id:
+        normalized_id = TcsService.default_service_id_for_bit_id(normalized_bit_id)
     if not normalized_id:
         return None
     service = TcsService.query.get(normalized_id)
@@ -301,11 +304,20 @@ def _ensure_tcs_service(service_id):
         service = TcsService(
             tcs_service_id=normalized_id,
             service_name=normalized_id,
+            bit_id=(
+                normalized_bit_id
+                or TcsService.default_bit_id_for_service_id(normalized_id)
+            ),
             is_active=True,
         )
         db.session.add(service)
     elif not service.service_name:
         service.service_name = normalized_id
+    if not service.bit_id:
+        service.bit_id = (
+            normalized_bit_id
+            or TcsService.default_bit_id_for_service_id(normalized_id)
+        )
     return service
 
 
@@ -686,7 +698,13 @@ def seed_default_deployment_modes():
 def seed_default_tcs_services():
     """Seed default TCS services."""
     seed_data = load_bootstrap_seed_data()
+    logical_service_entries = [
+        {"tcs_service_id": service_id, "service_name": service_id, "bit_id": bit_id}
+        for service_id, bit_id in TcsService.LOGICAL_BIT_ID_MAP.items()
+    ]
     for service_data in seed_data["tcs_services"]:
+        logical_service_entries.append(service_data)
+    for service_data in logical_service_entries:
         service_id = (
             service_data.get("tcs_service_id")
             or service_data.get("id")
@@ -704,7 +722,7 @@ def seed_default_tcs_services():
             tcs_service_id=service_id,
             defaults={
                 "service_name": service_name,
-                "bit_id": service_data.get("bit_id"),
+                "bit_id": TcsService.normalize_bit_id(service_data.get("bit_id")),
                 "description": service_data.get("description"),
                 "is_active": True,
             },

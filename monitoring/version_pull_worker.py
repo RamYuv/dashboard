@@ -127,7 +127,8 @@ class VersionPullWorker:
         lookup = target_info["lookup"]
         packages = target_info["packages"]
         deployment_mode_id = (deployment_details.get("mode") or "").strip() or None
-        tcs_service_ids = deployment_details.get("service_types") or []
+        parsed_service_values = deployment_details.get("service_types") or []
+        tcs_service_ids = TcsService.resolve_logical_service_ids(parsed_service_values)
 
         if deployment_mode_id:
             deployment_mode = TCSDeploymentMode.query.get(deployment_mode_id)
@@ -144,6 +145,7 @@ class VersionPullWorker:
                 service = TcsService(
                     tcs_service_id=tcs_service_id,
                     service_name=tcs_service_id,
+                    bit_id=TcsService.default_bit_id_for_service_id(tcs_service_id),
                     is_active=True,
                 )
                 db.session.add(service)
@@ -163,7 +165,14 @@ class VersionPullWorker:
             resolved_mode_id = deployment_mode_id if target_key == "TCS_APP" else None
             resolved_service_ids = tcs_service_ids if target_key == "TCS_APP" else [None]
             if not resolved_service_ids:
-                resolved_service_ids = [None]
+                logger.warning(
+                    "Skipping version state update for env_id=%s package=%s because no logical TCS service IDs were resolved from %s",
+                    mapping.env_id,
+                    package_key,
+                    parsed_service_values,
+                )
+                skipped += 1
+                continue
 
             for resolved_service_id in resolved_service_ids:
                 state = CurrentDeploymentState.query.filter_by(

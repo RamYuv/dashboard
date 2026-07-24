@@ -65,8 +65,8 @@ LEGACY_SERVER_TYPE_ALIASES = {
 }
 
 LEGACY_SERVICE_BIT_ID_MAP = {
-    "STL": 20,
-    "NOW": 21,
+    "STL": "20",
+    "NOW": "21",
 }
 
 
@@ -89,7 +89,13 @@ def _sqlite_table_exists(connection, table_name):
 def _clean(value):
     if value is None:
         return None
-    text = str(value).strip()
+    if isinstance(value, (bytes, bytearray)):
+        try:
+            text = bytes(value).decode("utf-8").strip()
+        except UnicodeDecodeError:
+            text = bytes(value).decode("latin-1").strip()
+    else:
+        text = str(value).strip()
     if not text:
         return None
     if text.upper() == "NULL":
@@ -419,8 +425,16 @@ def _resolve_or_create_tcs_service_from_combo(service_combo):
     if not normalized_combo:
         return None
 
+    normalized_combo = (
+        TcsService.default_service_id_for_bit_id(normalized_combo)
+        or normalized_combo
+    )
     record = TcsService.query.get(normalized_combo)
-    bit_id = LEGACY_SERVICE_BIT_ID_MAP.get(normalized_combo)
+    bit_id = (
+        TcsService.default_bit_id_for_service_id(normalized_combo)
+        or LEGACY_SERVICE_BIT_ID_MAP.get(normalized_combo)
+        or TcsService.normalize_bit_id(service_combo)
+    )
     if record is None:
         record = TcsService(
             tcs_service_id=normalized_combo,
@@ -622,13 +636,23 @@ def _resolve_or_create_pay_ui(pay_ui_data):
 def _normalize_service_types(event_data):
     combo_value = _clean(event_data.get("tcs_service_combo"))
     if combo_value:
+        normalized_combo = _upper(combo_value)
+        logical_service_id = TcsService.default_service_id_for_bit_id(normalized_combo)
+        if logical_service_id:
+            return [logical_service_id]
         return [
-            token.strip().upper()
+            (
+                TcsService.default_service_id_for_bit_id(token.strip().upper())
+                or token.strip().upper()
+            )
             for token in re.split(r"[|,;/]+", combo_value)
             if token.strip()
         ]
     service_value = _clean(event_data.get("tcs_service_id"))
-    return [service_value.upper()] if service_value else []
+    if not service_value:
+        return []
+    normalized_service_value = service_value.upper()
+    return [TcsService.default_service_id_for_bit_id(normalized_service_value) or normalized_service_value]
 
 
 def _build_legacy_metadata_description(event_data):
@@ -985,6 +1009,23 @@ def import_legacy_sensitive_values_from_sqlite(db_path, commit=True):
                 summary["orbits_updated"] += 1
 
         if _sqlite_table_exists(connection, "vm"):
+            def _update_mapping_password(env_id, server_type, hzn_value, deployment_user=None):
+                mapping = EnvironmentHostMapping.query.filter_by(
+                    env_id=env_id,
+                    server_type_id=server_type.server_type_id,
+                ).first()
+                if mapping is None:
+                    summary["missing_mappings"].append(
+                        "{}:{}".format(env_id, server_type.server_type_key)
+                    )
+                    return False
+
+                mapping.deploy_user_hzn = hzn_value
+                if _clean(deployment_user):
+                    mapping.deployment_user = _clean(deployment_user)
+                summary["environment_mappings_updated"] += 1
+                return True
+
             vm_rows = connection.execute(
                 "SELECT env_id, tcs_usage, hzn, usr, db_instance_id FROM vm"
             ).fetchall()
@@ -1002,22 +1043,36 @@ def import_legacy_sensitive_values_from_sqlite(db_path, commit=True):
                     )
                     continue
 
-                mapping = EnvironmentHostMapping.query.filter_by(
-                    env_id=normalized_env_id,
-                    server_type_id=server_type.server_type_id,
-                ).first()
-                if mapping is None:
-                    summary["missing_mappings"].append(
-                        "{}:{}".format(normalized_env_id, server_type.server_type_key)
-                    )
-                    continue
+                deployment_user = _clean(usr_value)
+                if (
+                    deployment_user is None and
+                    server_type.server_type_key in {"coredb", "lgdb"} and
+                    _clean(db_instance_id)
+                ):
+                    deployment_user = _clean(db_instance_id)
 
-                mapping.deploy_user_hzn = normalized_hzn_value
-                if _clean(usr_value):
-                    mapping.deployment_user = _clean(usr_value)
-                elif server_type.server_type_key in {"coredb", "lgdb"} and _clean(db_instance_id):
-                    mapping.deployment_user = _clean(db_instance_id)
-                summary["environment_mappings_updated"] += 1
+                _update_mapping_password(
+                    normalized_env_id,
+                    server_type,
+                    normalized_hzn_value,
+                    deployment_user=deployment_user,
+                )
+
+                derived_db_server_type_key = None
+                derived_db_deployment_user = _clean(db_instance_id) or deployment_user
+                if server_type.server_type_key == "core":
+                    derived_db_server_type_key = "coredb"
+                elif server_type.server_type_key == "gateway":
+                    derived_db_server_type_key = "lgdb"
+
+                if derived_db_server_type_key is not None:
+                    derived_db_server_type, _ = _resolve_server_type(derived_db_server_type_key)
+                    _update_mapping_password(
+                        normalized_env_id,
+                        derived_db_server_type,
+                        normalized_hzn_value,
+                        deployment_user=derived_db_deployment_user,
+                    )
 
         if commit:
             db.session.commit()

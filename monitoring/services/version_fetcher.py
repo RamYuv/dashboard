@@ -27,11 +27,6 @@ class VersionFetcher:
     DEFAULT_COMMANDS = {
         "version_info": "tcsexec version",
     }
-    DEPLOYED_NUM_SERVICE_TYPE_MAP = {
-        "21": "DOM",
-        "22": "MON",
-    }
-
     def __init__(self, executor=None, command_map=None):
         self.executor = executor or FabricRemoteExecutor()
         if not hasattr(self.executor, "run"):
@@ -160,9 +155,8 @@ class VersionFetcher:
             component_name: version
         }, {
             "mode": (deploy_info.get("mode") or "").strip(),
-            "service_types": (
-                self._parse_deployed_num_service_types(deploy_info.get("deployed_num"))
-                or self._parse_service_types(deploy_info.get("deploy_service"))
+            "service_types": self._parse_deployed_num_service_types(
+                deploy_info.get("deployed_num")
             ),
         }
 
@@ -170,10 +164,22 @@ class VersionFetcher:
         return self._split_unique_tokens(service_types_raw)
 
     def _parse_deployed_num_service_types(self, deployed_num_raw):
-        return self._split_unique_tokens(
-            deployed_num_raw,
-            transform=self.DEPLOYED_NUM_SERVICE_TYPE_MAP.get,
-        )
+        normalized_value = self._normalize_deployed_num_value(deployed_num_raw)
+        if not normalized_value:
+            return []
+        return [normalized_value]
+
+    def _normalize_deployed_num_value(self, deployed_num_raw):
+        normalized_tokens = self._split_unique_tokens((deployed_num_raw or "").replace(":", ","))
+        if not normalized_tokens:
+            return ""
+        if len(normalized_tokens) == 1:
+            return normalized_tokens[0]
+        try:
+            normalized_tokens = sorted(normalized_tokens, key=lambda item: int(item))
+        except ValueError:
+            normalized_tokens = sorted(normalized_tokens)
+        return ",".join(normalized_tokens)
 
     def _split_unique_tokens(self, raw_value, transform=None):
         if not raw_value:
