@@ -499,6 +499,16 @@ def _upgrade_user_schema():
     _backfill_default_password_flags()
 
 
+def _upgrade_environment_schema():
+    columns = _get_table_columns("environments")
+    if not columns:
+        return
+    _add_column_if_missing(
+        "environments",
+        "monitoring_enabled BOOLEAN NOT NULL DEFAULT 1",
+    )
+
+
 def _backfill_default_password_flags():
     """Mark users that still appear to use a known plaintext default password."""
     default_password_table_exists = bool(_get_table_columns("default_passwords"))
@@ -529,6 +539,7 @@ def _backfill_default_password_flags():
 def upgrade_existing_schema():
     """Apply lightweight SQLite-safe schema upgrades for evolving local models."""
     db.create_all()
+    _upgrade_environment_schema()
     _upgrade_user_schema()
     _upgrade_deployment_request_schema()
     _upgrade_current_deployment_state_schema()

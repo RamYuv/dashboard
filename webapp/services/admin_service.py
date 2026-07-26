@@ -210,6 +210,7 @@ def create_environment(form):
     team = (form.get("team") or "").strip().lower() or None
     description = (form.get("description") or "").strip() or None
     is_active = normalize_checkbox(form.get("is_active"))
+    monitoring_enabled = normalize_checkbox(form.get("monitoring_enabled"))
     if not env_id or not env_type:
         return "Environment ID and type are required."
     if Environment.query.filter_by(env_id=env_id).first() is not None:
@@ -221,6 +222,7 @@ def create_environment(form):
             team=team,
             description=description,
             is_active=is_active,
+            monitoring_enabled=monitoring_enabled,
         )
     )
     return None
@@ -243,6 +245,7 @@ def update_environment(form):
     environment.team = (form.get("team") or "").strip().lower() or None
     environment.description = (form.get("description") or "").strip() or None
     environment.is_active = normalize_checkbox(form.get("is_active"))
+    environment.monitoring_enabled = normalize_checkbox(form.get("monitoring_enabled"))
 
     for mapping in EnvironmentHostMapping.query.filter_by(env_id=env_id).all():
         mapping.env_type = env_type

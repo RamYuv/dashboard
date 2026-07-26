@@ -66,31 +66,21 @@
 
         <nav class="sidebar-nav">
             <a href="{{ url_for('main.environment_health') }}" class="menu-item active">Home</a>
-            <a href="{{ url_for('main.dashboard') }}" class="menu-item menu-item-light">Dashboards</a>
             <a href="#" class="menu-item menu-item-light" data-bs-toggle="modal" data-bs-target="#aboutApplicationModal">About</a>
 
             <details class="menu-group" open>
                 <summary class="menu-group-header">Services <i class="fas fa-chevron-down"></i></summary>
                 <div class="menu-group-body">
-                    <a href="{{ url_for('booking.booking_grid') }}" class="submenu-item">Bookings</a>
+                    <a href="{{ url_for('booking.booking_screen') }}" class="submenu-item">Bookings</a>
                     <a href="{{ url_for('booking.deployment_request') }}" class="submenu-item">Deployment Request</a>
                     {% if role == "admin" %}
                     <a href="{{ url_for('main.admin_screen') }}" class="submenu-item">Admin</a>
-                    {% endif %}
-                </div>
-            </details>
-
-            <details class="menu-group" open>
-                <summary class="menu-group-header">Features <i class="fas fa-chevron-down"></i></summary>
-                <div class="menu-group-body">
-                    <a href="{{ url_for('booking.booking_screen') }}" class="submenu-item">Booking Calendar</a>
-                    <a href="{{ url_for('booking.manage_bookings') }}" class="submenu-item">Automated Correspondence</a>
-                    {% if role == "admin" %}
                     <a href="{{ url_for('main.user_management_screen') }}" class="submenu-item">User Management</a>
                     {% endif %}
                 </div>
             </details>
 
+            <a href="{{ url_for('main.dashboard') }}" class="menu-item menu-item-light">Dashboards</a>
             <a href="{{ url_for('main.profile') }}" class="menu-item menu-item-light">Contact</a>
         </nav>
     </aside>

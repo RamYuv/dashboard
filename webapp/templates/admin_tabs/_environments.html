@@ -2,7 +2,7 @@
     <div class="col-12">
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-2">
             <h1 class="admin-section-heading mb-0">{{ tab_titles.get(active_tab, "Environment Inventory Management") }}</h1>
-            <button class="btn btn-success" type="button" data-bs-toggle="modal" data-bs-target="#addEnvironmentModal" data-admin-modal-trigger data-admin-form="#addEnvironmentForm" data-admin-action="create" data-admin-title="#addEnvironmentModalLabel" data-admin-title-text="Add Environment" data-admin-submit="#addEnvironmentSubmit" data-admin-submit-text="Save Environment" data-admin-values='{"original_env_id":"","env_id":"","env_type":"","team":"","description":"","is_active":true}'>
+            <button class="btn btn-success" type="button" data-bs-toggle="modal" data-bs-target="#addEnvironmentModal" data-admin-modal-trigger data-admin-form="#addEnvironmentForm" data-admin-action="create" data-admin-title="#addEnvironmentModalLabel" data-admin-title-text="Add Environment" data-admin-submit="#addEnvironmentSubmit" data-admin-submit-text="Save Environment" data-admin-values='{"original_env_id":"","env_id":"","env_type":"","team":"","description":"","is_active":true,"monitoring_enabled":true}'>
                 <i class="fas fa-plus me-2"></i>Add New
             </button>
         </div>
@@ -20,6 +20,7 @@
                                 <th>Environment Type</th>
                                 <th>Team</th>
                                 <th>Active</th>
+                                <th>Monitoring</th>
                                 <th class="admin-action-cell">Actions</th>
                             </tr>
                         </thead>
@@ -31,9 +32,10 @@
                                 <td>{{ environment.env_type }}</td>
                                 <td>{{ environment.team or "-" }}</td>
                                 <td>{{ "Yes" if environment.is_active else "No" }}</td>
+                                <td>{{ "Enabled" if environment.monitoring_enabled else "Disabled" }}</td>
                                 <td class="admin-action-cell">
                                     <div class="admin-row-actions">
-                                        <button class="btn btn-outline-primary admin-icon-btn" type="button" data-bs-toggle="modal" data-bs-target="#addEnvironmentModal" data-admin-modal-trigger data-admin-form="#addEnvironmentForm" data-admin-action="update_environment" data-admin-title="#addEnvironmentModalLabel" data-admin-title-text="Edit Environment" data-admin-submit="#addEnvironmentSubmit" data-admin-submit-text="Update Environment" data-admin-values='{{ {"original_env_id": environment.env_id, "env_id": environment.env_id, "env_type": environment.env_type, "team": environment.team or "", "description": environment.description or "", "is_active": environment.is_active}|tojson }}' aria-label="Edit environment">
+                                        <button class="btn btn-outline-primary admin-icon-btn" type="button" data-bs-toggle="modal" data-bs-target="#addEnvironmentModal" data-admin-modal-trigger data-admin-form="#addEnvironmentForm" data-admin-action="update_environment" data-admin-title="#addEnvironmentModalLabel" data-admin-title-text="Edit Environment" data-admin-submit="#addEnvironmentSubmit" data-admin-submit-text="Update Environment" data-admin-values='{{ {"original_env_id": environment.env_id, "env_id": environment.env_id, "env_type": environment.env_type, "team": environment.team or "", "description": environment.description or "", "is_active": environment.is_active, "monitoring_enabled": environment.monitoring_enabled}|tojson }}' aria-label="Edit environment">
                                             <i class="fas fa-pen"></i>
                                         </button>
                                         <form method="post" class="d-inline">
@@ -49,7 +51,7 @@
                                 </td>
                             </tr>
                         {% else %}
-                            <tr><td colspan="6" class="text-muted">No environments found.</td></tr>
+                            <tr><td colspan="7" class="text-muted">No environments found.</td></tr>
                         {% endfor %}
                         </tbody>
                     </table>
@@ -93,6 +95,12 @@
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" id="env_active" name="is_active" checked>
                                 <label class="form-check-label" for="env_active">Enable environment</label>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="env_monitoring_enabled" name="monitoring_enabled" checked>
+                                <label class="form-check-label" for="env_monitoring_enabled">Enable monitoring</label>
                             </div>
                         </div>
                     </div>

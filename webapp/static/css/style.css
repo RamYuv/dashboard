@@ -171,6 +171,28 @@ body {
     color: #ffffff !important;
 }
 
+.app-shell-secondary-dropdown .dropdown-toggle::after {
+    margin-left: 0.2rem;
+    vertical-align: middle;
+}
+
+.app-shell-secondary-button {
+    border: 0;
+    box-shadow: none;
+}
+
+.app-shell-secondary-button:hover,
+.app-shell-secondary-button:focus,
+.app-shell-secondary-button:active,
+.app-shell-secondary-button.show {
+    border: 0;
+    box-shadow: none;
+}
+
+.app-shell-secondary-menu {
+    min-width: 10rem;
+}
+
 .app-shell-user-toggle {
     display: inline-flex;
     align-items: center;

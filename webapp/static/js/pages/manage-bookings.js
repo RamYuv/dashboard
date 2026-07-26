@@ -193,16 +193,19 @@
                     '<button class="btn btn-sm btn-outline-secondary" data-action="view" data-id="' + common.escapeHtml(booking.booking_id) + '">View</button>' +
                     "</div>";
 
-            const windowText = booking.is_standalone_deployment_request
+            const startText = booking.start_time
                 ? common.formatDisplayDate(booking.start_time)
-                : formatWindowDisplay(booking.start_time, booking.end_time, booking.lifecycle_status);
+                : "-";
+            const endText = booking.is_standalone_deployment_request
+                ? ""
+                : (booking.end_time ? common.formatDisplayDate(booking.end_time) : "-");
 
             return '<tr>' +
-                '<td><div class="fw-semibold">' + common.escapeHtml(booking.booking_id) + "</div>" + note + "</td>" +
-                '<td><div class="fw-semibold">' + common.escapeHtml(ownerLabel) + "</div></td>" +
                 '<td><div><span class="app-env-label">' + common.escapeHtml(environmentLabel) + '</span></div><div class="row-note">' + common.escapeHtml(environmentNote || "-") + "</div></td>" +
-                "<td><div>" + common.escapeHtml(windowText) + "</div></td>" +
                 "<td>" + typePill(booking.booking_type) + "</td>" +
+                "<td><div>" + common.escapeHtml(startText) + "</div></td>" +
+                "<td><div>" + common.escapeHtml(endText) + "</div></td>" +
+                '<td><div class="fw-semibold">' + common.escapeHtml(ownerLabel) + "</div>" + note + "</td>" +
                 "<td>" + statusPill(booking) + "</td>" +
                 "<td>" + actions + "</td>" +
                 "</tr>";
@@ -454,7 +457,7 @@
             })
             .catch(function (error) {
                 showPageMessage(error.message, "danger");
-                document.getElementById("bookingTableBody").innerHTML = '<tr><td colspan="6" class="empty-state">Unable to load booking requests.</td></tr>';
+                document.getElementById("bookingTableBody").innerHTML = '<tr><td colspan="7" class="empty-state">Unable to load booking requests.</td></tr>';
             });
     }
 
@@ -466,6 +469,34 @@
         renderTable();
     }
 
+    function buildExportQuery() {
+        const params = new URLSearchParams();
+        const envType = document.getElementById("filterEnvType").value;
+        const bookingType = document.getElementById("filterBookingType").value;
+        const status = document.getElementById("filterStatus").value;
+        const search = document.getElementById("filterSearch").value.trim();
+
+        if (envType) {
+            params.set("env_type", envType);
+        }
+        if (bookingType) {
+            params.set("booking_type", bookingType);
+        }
+        if (status) {
+            params.set("status", status);
+        }
+        if (search) {
+            params.set("search", search);
+        }
+
+        return params.toString();
+    }
+
+    function exportCsv() {
+        const query = buildExportQuery();
+        window.location.href = "/api/bookings/export" + (query ? "?" + query : "");
+    }
+
     document.addEventListener("DOMContentLoaded", function () {
         editModal = new bootstrap.Modal(document.getElementById("editBookingModal"));
         populateTimeSlotFields();
@@ -475,6 +506,7 @@
         });
         document.getElementById("filterSearch").addEventListener("input", renderTable);
         document.getElementById("clearFiltersButton").addEventListener("click", clearFilters);
+        document.getElementById("exportCsvButton").addEventListener("click", exportCsv);
         document.getElementById("editEnvType").addEventListener("change", function () {
             populateEnvironmentOptions("editEnvId", this.value, "");
         });

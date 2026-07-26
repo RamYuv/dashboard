@@ -234,7 +234,10 @@
                     <input id="filterSearch" class="form-control" type="text" placeholder="Env, booking id, requester">
                 </div>
             </div>
-            <div class="d-flex justify-content-end mt-2">
+            <div class="d-flex justify-content-end gap-2 mt-2">
+                <button id="exportCsvButton" type="button" class="btn btn-outline-primary btn-sm">
+                    <i class="fas fa-file-csv me-1"></i>Export CSV
+                </button>
                 <button id="clearFiltersButton" type="button" class="btn btn-outline-secondary btn-sm">
                     <i class="fas fa-rotate-left me-1"></i>Clear Filters
                 </button>
@@ -246,11 +249,11 @@
                 <table class="table table-hover align-middle mb-0">
                     <thead>
                         <tr>
-                            <th>Booking ID</th>
-                            <th>Owner</th>
                             <th>Env</th>
-                            <th>Window</th>
                             <th>Type</th>
+                            <th>Start</th>
+                            <th>End</th>
+                            <th>Owner</th>
                             <th>Status</th>
                             <th>Actions</th>
                         </tr>

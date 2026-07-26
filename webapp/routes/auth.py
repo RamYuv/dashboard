@@ -13,7 +13,7 @@ from ..auth_service import (
     should_redirect_to_password_change,
 )
 from ..helpers import normalize_role, normalize_team
-from ..models import PasswordChangeRequest, Team, TeamMember, User, db
+from ..models import EmailDomain, PasswordChangeRequest, Team, TeamMember, User, db
 from ..password_utils import (
     hash_password,
     should_force_password_change,
@@ -26,7 +26,9 @@ from ..services.email_service import EmailDeliveryError, SendmailEmailService
 logger = logging.getLogger(__name__)
 HZN_CHANGE_SESSION_KEY = "password_change_otp"
 FORGOT_HZN_SESSION_KEY = "forgot_password_otp"
+REGISTER_SESSION_KEY = "register_otp"
 HZN_CHANGE_OTP_TTL_SECONDS = 120
+REGISTER_OTP_TTL_SECONDS = 120
 
 
 def _registration_team_choices():
@@ -36,8 +38,19 @@ def _registration_team_choices():
     return [Team(team_name="support")]
 
 
-def _render_register_page(team_choices):
-    return render_template("register.html", team_choices=team_choices)
+def _registration_domain_choices():
+    domains = EmailDomain.query.order_by(EmailDomain.email_domain_id).all()
+    if domains:
+        return domains
+    return [EmailDomain(email_domain_id="example")]
+
+
+def _render_register_page(team_choices, domain_choices):
+    return render_template(
+        "register.html",
+        team_choices=team_choices,
+        domain_choices=domain_choices,
+    )
 
 
 def _render_hzn_page(mode, user=None):
@@ -49,7 +62,7 @@ def _render_hzn_page(mode, user=None):
         page_title="Forgot Password" if is_forgot_password else "Change Password",
         page_heading="Forgot Password" if is_forgot_password else "Change Password",
         page_description=(
-            "Enter your user ID, choose a new password, then verify with a code sent to your email."
+            ""
             if is_forgot_password
             else "Update your password, then verify the change with a code sent to your email."
         ),
@@ -106,6 +119,19 @@ def _forgot_hzn_email_message(user, code):
     ])
 
 
+def _registration_email_message(user_id, email_id, code):
+    return "\n".join([
+        "A new Envista account registration was requested.",
+        "",
+        "User ID: {}".format(user_id),
+        "Email: {}".format(email_id),
+        "Verification code: {}".format(code),
+        "",
+        "This code will expire in 2 minutes.",
+        "If you did not request this registration, please ignore this email.",
+    ])
+
+
 def _clear_otp_session(session_key):
     session.pop(session_key, None)
 
@@ -116,6 +142,10 @@ def _clear_hzn_change_session():
 
 def _clear_forgot_hzn_session():
     _clear_otp_session(FORGOT_HZN_SESSION_KEY)
+
+
+def _clear_register_hzn_session():
+    _clear_otp_session(REGISTER_SESSION_KEY)
 
 
 def _clear_pending_hzn_change_requests(user_id):
@@ -132,6 +162,11 @@ def _store_hzn_change_session(request_id):
 
 def _store_forgot_hzn_session(request_id):
     session[FORGOT_HZN_SESSION_KEY] = request_id
+    session.modified = True
+
+
+def _store_register_hzn_session(payload):
+    session[REGISTER_SESSION_KEY] = payload
     session.modified = True
 
 
@@ -170,16 +205,34 @@ def _load_pending_forgot_hzn_request():
     return PasswordChangeRequest.find_by_id(request_id)
 
 
+def _load_pending_register_request():
+    payload = session.get(REGISTER_SESSION_KEY)
+    return payload if isinstance(payload, dict) else None
+
+
 def _find_user_by_username(username):
     return User.find_by_username(username)
 
 
+def _build_registration_email(username, email_domain):
+    normalized_username = (username or "").strip().lower()
+    normalized_domain = (email_domain or "").strip().lower().lstrip("@")
+    if not normalized_username or not normalized_domain:
+        return ""
+    if "." not in normalized_domain:
+        normalized_domain = normalized_domain + ".com"
+    return "{}@{}".format(normalized_username, normalized_domain)
+
+
 def _normalize_registration_form():
+    username = request.form.get("user_id", "").strip().lower()
+    email_domain = request.form.get("email_domain", "").strip().lower()
     return {
         "first_name": request.form.get("first_name", "").strip(),
         "last_name": request.form.get("last_name", "").strip(),
-        "username": request.form.get("user_id", "").strip().lower(),
-        "email_id": request.form.get("email", "").strip().lower(),
+        "username": username,
+        "email_domain": email_domain,
+        "email_id": _build_registration_email(username, email_domain),
         "password": request.form.get("password", ""),
         "confirm_hzn": request.form.get("confirm_hzn", ""),
         "team": normalize_team(request.form.get("team", "support")),
@@ -249,6 +302,7 @@ def index():
 @main_bp.route("/register", methods=["GET", "POST"])
 def register():
     team_choices = _registration_team_choices()
+    domain_choices = _registration_domain_choices()
     if request.method == "POST":
         form_data = _normalize_registration_form()
         if not all(
@@ -256,16 +310,22 @@ def register():
                 form_data["first_name"],
                 form_data["last_name"],
                 form_data["username"],
+                form_data["email_domain"],
                 form_data["email_id"],
                 form_data["password"],
             ]
         ):
-            flash("First name, last name, user ID, email, and password are required.", "danger")
-            return _render_register_page(team_choices)
+            return jsonify(
+                success=False,
+                error="First name, last name, user ID, email domain, and password are required.",
+            ), 400
 
         if form_data["password"] != form_data["confirm_hzn"]:
-            flash("Passwords do not match.", "danger")
-            return _render_register_page(team_choices)
+            return jsonify(success=False, error="Passwords do not match."), 400
+
+        policy_error = _validate_hzn_policy(form_data["password"])
+        if policy_error:
+            return jsonify(success=False, error=policy_error), 400
 
         existing_user = _find_existing_registration_user(
             form_data["username"],
@@ -277,41 +337,141 @@ def register():
                 if (existing_user.user_id or "").strip().lower() == form_data["username"]
                 else "email"
             )
-            flash("That {} is already registered.".format(duplicate_field), "danger")
-            return _render_register_page(team_choices)
+            return jsonify(
+                success=False,
+                error="That {} is already registered.".format(duplicate_field),
+            ), 400
 
-        team_record = _find_or_create_registration_team(form_data["team"])
-        user = _build_registration_user(form_data)
-        db.session.add(user)
-        db.session.flush()
-        db.session.add(
-            TeamMember(
-                user_id=user.user_id,
-                team_id=team_record.team_id,
-                role=form_data["role"],
-            )
-        )
+        verification_code = random.randint(100000, 999999)
         try:
-            db.session.commit()
-        except IntegrityError:
-            db.session.rollback()
-            logger.warning(
-                "Registration failed because user %s already exists.",
-                form_data["username"],
+            SendmailEmailService.send_message(
+                subject="[Envista] Registration verification",
+                recipients=[form_data["email_id"]],
+                body=_registration_email_message(
+                    form_data["username"],
+                    form_data["email_id"],
+                    verification_code,
+                ),
+                reply_to=form_data["email_id"],
             )
-            flash("That user ID or email is already registered.", "danger")
-            return _render_register_page(team_choices)
+        except EmailDeliveryError as exc:
+            logger.exception(
+                "Registration verification email failed for user %s: %s",
+                form_data["username"],
+                exc,
+            )
+            return jsonify(
+                success=False,
+                error="Unable to send the verification code right now. Please try again later.",
+            ), 500
+
+        _store_register_hzn_session(
+            {
+                "first_name": form_data["first_name"],
+                "last_name": form_data["last_name"],
+                "username": form_data["username"],
+                "email_domain": form_data["email_domain"],
+                "email_id": form_data["email_id"],
+                "password_hash": hash_password(form_data["password"]),
+                "team": form_data["team"],
+                "role": form_data["role"],
+                "verification_code": str(verification_code),
+                "expires_at": (
+                    datetime.utcnow() + timedelta(seconds=REGISTER_OTP_TTL_SECONDS)
+                ).isoformat(),
+            }
+        )
 
         logger.info(
-            "User %s registered with role=%s team=%s",
+            "Registration verification initiated for user %s with role=%s team=%s",
             form_data["username"],
             form_data["role"],
             form_data["team"],
         )
-        flash("Registration successful. Please log in.", "success")
-        return redirect(url_for("main.login"))
+        return jsonify(success=True, email_id=form_data["email_id"])
 
-    return _render_register_page(team_choices)
+    _clear_register_hzn_session()
+    return _render_register_page(team_choices, domain_choices)
+
+
+@main_bp.route("/verify-register", methods=["POST"])
+def verify_register():
+    data = request.get_json(silent=True) or {}
+    submitted_code = str(data.get("code", "")).strip()
+    pending_registration = _load_pending_register_request()
+
+    if not pending_registration:
+        return jsonify(success=False, error="Verification session expired. Please start again."), 400
+
+    expires_at_raw = pending_registration.get("expires_at")
+    try:
+        expires_at = datetime.fromisoformat(expires_at_raw) if expires_at_raw else None
+    except ValueError:
+        expires_at = None
+
+    if expires_at is None or expires_at < datetime.utcnow():
+        _clear_register_hzn_session()
+        return jsonify(success=False, error="Verification code expired. Please start again."), 400
+
+    if submitted_code != str(pending_registration.get("verification_code", "")).strip():
+        return jsonify(success=False, error="Invalid verification code."), 400
+
+    username = pending_registration.get("username", "")
+    email_id = pending_registration.get("email_id", "")
+    existing_user = _find_existing_registration_user(username, email_id)
+    if existing_user is not None:
+        duplicate_field = (
+            "user ID"
+            if (existing_user.user_id or "").strip().lower() == username
+            else "email"
+        )
+        _clear_register_hzn_session()
+        return jsonify(
+            success=False,
+            error="That {} is already registered.".format(duplicate_field),
+        ), 400
+
+    team_record = _find_or_create_registration_team(pending_registration.get("team"))
+    user = User(
+        username=username,
+        email_id=email_id,
+        first_name=pending_registration.get("first_name", ""),
+        last_name=pending_registration.get("last_name", ""),
+        name="{} {}".format(
+            pending_registration.get("first_name", ""),
+            pending_registration.get("last_name", ""),
+        ).strip(),
+        hzn_hash=pending_registration.get("password_hash", ""),
+        role=pending_registration.get("role", "user"),
+    )
+    db.session.add(user)
+    db.session.flush()
+    db.session.add(
+        TeamMember(
+            user_id=user.user_id,
+            team_id=team_record.team_id,
+            role=pending_registration.get("role", "user"),
+        )
+    )
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        logger.warning(
+            "Registration failed because user %s already exists.",
+            username,
+        )
+        _clear_register_hzn_session()
+        return jsonify(success=False, error="That user ID or email is already registered."), 400
+
+    _clear_register_hzn_session()
+    logger.info(
+        "User %s registered with role=%s team=%s",
+        username,
+        pending_registration.get("role", "user"),
+        pending_registration.get("team", "support"),
+    )
+    return jsonify(success=True)
 
 
 @main_bp.route("/login", methods=["GET", "POST"])

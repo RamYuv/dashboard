@@ -301,6 +301,46 @@ def get_list_bookings(user=None):
     return sorted(items, key=lambda item: item.get("start_time") or "")
 
 
+def filter_bookings_for_history(items, env_type="", booking_type="", status="", search=""):
+    """Apply Request History filter semantics to booking/deployment items."""
+    normalized_env_type = (env_type or "").strip()
+    normalized_booking_type = (booking_type or "").strip().upper()
+    normalized_status = (status or "").strip().lower()
+    normalized_search = (search or "").strip().lower()
+
+    filtered_items = []
+    for item in items or []:
+        deployment = item.get("deployment_request") or {}
+        item_env_type = deployment.get("requested_env_type") or item.get("env_type") or ""
+        resolved_hosts = deployment.get("resolved_hosts_summary") or ""
+        search_haystack = " ".join([
+            str(item.get("booking_id") or ""),
+            str(item.get("env_id") or ""),
+            str(deployment.get("environment_display") or item.get("env_id") or ""),
+            str(item_env_type or ""),
+            str(resolved_hosts or ""),
+            str(item.get("requested_by") or ""),
+            str(item.get("requested_by_name") or ""),
+            str(item.get("requested_by_team") or ""),
+            str(item.get("requested_by_display") or ""),
+            str(item.get("description") or ""),
+            str(deployment.get("selected_servers_summary") or ""),
+        ]).lower()
+
+        if normalized_env_type and item_env_type != normalized_env_type:
+            continue
+        if normalized_booking_type and (item.get("booking_type") or "").strip().upper() != normalized_booking_type:
+            continue
+        if normalized_status and (item.get("lifecycle_status") or "").strip().lower() != normalized_status:
+            continue
+        if normalized_search and normalized_search not in search_haystack:
+            continue
+
+        filtered_items.append(item)
+
+    return filtered_items
+
+
 def _serialize_booking_operation_item(booking):
     booking_data = serialize_booking(booking)
     return {

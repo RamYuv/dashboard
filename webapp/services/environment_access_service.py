@@ -60,12 +60,15 @@ class EnvironmentAccessService:
 
         port = cls._reserve_port()
         password_file = cls._write_password_file(env_id, normalized_access_type, password_value)
+        terminal_title = cls._build_terminal_title(payload.get("env_id"), payload.get("server_type_key"))
         command = [
             str(ttyd_path),
             "-p",
             str(port),
             "-m",
             str(current_app.config.get("TTYD_MAX_CONNECTIONS", 100)),
+            "-t",
+            "titleFixed={}".format(terminal_title),
             "-w",
             str(sshpass_path),
             "-f",
@@ -88,6 +91,7 @@ class EnvironmentAccessService:
             "password_file": password_file,
             "request_user": getattr(user, "user_id", None),
             "host": hostname,
+            "terminal_title": terminal_title,
         }
         with cls._lock:
             cls._sessions[session_id] = session
@@ -98,6 +102,8 @@ class EnvironmentAccessService:
             "port": port,
             "host": hostname,
             "server_type_key": payload.get("server_type_key"),
+            "env_id": payload.get("env_id"),
+            "terminal_title": terminal_title,
         }, None
 
     @classmethod
@@ -217,3 +223,18 @@ class EnvironmentAccessService:
             base_host = host_value.split(":", 1)[0]
         scheme = current_app.config.get("TTYD_PUBLIC_SCHEME", "http")
         return "{}://{}:{}".format(scheme, base_host, port)
+
+    @classmethod
+    def _build_terminal_title(cls, env_id, server_type_key):
+        normalized_env_id = (env_id or "Environment").strip() or "Environment"
+        server_label_map = {
+            ServerTypeKey.CORE.value: "Core Server",
+            ServerTypeKey.GATEWAY.value: "Gateway Server",
+            ServerTypeKey.COREDB.value: "Core Database",
+            ServerTypeKey.LGDB.value: "LG Database",
+        }
+        normalized_server_key = (server_type_key or "").strip().lower()
+        server_label = server_label_map.get(normalized_server_key)
+        if server_label:
+            return "{} - {}".format(normalized_env_id, server_label)
+        return normalized_env_id

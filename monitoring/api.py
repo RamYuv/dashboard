@@ -12,6 +12,14 @@ from webapp.helpers import get_booking_lifecycle_status
 monitoring_bp = Blueprint("monitoring", __name__)
 
 
+def _monitoring_enabled_env_ids():
+    return {
+        environment.env_id
+        for environment in Environment.query.filter_by(monitoring_enabled=True).all()
+        if isinstance(environment.env_id, str) and environment.env_id.strip()
+    }
+
+
 def _included_server_types():
     raw_value = current_app.config.get(
         "MONITOR_INCLUDED_SERVER_TYPES",
@@ -27,10 +35,14 @@ def _included_server_types():
 
 def _get_active_booking_env_ids():
     now = datetime.utcnow()
+    enabled_env_ids = _monitoring_enabled_env_ids()
     active_env_ids = []
     bookings = EnvironmentBooking.query.all()
     for booking in bookings:
-        if get_booking_lifecycle_status(booking, now=now) == "active":
+        if (
+            booking.env_id in enabled_env_ids and
+            get_booking_lifecycle_status(booking, now=now) == "active"
+        ):
             active_env_ids.append(booking.env_id)
     return sorted(set(active_env_ids))
 
@@ -249,6 +261,21 @@ def _build_environment_team_map(env_ids):
     return team_map
 
 
+def _filter_monitoring_enabled_statuses(env_statuses, active_booking_envs):
+    enabled_env_ids = _monitoring_enabled_env_ids()
+    filtered_statuses = {
+        env_id: status_data
+        for env_id, status_data in (env_statuses or {}).items()
+        if env_id in enabled_env_ids
+    }
+    filtered_active_bookings = [
+        env_id
+        for env_id in (active_booking_envs or [])
+        if env_id in enabled_env_ids
+    ]
+    return filtered_statuses, filtered_active_bookings
+
+
 def _collect_not_running_components(vm_details):
     names = []
     for vm_status in (vm_details or {}).values():
@@ -260,9 +287,35 @@ def _collect_not_running_components(vm_details):
     return names
 
 
+def _build_status_summary(statuses, last_update):
+    summary = {
+        "total": 0,
+        "healthy": 0,
+        "warning": 0,
+        "critical": 0,
+        "maintenance": 0,
+        "last_updated": last_update or "Never",
+    }
+
+    for status in statuses or []:
+        normalized_status = (status.get("status") or "").strip().lower()
+        summary["total"] += 1
+
+        if normalized_status in {"healthy", "warning", "critical", "maintenance"}:
+            summary[normalized_status] += 1
+        else:
+            # Treat unexpected or unknown states the same way the UI does:
+            # surface them under the final unavailable bucket.
+            summary["maintenance"] += 1
+
+    return summary
+
+
 def _build_environment_health_payload(env_statuses, last_update, active_booking_envs):
-    env_statuses = env_statuses or {}
-    active_booking_envs = active_booking_envs or []
+    env_statuses, active_booking_envs = _filter_monitoring_enabled_statuses(
+        env_statuses or {},
+        active_booking_envs or [],
+    )
     env_ids = sorted(
         {
             env_id
@@ -274,14 +327,6 @@ def _build_environment_health_payload(env_statuses, last_update, active_booking_
     tcs_runtime = _build_tcs_runtime_map(env_ids)
     env_team_map = _build_environment_team_map(env_ids)
     statuses = []
-    summary = {
-        "total": 0,
-        "healthy": 0,
-        "warning": 0,
-        "critical": 0,
-        "maintenance": 0,
-        "last_updated": last_update or "Never",
-    }
 
     for env_id in env_ids:
         status_data = env_statuses.get(env_id, {})
@@ -317,17 +362,10 @@ def _build_environment_health_payload(env_statuses, last_update, active_booking_
             "not_running_components": not_running_components,
         }
         statuses.append(status_item)
-        summary["total"] += 1
-
-        if normalized_status in summary:
-            summary[normalized_status] += 1
-        elif normalized_status == "unknown":
-            # Surface the grey/no-light TCS status in the final summary card.
-            summary["maintenance"] += 1
 
     return {
         "statuses": statuses,
-        "summary": summary,
+        "summary": _build_status_summary(statuses, last_update),
         "summary_labels": {
             "healthy": "Healthy",
             "warning": "Idle",

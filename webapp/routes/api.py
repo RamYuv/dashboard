@@ -1,8 +1,13 @@
-from flask import jsonify, request
+import csv
+from datetime import datetime
+from io import StringIO
+
+from flask import Response, jsonify, request
 
 from .blueprint import main_bp
 from ..auth_service import can_access_env_team_screen, current_user, login_required
 from ..helpers import (
+    filter_bookings_for_history,
     get_environment_types,
     get_environments,
     list_environment_operations,
@@ -21,6 +26,62 @@ from ..services.environment_access_service import EnvironmentAccessService
 @login_required
 def api_list_bookings():
     return jsonify(get_list_bookings(user=current_user()))
+
+
+@main_bp.route("/api/bookings/export", methods=["GET"])
+@login_required
+def api_export_bookings():
+    user = current_user()
+    items = get_list_bookings(user=user)
+    filtered_items = filter_bookings_for_history(
+        items,
+        env_type=request.args.get("env_type"),
+        booking_type=request.args.get("booking_type"),
+        status=request.args.get("status"),
+        search=request.args.get("search"),
+    )
+
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "booking_id",
+        "owner",
+        "requested_by",
+        "team",
+        "environment_id",
+        "environment_type",
+        "booking_type",
+        "status",
+        "status_label",
+        "start_time_utc",
+        "end_time_utc",
+        "description",
+    ])
+    for item in filtered_items:
+        deployment = item.get("deployment_request") or {}
+        writer.writerow([
+            item.get("booking_id") or "",
+            item.get("requested_by_name") or item.get("requested_by") or "",
+            item.get("requested_by") or "",
+            item.get("requested_by_team") or "",
+            item.get("env_id") or "",
+            deployment.get("requested_env_type") or "",
+            item.get("booking_type") or "",
+            item.get("lifecycle_status") or "",
+            item.get("status_label") or "",
+            item.get("start_time") or "",
+            item.get("end_time") or "",
+            item.get("description") or "",
+        ])
+
+    filename = "booking-history-{}.csv".format(datetime.utcnow().strftime("%Y%m%d-%H%M%S"))
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={
+            "Content-Disposition": 'attachment; filename="{}"'.format(filename),
+        },
+    )
 
 
 @main_bp.route("/api/bookings", methods=["POST"])

@@ -406,6 +406,7 @@ class Environment(db.Model):
     description = db.Column(db.Text)
 
     is_active = db.Column(db.Boolean, default=True)
+    monitoring_enabled = db.Column(db.Boolean, nullable=False, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     domain = db.synonym("team")
@@ -742,7 +743,10 @@ class TcsService(db.Model):
 
     @classmethod
     def normalize_bit_id(cls, value):
-        raw_value = (value or "").strip()
+        if value is None:
+            raw_value = ""
+        else:
+            raw_value = str(value).strip()
         if not raw_value:
             return None
         tokens = []

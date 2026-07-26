@@ -17,7 +17,7 @@
                         <tbody>
                         {% for team in teams %}
                             <tr>
-                                <td>{{ team.team_name }}</td>
+                                <td>{{ team.team_name|upper }}</td>
                                 <td>{{ team.description or "-" }}</td>
                                 <td>{{ team.created_at or "-" }}</td>
                                 <td class="admin-action-cell">

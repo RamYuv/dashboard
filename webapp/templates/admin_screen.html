@@ -500,7 +500,7 @@
                         <tbody>
                         {% for team in teams %}
                             <tr>
-                                <td>{{ team.team_name }}</td>
+                                <td>{{ team.team_name|upper }}</td>
                                 <td>{{ team.description or "-" }}</td>
                                 <td>{{ team.created_at or "-" }}</td>
                             </tr>
@@ -543,6 +543,10 @@
                         <input class="form-check-input" type="checkbox" id="env_active" name="is_active" checked>
                         <label class="form-check-label" for="env_active">Active</label>
                     </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="env_monitoring_enabled" name="monitoring_enabled" checked>
+                        <label class="form-check-label" for="env_monitoring_enabled">Monitoring Enabled</label>
+                    </div>
                     <button class="btn btn-primary w-100" type="submit">Save Environment</button>
                 </form>
             </div>
@@ -554,7 +558,7 @@
                 <h2 class="h5 mb-3">Existing Environments</h2>
                 <div class="table-responsive admin-table-wrap">
                     <table class="table align-middle">
-                        <thead><tr><th>Env ID</th><th>Type</th><th>Team</th><th>Description</th><th>Active</th></tr></thead>
+                        <thead><tr><th>Env ID</th><th>Type</th><th>Team</th><th>Description</th><th>Active</th><th>Monitoring</th></tr></thead>
                         <tbody>
                         {% for environment in environments %}
                             <tr>
@@ -563,9 +567,10 @@
                                 <td>{{ environment.team or "-" }}</td>
                                 <td>{{ environment.description or "-" }}</td>
                                 <td>{{ "Yes" if environment.is_active else "No" }}</td>
+                                <td>{{ "Enabled" if environment.monitoring_enabled else "Disabled" }}</td>
                             </tr>
                         {% else %}
-                            <tr><td colspan="5" class="text-muted">No environments found.</td></tr>
+                            <tr><td colspan="6" class="text-muted">No environments found.</td></tr>
                         {% endfor %}
                         </tbody>
                     </table>

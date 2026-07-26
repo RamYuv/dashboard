@@ -368,6 +368,7 @@
             hideContextMenu();
             return;
         }
+        const pendingTitle = activeContextEnv.env_id + " - Opening Terminal";
 
         const pendingWindow = window.open("", "_blank");
         if (!pendingWindow) {
@@ -377,7 +378,7 @@
         }
 
         try {
-            pendingWindow.document.write("<title>Opening terminal...</title><p>Opening terminal access...</p>");
+            pendingWindow.document.write("<title>" + escapeAttribute(pendingTitle) + "</title><p>Opening terminal access for " + escapeAttribute(activeContextEnv.env_id) + "...</p>");
             pendingWindow.document.close();
         } catch (_error) {
             return null;
@@ -406,6 +407,13 @@
                     return;
                 }
 
+                if (result.data.terminal_title) {
+                    try {
+                        pendingWindow.document.title = result.data.terminal_title;
+                    } catch (_error) {
+                        return null;
+                    }
+                }
                 pendingWindow.location.replace(result.data.access_url);
                 terminalSessionWindows.set(result.data.session_id, pendingWindow);
             })

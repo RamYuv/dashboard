@@ -36,16 +36,15 @@
         return '<span class="type-pill ' + className + '">' + common.escapeHtml(requestType === "DEPLOYMENT" ? "Deployment" : "Booking") + "</span>";
     }
 
-    function formatWindow(item) {
+    function formatStart(item) {
+        return common.formatDisplayDate(item.window_start) || "-";
+    }
+
+    function formatEnd(item) {
         if (item.request_type === "DEPLOYMENT") {
-            return common.formatDisplayDate(item.window_start) || "-";
+            return "";
         }
-
-        if (!item.window_start || !item.window_end) {
-            return "-";
-        }
-
-        return common.formatDisplayDate(item.window_start) + " -> " + common.formatDisplayDate(item.window_end);
+        return common.formatDisplayDate(item.window_end) || "-";
     }
 
     function targetDetails(item) {
@@ -143,10 +142,10 @@
                 : "";
 
             return '<tr>' +
-                '<td><div class="fw-semibold">' + common.escapeHtml(item.request_id) + "</div>" + descriptionNote + "</td>" +
-                "<td>" + typePill(item.request_type) + "</td>" +
                 '<td><div class="fw-semibold">' + common.escapeHtml(environmentLabel) + '</div><div class="text-muted small">' + common.escapeHtml(environmentNote || "-") + "</div></td>" +
-                "<td>" + common.escapeHtml(formatWindow(item)) + "</td>" +
+                "<td>" + typePill(item.request_type) + "</td>" +
+                "<td>" + common.escapeHtml(formatStart(item)) + "</td>" +
+                "<td>" + common.escapeHtml(formatEnd(item)) + "</td>" +
                 "<td>" + requesterDisplay(item) + "</td>" +
                 "<td>" + targetDetails(item) + "</td>" +
                 "<td>" + common.escapeHtml(item.requested_version || "-") + '</td>' +

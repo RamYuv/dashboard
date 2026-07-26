@@ -1,59 +1,239 @@
 {% extends "base.html" %}
 {% block title %}Register{% endblock %}
+{% block extra_head %}
+<style>
+    .register-shell {
+        min-height: calc(100vh - var(--app-shell-header-height));
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        padding: 1rem 1rem 1.5rem;
+    }
+
+    .register-card {
+        width: min(100%, 760px);
+    }
+
+    .register-card .card {
+        border-radius: 1.5rem;
+        overflow: hidden;
+    }
+
+    .register-preview {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.95rem;
+        padding: 0.8rem 0.95rem;
+        min-height: 58px;
+    }
+
+    .register-preview-label {
+        display: block;
+        font-size: 0.76rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #64748b;
+        margin-bottom: 0.2rem;
+    }
+
+    .register-preview-value {
+        color: #0f172a;
+        font-weight: 600;
+        word-break: break-word;
+    }
+
+    .password-rules {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: grid;
+        gap: 0.35rem;
+    }
+
+    .password-rule {
+        display: flex;
+        align-items: center;
+        gap: 0.55rem;
+        color: #475569;
+        font-size: 0.88rem;
+    }
+
+    .password-rule i {
+        width: 16px;
+        text-align: center;
+    }
+
+    .password-rule.is-valid {
+        color: #166534;
+    }
+
+    .password-rule.is-invalid {
+        color: #b91c1c;
+    }
+
+    .password-feedback {
+        min-height: 1.25rem;
+        font-weight: 600;
+        margin-top: 0.55rem;
+    }
+
+    .otp-inputs {
+        display: grid;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: 0.6rem;
+    }
+
+    .otp-input {
+        text-align: center;
+        font-size: 1.25rem;
+        font-weight: 700;
+        min-height: 54px;
+    }
+
+    @media (max-width: 576px) {
+        .register-shell {
+            padding-top: 0.75rem;
+        }
+
+        .otp-inputs {
+            gap: 0.45rem;
+        }
+
+        .otp-input {
+            min-height: 48px;
+            font-size: 1.1rem;
+        }
+    }
+</style>
+{% endblock %}
+{% block main_class %}container-fluid px-0 py-0{% endblock %}
+{% block shell_title %}Envista{% endblock %}
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-8 col-lg-6">
+<div class="register-shell">
+    <div class="register-card">
         <div class="card border-0 shadow-lg">
             <div class="card-body p-4 p-md-5">
                 <h1 class="h3 mb-2">Register</h1>
-                <p class="text-muted mb-4">Create your local account and choose the team you belong to.</p>
-                <form method="post">
+                <form id="registerForm" autocomplete="off" novalidate>
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label" for="first_name">First Name</label>
-                            <input class="form-control" id="first_name" name="first_name" autocomplete="given-name" value="{{ request.form.get('first_name', '') }}" required autofocus>
+                            <input class="form-control" id="first_name" name="first_name" autocomplete="given-name" required autofocus>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label" for="last_name">Last Name</label>
-                            <input class="form-control" id="last_name" name="last_name" autocomplete="family-name" value="{{ request.form.get('last_name', '') }}" required>
+                            <input class="form-control" id="last_name" name="last_name" autocomplete="family-name" required>
                         </div>
                     </div>
+
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label" for="user_id">User ID</label>
-                            <input class="form-control" id="user_id" name="user_id" autocomplete="username" value="{{ request.form.get('user_id', '') }}" required>
+                            <input class="form-control" id="user_id" name="user_id" autocomplete="username" required>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label class="form-label" for="email">Email</label>
-                            <input class="form-control" id="email" name="email" type="email" autocomplete="email" value="{{ request.form.get('email', '') }}" required>
+                            <label class="form-label" for="email_domain">Domain</label>
+                            <select class="form-select" id="email_domain" name="email_domain" required>
+                                {% for domain in domain_choices %}
+                                <option value="{{ domain.email_domain_id }}">{{ domain.email_domain_id }}</option>
+                                {% endfor %}
+                            </select>
                         </div>
                     </div>
+
+                    <div class="mb-3">
+                        <div class="register-preview">
+                            <span class="register-preview-label">Email ID</span>
+                            <div class="register-preview-value" id="emailPreview">Enter a user ID to preview the email address.</div>
+                        </div>
+                    </div>
+
                     <div class="mb-3">
                         <label class="form-label" for="team">User Group</label>
                         <select class="form-select" id="team" name="team" required>
-                            {% set selected_team = request.form.get('team', 'support')|lower %}
                             {% for team in team_choices %}
-                                <option value="{{ team.team_name }}" {% if team.team_name|lower == selected_team %}selected{% endif %}>
-                                    {{ team.team_name|upper }}
-                                </option>
+                            <option value="{{ team.team_name }}">{{ team.team_name|upper }}</option>
                             {% endfor %}
                         </select>
                     </div>
+
                     <div class="row">
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-6 mb-2">
                             <label class="form-label" for="password">Password</label>
                             <input class="form-control" id="password" name="password" type="password" autocomplete="new-password" required>
                         </div>
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-6 mb-2">
                             <label class="form-label" for="confirm_hzn">Confirm Password</label>
                             <input class="form-control" id="confirm_hzn" name="confirm_hzn" type="password" autocomplete="new-password" required>
                         </div>
                     </div>
-                    <button class="btn btn-primary w-100 mt-2" type="submit">Create account</button>
+
+                    <div class="mb-3">
+                        <ul class="password-rules">
+                            <li class="password-rule is-invalid" data-rule="length"><i class="fas fa-times-circle"></i><span>Minimum 8 characters</span></li>
+                            <li class="password-rule is-invalid" data-rule="uppercase"><i class="fas fa-times-circle"></i><span>At least one uppercase letter</span></li>
+                            <li class="password-rule is-invalid" data-rule="lowercase"><i class="fas fa-times-circle"></i><span>At least one lowercase letter</span></li>
+                            <li class="password-rule is-invalid" data-rule="digit"><i class="fas fa-times-circle"></i><span>At least one digit (0-9)</span></li>
+                            <li class="password-rule is-invalid" data-rule="symbol"><i class="fas fa-times-circle"></i><span>At least one symbol (@$!%*?&)</span></li>
+                        </ul>
+                        <div id="passwordFeedback" class="password-feedback text-danger"></div>
+                        <div id="passwordMatchFeedback" class="password-feedback text-danger"></div>
+                    </div>
+
+                    <div id="registerMessage" class="alert d-none" role="alert"></div>
+
+                    <div class="d-flex gap-2 flex-wrap pt-2">
+                        <button class="btn btn-primary" id="registerButton" type="submit" disabled>
+                            <i class="fas fa-user-plus me-2"></i>Send Verification Code
+                        </button>
+                        <a class="btn btn-outline-secondary" href="{{ url_for('main.login') }}">Back to Login</a>
+                    </div>
                 </form>
+
                 <p class="mt-4 mb-0 text-center">Already registered? <a href="{{ url_for('main.login') }}">Login</a></p>
             </div>
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="registerOtpModal" tabindex="-1" aria-labelledby="registerOtpModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header">
+                <h2 class="modal-title h5 mb-0" id="registerOtpModalLabel">
+                    <i class="fas fa-envelope-open-text me-2"></i>Verify Registration
+                </h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <p class="text-muted mb-2">Enter the 6-digit verification code sent to your email address.</p>
+                <p class="small text-muted mb-3">The verification code expires in 2 minutes.</p>
+                <form id="verifyRegisterForm" autocomplete="off" novalidate>
+                    <div class="otp-inputs mb-3">
+                        {% for index in range(1, 7) %}
+                        <input class="form-control otp-input" id="registerOtp{{ index }}" type="text" inputmode="numeric" maxlength="1" pattern="[0-9]*" autocomplete="one-time-code">
+                        {% endfor %}
+                    </div>
+                    <div id="verifyRegisterMessage" class="alert d-none" role="alert"></div>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <button class="btn btn-primary" type="submit" id="verifyRegisterButton">Verify and Create Account</button>
+                        <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+{{ super() }}
+<script>
+window.pageData = {
+    requestUrl: {{ url_for('main.register')|tojson }},
+    verifyUrl: {{ url_for('main.verify_register')|tojson }},
+    successRedirectUrl: {{ url_for('main.login')|tojson }}
+};
+</script>
+<script src="{{ url_for('static', filename='js/pages/register.js') }}"></script>
 {% endblock %}

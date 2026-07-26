@@ -3,10 +3,10 @@
 {% block main_class %}p-0{% endblock %}
 {% block shell_nav %}
 {% set nav_labels = {
-    "grid": {"icon": "fas fa-calendar-plus", "label": "Environment Booking Form"},
+    "grid": {"icon": "fas fa-clipboard-list", "label": "Booking Form"},
     "deployment": {"icon": "fas fa-rocket", "label": "Deployment Request Form"},
-    "deployment_manage": {"icon": "fas fa-diagram-project", "label": "Environment Operations"},
-    "calendar": {"icon": "fas fa-calendar", "label": "View Calendar"},
+    "deployment_manage": {"icon": "fas fa-headset", "label": "App Support Team"},
+    "calendar": {"icon": "fas fa-calendar-days", "label": "View Calendar"},
     "manage": {"icon": "fas fa-list", "label": "Request History"},
 } %}
 {% set current_nav = nav_labels.get(workspace_nav) %}
@@ -61,25 +61,22 @@
     </div>
     <nav class="sidebar-nav">
         <a href="{{ url_for('booking.booking_grid') }}" class="sidebar-link{% if workspace_nav == 'grid' %} active{% endif %}">
-            <i class="fas fa-calendar-plus"></i> Quick Booking
+            <i class="fas fa-clipboard-list"></i> Booking Form
         </a>
         <a href="{{ url_for('booking.deployment_request') }}" class="sidebar-link{% if workspace_nav == 'deployment' %} active{% endif %}">
             <i class="fas fa-rocket"></i> Deployment Request
         </a>
-        {% if user is defined and (user.is_admin or user.is_env_member) %}
-        <a href="{{ url_for('booking.manage_deployment_requests') }}" class="sidebar-link{% if workspace_nav == 'deployment_manage' %} active{% endif %}">
-            <i class="fas fa-diagram-project"></i> Environment Operations
-        </a>
-        {% endif %}
         <a href="{{ url_for('booking.booking_screen') }}" class="sidebar-link{% if workspace_nav == 'calendar' %} active{% endif %}">
-            <i class="fas fa-calendar"></i> View Calendar
+            <i class="fas fa-calendar-days"></i> View Calendar
         </a>
         <a href="{{ url_for('booking.manage_bookings') }}" class="sidebar-link{% if workspace_nav == 'manage' %} active{% endif %}">
             <i class="fas fa-list"></i> Request History
         </a>
-        <a href="{{ url_for('main.dashboard') }}" class="sidebar-link">
-            <i class="fas fa-tachometer-alt"></i> Monitoring Dashboard
+        {% if user is defined and (user.is_admin or user.is_env_member) %}
+        <a href="{{ url_for('booking.manage_deployment_requests') }}" class="sidebar-link{% if workspace_nav == 'deployment_manage' %} active{% endif %}">
+            <i class="fas fa-headset"></i> App Support Team
         </a>
+        {% endif %}
         <a href="{{ url_for('main.environment_health') }}" class="sidebar-link">
             <i class="fas fa-heartbeat"></i> Health Status
         </a>

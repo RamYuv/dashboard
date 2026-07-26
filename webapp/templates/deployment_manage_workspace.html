@@ -1,8 +1,8 @@
 {% extends "booking_workspace_base.html" %}
 {% set workspace_nav = "deployment_manage" %}
-{% block workspace_title %}Environment Operations{% endblock %}
-{% block workspace_shell_title %}Environment Operations{% endblock %}
-{% block workspace_shell_subtitle %}Review booking and deployment requests for your environments in one operational queue.{% endblock %}
+{% block workspace_title %}App Support Team{% endblock %}
+{% block workspace_shell_title %}App Support Team{% endblock %}
+{% block workspace_shell_subtitle %}Review booking and deployment requests for your environments in one support queue.{% endblock %}
 {% block workspace_styles %}
 .table-actions {
     display: flex;
@@ -197,7 +197,7 @@
                         <div class="search-toolbar-group">
                             <div class="search-toolbar-field">
                                 <label for="searchFilter" class="form-label">Search</label>
-                                <input id="searchFilter" class="form-control" type="search" placeholder="Env, request id, user, target, version...">
+                                <input id="searchFilter" class="form-control" type="search" placeholder="Env, user, target, version...">
                             </div>
                             <button type="button" id="refreshQueueBtn" class="btn btn-outline-secondary-custom refresh-queue-btn">
                                 <i class="fas fa-rotate"></i> Refresh
@@ -211,10 +211,10 @@
                 <table class="table align-middle">
                     <thead>
                         <tr>
-                            <th>Request</th>
-                            <th>Type</th>
                             <th>Environment</th>
-                            <th>Window</th>
+                            <th>Type</th>
+                            <th>Start</th>
+                            <th>End</th>
                             <th>Requested By</th>
                             <th>Target</th>
                             <th>Version</th>

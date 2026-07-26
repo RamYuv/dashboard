@@ -16,6 +16,7 @@ import logging
 
 from webapp.models import (
     CurrentDeploymentState,
+    Environment,
     EnvironmentHostMapping,
     TCSDeploymentMode,
     TcsService,
@@ -65,11 +66,31 @@ class VersionPullWorker:
     def _load_mappings(self):
         mappings = (
             EnvironmentHostMapping.query
-            .options(joinedload(EnvironmentHostMapping.server_type), joinedload(EnvironmentHostMapping.host))
+            .options(
+                joinedload(EnvironmentHostMapping.server_type),
+                joinedload(EnvironmentHostMapping.host),
+                joinedload(EnvironmentHostMapping.environment),
+            )
             .order_by(EnvironmentHostMapping.env_id, EnvironmentHostMapping.environment_host_mapping_id)
             .all()
         )
-        return mappings
+        return [
+            mapping
+            for mapping in mappings
+            if self._is_monitoring_enabled(mapping)
+        ]
+
+    def _is_monitoring_enabled(self, mapping):
+        environment = getattr(mapping, "environment", None)
+        if environment is not None:
+            return bool(getattr(environment, "monitoring_enabled", True))
+
+        env_id = (getattr(mapping, "env_id", "") or "").strip()
+        if not env_id:
+            return False
+
+        environment = Environment.query.filter_by(env_id=env_id).first()
+        return bool(environment is not None and getattr(environment, "monitoring_enabled", True))
 
     def _group_mappings_by_environment(self, mappings):
         grouped = []

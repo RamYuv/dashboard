@@ -49,6 +49,9 @@ class EnvMonitorWorker:
             return False
         if not getattr(mapping, "env_id", None):
             return False
+        environment = getattr(mapping, "environment", None)
+        if environment is not None and not bool(getattr(environment, "monitoring_enabled", True)):
+            return False
         server_type = mapping.server_type.server_type_key if mapping.server_type else None
         return bool(server_type and server_type in included_server_types)
 
