@@ -949,6 +949,7 @@ class EnvironmentBooking(db.Model):
         data = {
             "booking_id": self.booking_id,
             "env_id": self.env_id,
+            "env_type": self.environment.env_type if self.environment else None,
             "requested_by": self.requested_by,
             "requested_by_name": requested_by_name,
             "requested_by_team": requested_by_team,

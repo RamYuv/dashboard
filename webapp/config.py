@@ -8,10 +8,24 @@ def _read_bool(value, default=False):
     return str(value).strip().lower() == 'true'
 
 
+def _read_app_version(project_root, default="1.0"):
+    version_from_env = os.environ.get("APP_VERSION")
+    if version_from_env:
+        return version_from_env
+
+    version_file = Path(project_root, "version.txt")
+    if version_file.exists():
+        for line in version_file.read_text(encoding="utf-8").splitlines():
+            value = line.strip()
+            if value:
+                return value
+    return default
+
+
 class Config:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     PROJECT_ROOT = os.path.dirname(BASE_DIR)
-    DEFAULT_DB_PATH = Path(PROJECT_ROOT, "envbooking_app.db").as_posix()
+    DEFAULT_DB_PATH = Path(PROJECT_ROOT, "dashboard.db").as_posix()
     DEFAULT_BOOTSTRAP_SEED_PATH = Path(
         PROJECT_ROOT,
         "configs",
@@ -28,7 +42,7 @@ class Config:
 
     # Other settings
     SERVER_TIMEZONE = os.environ.get('SERVER_TIMEZONE', 'UTC')
-    APP_VERSION = os.environ.get('APP_VERSION', '1.0')
+    APP_VERSION = _read_app_version(PROJECT_ROOT, default='1.0')
 
     # Monitoring scheduler/cache
     MONITOR_REFRESH_SECONDS = int(os.environ.get('MONITOR_REFRESH_SECONDS', 60))

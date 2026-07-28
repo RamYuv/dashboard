@@ -65,7 +65,7 @@ def api_export_bookings():
             item.get("requested_by") or "",
             item.get("requested_by_team") or "",
             item.get("env_id") or "",
-            deployment.get("requested_env_type") or "",
+            deployment.get("requested_env_type") or item.get("env_type") or "",
             item.get("booking_type") or "",
             item.get("lifecycle_status") or "",
             item.get("status_label") or "",
