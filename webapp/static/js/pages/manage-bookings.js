@@ -74,6 +74,40 @@
         return deployment.resolved_hosts_summary || "";
     }
 
+    function bookingVersionLabel(booking) {
+        const deployment = booking.deployment_request || {};
+        const snapshotRuntime = booking.snapshot_runtime || {};
+        return deployment.requested_version || snapshotRuntime.version || "-";
+    }
+
+    function bookingServiceLabel(booking) {
+        const deployment = booking.deployment_request || {};
+        const snapshotRuntime = booking.snapshot_runtime || {};
+        const values = deployment.tcs_service_names || snapshotRuntime.tcs_service_names || [];
+        return values.length ? values.join(", ") : "-";
+    }
+
+    function bookingModeLabel(booking) {
+        const deployment = booking.deployment_request || {};
+        const snapshotRuntime = booking.snapshot_runtime || {};
+        if (deployment.tcs_deployment_mode) {
+            return deployment.tcs_deployment_mode;
+        }
+        const values = snapshotRuntime.tcs_deployment_modes || [];
+        return values.length ? values.join(", ") : "-";
+    }
+
+    function bookingDetailsHtml(booking) {
+        const details = [
+            "Version: " + bookingVersionLabel(booking),
+            "Service: " + bookingServiceLabel(booking),
+            "Mode: " + bookingModeLabel(booking),
+        ];
+        return details.map(function (detail) {
+            return '<div class="row-note">' + common.escapeHtml(detail) + "</div>";
+        }).join("");
+    }
+
     function bookingOwnerLabel(booking) {
         const ownerValue =
             String(booking.requested_by_name || "").trim() ||
@@ -135,6 +169,9 @@
                 booking.description,
                 bookingResolvedHostsLabel(booking),
                 (booking.deployment_request && booking.deployment_request.selected_servers_summary) || "",
+                bookingVersionLabel(booking),
+                bookingServiceLabel(booking),
+                bookingModeLabel(booking),
             ].join(" ").toLowerCase();
             return haystack.includes(search);
         });
@@ -170,7 +207,7 @@
         updateSummary();
 
         if (!visibleBookings.length) {
-            tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No booking requests match the current filters.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No booking requests match the current filters.</td></tr>';
             return;
         }
 
@@ -184,6 +221,7 @@
             const resolvedHosts = bookingResolvedHostsLabel(booking);
             const environmentNote = resolvedHosts || environmentType;
             const ownerLabel = bookingOwnerLabel(booking);
+            const detailsHtml = bookingDetailsHtml(booking);
             const actions = canModify
                 ? '<div class="action-group">' +
                     '<button class="btn btn-sm btn-outline-primary" data-action="edit" data-id="' + common.escapeHtml(booking.booking_id) + '">Edit</button>' +
@@ -206,6 +244,7 @@
                 "<td><div>" + common.escapeHtml(startText) + "</div></td>" +
                 "<td><div>" + common.escapeHtml(endText) + "</div></td>" +
                 '<td><div class="fw-semibold">' + common.escapeHtml(ownerLabel) + "</div>" + note + "</td>" +
+                "<td>" + detailsHtml + "</td>" +
                 "<td>" + statusPill(booking) + "</td>" +
                 "<td>" + actions + "</td>" +
                 "</tr>";

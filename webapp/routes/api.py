@@ -55,10 +55,29 @@ def api_export_bookings():
         "status_label",
         "start_time_utc",
         "end_time_utc",
+        "version",
+        "service",
+        "mode",
         "description",
     ])
     for item in filtered_items:
         deployment = item.get("deployment_request") or {}
+        snapshot_runtime = item.get("snapshot_runtime") or {}
+        version_value = (
+            deployment.get("requested_version") or
+            snapshot_runtime.get("version") or
+            ""
+        )
+        service_value = ", ".join(
+            deployment.get("tcs_service_names") or
+            snapshot_runtime.get("tcs_service_names") or
+            []
+        )
+        mode_value = ", ".join(
+            ([deployment.get("tcs_deployment_mode")] if deployment.get("tcs_deployment_mode") else []) or
+            snapshot_runtime.get("tcs_deployment_modes") or
+            []
+        )
         writer.writerow([
             item.get("booking_id") or "",
             item.get("requested_by_name") or item.get("requested_by") or "",
@@ -71,6 +90,9 @@ def api_export_bookings():
             item.get("status_label") or "",
             item.get("start_time") or "",
             item.get("end_time") or "",
+            version_value,
+            service_value,
+            mode_value,
             item.get("description") or "",
         ])
 

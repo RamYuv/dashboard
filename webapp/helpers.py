@@ -231,6 +231,32 @@ def normalize_team(team):
 def serialize_booking(booking):
     """Serialize booking object to dictionary."""
     data = booking.to_dict()
+    snapshot_versions = []
+    snapshot_services = []
+    snapshot_modes = []
+    for snapshot in getattr(booking, "system_snapshots", []) or []:
+        version = (getattr(snapshot, "current_version", None) or "").strip()
+        if version and version not in snapshot_versions:
+            snapshot_versions.append(version)
+
+        service_name = ""
+        if getattr(snapshot, "tcs_service", None) is not None:
+            service_name = (snapshot.tcs_service.service_name or "").strip()
+        if service_name and service_name not in snapshot_services:
+            snapshot_services.append(service_name)
+
+        mode_name = ""
+        if getattr(snapshot, "tcs_deployment_mode", None) is not None:
+            mode_name = (snapshot.tcs_deployment_mode.mode_name or "").strip()
+        if mode_name and mode_name not in snapshot_modes:
+            snapshot_modes.append(mode_name)
+
+    data["snapshot_runtime"] = {
+        "versions": snapshot_versions,
+        "version": snapshot_versions[0] if snapshot_versions else "",
+        "tcs_service_names": snapshot_services,
+        "tcs_deployment_modes": snapshot_modes,
+    }
     stored_status = get_booking_stored_status(booking)
     data["stored_status"] = stored_status
     data["status"] = stored_status
@@ -311,6 +337,7 @@ def filter_bookings_for_history(items, env_type="", booking_type="", status="", 
     filtered_items = []
     for item in items or []:
         deployment = item.get("deployment_request") or {}
+        snapshot_runtime = item.get("snapshot_runtime") or {}
         item_env_type = deployment.get("requested_env_type") or item.get("env_type") or ""
         resolved_hosts = deployment.get("resolved_hosts_summary") or ""
         search_haystack = " ".join([
@@ -325,6 +352,11 @@ def filter_bookings_for_history(items, env_type="", booking_type="", status="", 
             str(item.get("requested_by_display") or ""),
             str(item.get("description") or ""),
             str(deployment.get("selected_servers_summary") or ""),
+            str(deployment.get("requested_version") or snapshot_runtime.get("version") or ""),
+            str(deployment.get("tcs_deployment_mode") or ""),
+            " ".join(deployment.get("tcs_service_names") or []),
+            " ".join(snapshot_runtime.get("tcs_deployment_modes") or []),
+            " ".join(snapshot_runtime.get("tcs_service_names") or []),
         ]).lower()
 
         if normalized_env_type and item_env_type != normalized_env_type:
@@ -343,6 +375,7 @@ def filter_bookings_for_history(items, env_type="", booking_type="", status="", 
 
 def _serialize_booking_operation_item(booking):
     booking_data = serialize_booking(booking)
+    snapshot_runtime = booking_data.get("snapshot_runtime") or {}
     return {
         "request_type": "BOOKING",
         "request_type_label": "Booking",
@@ -362,10 +395,10 @@ def _serialize_booking_operation_item(booking):
         "status_label": booking_data.get("status_label"),
         "description": booking_data.get("description"),
         "target_key": "",
-        "requested_version": "",
-        "tcs_deployment_mode": "",
+        "requested_version": snapshot_runtime.get("version") or "",
+        "tcs_deployment_mode": ", ".join(snapshot_runtime.get("tcs_deployment_modes") or []),
         "tcs_service_ids": [],
-        "tcs_service_names": [],
+        "tcs_service_names": snapshot_runtime.get("tcs_service_names") or [],
         "package_keys": [],
         "resolved_hosts_summary": "",
         "available_actions": [],

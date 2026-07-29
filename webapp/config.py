@@ -1,4 +1,5 @@
 import os
+import re
 from pathlib import Path
 
 
@@ -15,7 +16,15 @@ def _read_app_version(project_root, default="1.0"):
 
     version_file = Path(project_root, "version.txt")
     if version_file.exists():
-        for line in version_file.read_text(encoding="utf-8").splitlines():
+        lines = version_file.read_text(encoding="utf-8").splitlines()
+        for line in lines:
+            value = line.strip()
+            match = re.match(r"^Version\s*:\s*(.+)$", value, re.IGNORECASE)
+            if match:
+                parsed_version = match.group(1).strip()
+                if parsed_version:
+                    return parsed_version
+        for line in lines:
             value = line.strip()
             if value:
                 return value

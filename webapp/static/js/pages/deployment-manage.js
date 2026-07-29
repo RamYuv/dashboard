@@ -47,25 +47,16 @@
         return common.formatDisplayDate(item.window_end) || "-";
     }
 
-    function targetDetails(item) {
-        if (item.request_type !== "DEPLOYMENT") {
-            return '<span class="text-muted small">-</span>';
-        }
+    function serviceDisplay(item) {
+        return (item.tcs_service_names || []).join(", ") || "-";
+    }
 
-        const target = item.target_key || "-";
-        const details = [];
-        if (item.tcs_deployment_mode) {
-            details.push("Mode: " + item.tcs_deployment_mode);
-        }
-        if ((item.tcs_service_names || []).length) {
-            details.push("Service: " + item.tcs_service_names.join(", "));
-        }
-        if (item.selected_servers_summary) {
-            details.push("Servers: " + item.selected_servers_summary);
-        }
+    function modeDisplay(item) {
+        return item.tcs_deployment_mode || "-";
+    }
 
-        return '<div class="fw-semibold">' + common.escapeHtml(target) + "</div>" +
-            '<div class="text-muted small">' + common.escapeHtml(details.join(" | ") || "-") + "</div>";
+    function versionDisplay(item) {
+        return item.requested_version || "-";
     }
 
     function filteredOperations() {
@@ -93,12 +84,12 @@
                 item.requested_by_name,
                 item.requested_by_team,
                 item.requested_by_display,
-                item.target_key,
+                (item.tcs_service_names || []).join(" "),
+                item.tcs_deployment_mode,
                 item.requested_version,
+                item.target_key,
                 item.selected_servers_summary,
                 item.status,
-                item.tcs_deployment_mode,
-                (item.tcs_service_names || []).join(" "),
                 item.resolved_hosts_summary,
                 item.description,
             ].join(" ").toLowerCase();
@@ -147,8 +138,9 @@
                 "<td>" + common.escapeHtml(formatStart(item)) + "</td>" +
                 "<td>" + common.escapeHtml(formatEnd(item)) + "</td>" +
                 "<td>" + requesterDisplay(item) + "</td>" +
-                "<td>" + targetDetails(item) + "</td>" +
-                "<td>" + common.escapeHtml(item.requested_version || "-") + '</td>' +
+                "<td>" + common.escapeHtml(serviceDisplay(item)) + "</td>" +
+                "<td>" + common.escapeHtml(modeDisplay(item)) + "</td>" +
+                "<td>" + common.escapeHtml(versionDisplay(item)) + '</td>' +
                 '<td><span class="status-pill ' + common.escapeHtml(statusClass(item.status)) + '">' + common.escapeHtml(item.status_label || item.status || "-") + "</span></td>" +
                 '<td><div class="table-actions">' + (actions || '<span class="text-muted small">View only</span>') + "</div></td>" +
                 "</tr>";

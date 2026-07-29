@@ -118,8 +118,10 @@
     background: #f8fafc;
     border-bottom-width: 1px;
     color: #0f172a;
-    font-size: 0.95rem;
+    font-size: 0.74rem;
     font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
     padding-top: 1rem;
     padding-bottom: 1rem;
 }
@@ -197,7 +199,7 @@
                         <div class="search-toolbar-group">
                             <div class="search-toolbar-field">
                                 <label for="searchFilter" class="form-label">Search</label>
-                                <input id="searchFilter" class="form-control" type="search" placeholder="Env, user, target, version...">
+                                <input id="searchFilter" class="form-control" type="search" placeholder="Env, user, service, mode, version...">
                             </div>
                             <button type="button" id="refreshQueueBtn" class="btn btn-outline-secondary-custom refresh-queue-btn">
                                 <i class="fas fa-rotate"></i> Refresh
@@ -216,7 +218,8 @@
                             <th>Start</th>
                             <th>End</th>
                             <th>Requested By</th>
-                            <th>Target</th>
+                            <th>Service</th>
+                            <th>Mode</th>
                             <th>Version</th>
                             <th>Status</th>
                             <th>Actions</th>
