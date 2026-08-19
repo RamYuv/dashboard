@@ -76,7 +76,7 @@
     }
 
     function loadBookings(fetchInfo, successCallback, failureCallback) {
-        common.fetchJson("/api/bookings", { credentials: "include" })
+        common.fetchJson("/api/bookings?scope=all", { credentials: "include" })
             .then(function (result) {
                 if (!result.ok) {
                     throw new Error(result.data.error || "Failed to load bookings.");

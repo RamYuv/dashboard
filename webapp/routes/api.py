@@ -25,14 +25,30 @@ from ..services.environment_access_service import EnvironmentAccessService
 @main_bp.route("/api/bookings", methods=["GET"])
 @login_required
 def api_list_bookings():
-    return jsonify(get_list_bookings(user=current_user()))
+    scope = (request.args.get("scope") or "").strip().lower()
+    include_all = scope == "all"
+    history_scope = scope == "history"
+    return jsonify(
+        get_list_bookings(
+            user=current_user(),
+            include_all=include_all,
+            history_scope=history_scope,
+        )
+    )
 
 
 @main_bp.route("/api/bookings/export", methods=["GET"])
 @login_required
 def api_export_bookings():
     user = current_user()
-    items = get_list_bookings(user=user)
+    scope = (request.args.get("scope") or "").strip().lower()
+    include_all = scope == "all"
+    history_scope = scope == "history"
+    items = get_list_bookings(
+        user=user,
+        include_all=include_all,
+        history_scope=history_scope,
+    )
     filtered_items = filter_bookings_for_history(
         items,
         env_type=request.args.get("env_type"),
@@ -197,7 +213,10 @@ def api_list_deployment_requests():
 @login_required
 def api_environment_operations():
     user = current_user()
-    operations, error, status_code = list_environment_operations(user)
+    operations, error, status_code = list_environment_operations(
+        user,
+        include_all_bookings=can_access_env_team_screen(user),
+    )
     if error:
         return json_error(error, status_code)
     return jsonify({"operations": operations})

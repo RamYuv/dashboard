@@ -123,7 +123,7 @@
     }
 
     function userCanSeeBooking(booking) {
-        return userRole === "admin" || booking.requested_by === currentUser;
+        return !!booking;
     }
 
     function userCanModifyBooking(booking) {
@@ -486,7 +486,8 @@
     }
 
     function fetchBookings() {
-        common.fetchJson("/api/bookings", { credentials: "include" })
+        const bookingsApiUrl = "/api/bookings?scope=history";
+        common.fetchJson(bookingsApiUrl, { credentials: "include" })
             .then(function (result) {
                 if (!result.ok) {
                     throw new Error(result.data.error || "Unable to load bookings.");
@@ -533,7 +534,10 @@
 
     function exportCsv() {
         const query = buildExportQuery();
-        window.location.href = "/api/bookings/export" + (query ? "?" + query : "");
+        const exportParams = new URLSearchParams(query);
+        exportParams.set("scope", "history");
+        const exportQuery = exportParams.toString();
+        window.location.href = "/api/bookings/export" + (exportQuery ? "?" + exportQuery : "");
     }
 
     document.addEventListener("DOMContentLoaded", function () {

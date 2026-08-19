@@ -27,12 +27,7 @@ def _resolve_target_db_path():
     return Path(Config.DEFAULT_DB_PATH).resolve()
 
 
-def _ensure_legacy_db_path():
-    explicit_path = (os.environ.get("LEGACY_DB_PATH") or "").strip()
-    if explicit_path:
-        explicit_candidate = Path(explicit_path).resolve()
-        return explicit_candidate if explicit_candidate.exists() else None
-
+def _prepare_legacy_db_path():
     preferred_legacy_path = (PROJECT_ROOT / "dashboard_pre_migration.db").resolve()
     if preferred_legacy_path.exists():
         return preferred_legacy_path
@@ -45,30 +40,8 @@ def _ensure_legacy_db_path():
     return None
 
 
-def _candidate_legacy_db_paths():
-    candidates = []
-    ensured_legacy_path = _ensure_legacy_db_path()
-    if ensured_legacy_path is not None:
-        candidates.append(ensured_legacy_path)
-    candidates.append((PROJECT_ROOT / "dashboard_legacy.db").resolve())
-    candidates.append((PROJECT_ROOT / "legacy.db").resolve())
-
-    unique_candidates = []
-    seen = set()
-    for candidate in candidates:
-        normalized = str(candidate)
-        if normalized in seen:
-            continue
-        seen.add(normalized)
-        unique_candidates.append(candidate)
-    return unique_candidates
-
-
 def _resolve_legacy_db_path():
-    for candidate in _candidate_legacy_db_paths():
-        if candidate.exists() and candidate.is_file():
-            return candidate
-    return None
+    return _prepare_legacy_db_path()
 
 
 def _build_summary_message(summary):
@@ -87,8 +60,11 @@ def _build_summary_message(summary):
 def main():
     legacy_db_path = _resolve_legacy_db_path()
     if legacy_db_path is None:
-        print("No legacy dashboard DB found. Skipping migration.")
-        return 0
+        print(
+            "dashboard.db was not found under PROJECT_ROOT, and "
+            "dashboard_pre_migration.db does not exist. Cannot run migration."
+        )
+        return 1
 
     target_db_path = _resolve_target_db_path()
     event_mode = (os.environ.get("LEGACY_EVENT_MODE") or "booking").strip().lower() or "booking"

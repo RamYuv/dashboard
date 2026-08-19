@@ -29,6 +29,37 @@ def get_user_team_names(user):
     }
 
 
+def get_user_lead_team_names(user):
+    """Return normalized team names where the user is marked as a lead."""
+    if user is None:
+        return set()
+    return {
+        (membership.team.team_name or "").strip().lower()
+        for membership in getattr(user, "team_memberships", []) or []
+        if (
+            getattr(membership, "team", None) is not None and
+            getattr(membership, "team_lead", False) and
+            (membership.team.team_name or "").strip()
+        )
+    }
+
+
+def can_user_view_history_requester(user, requester):
+    """Return whether the viewer can see history rows for the requester."""
+    if user is None or requester is None:
+        return False
+    if getattr(user, "is_admin", False):
+        return True
+    if getattr(requester, "user_id", None) == getattr(user, "user_id", None):
+        return True
+
+    lead_team_names = get_user_lead_team_names(user)
+    if not lead_team_names:
+        return False
+
+    return bool(lead_team_names & get_user_team_names(requester))
+
+
 def can_user_access_environment(user, environment):
     """Return whether the user may access/book the given environment."""
     if user is None or environment is None:
@@ -297,10 +328,16 @@ def serialize_deployment_request_for_workspace(deployment_request):
     }
 
 
-def get_list_bookings(user=None):
+def get_list_bookings(user=None, include_all=False, history_scope=False):
     """Retrieve bookings plus standalone deployment requests for workspace views."""
     bookings = EnvironmentBooking.query.order_by(EnvironmentBooking.start_time).all()
-    if user is not None:
+    if user is not None and history_scope:
+        bookings = [
+            booking
+            for booking in bookings
+            if can_user_view_history_requester(user, booking.requester)
+        ]
+    elif user is not None and not include_all:
         bookings = [
             booking
             for booking in bookings
@@ -310,7 +347,13 @@ def get_list_bookings(user=None):
     deployment_requests = DeploymentRequest.query.order_by(
         DeploymentRequest.planned_start_time
     ).all()
-    if user is not None:
+    if user is not None and history_scope:
+        deployment_requests = [
+            deployment_request
+            for deployment_request in deployment_requests
+            if can_user_view_history_requester(user, deployment_request.requester)
+        ]
+    elif user is not None and not include_all:
         deployment_requests = [
             deployment_request
             for deployment_request in deployment_requests
@@ -445,17 +488,18 @@ def _serialize_deployment_operation_item(deployment_request_data):
     }
 
 
-def list_environment_operations(user):
+def list_environment_operations(user, include_all_bookings=False):
     """Return a combined env-team operational view of bookings and deployments."""
     bookings = EnvironmentBooking.query.order_by(
         EnvironmentBooking.start_time.desc(),
         EnvironmentBooking.created_at.desc(),
     ).all()
-    bookings = [
-        booking
-        for booking in bookings
-        if can_user_access_environment(user, booking.environment)
-    ]
+    if not include_all_bookings:
+        bookings = [
+            booking
+            for booking in bookings
+            if can_user_access_environment(user, booking.environment)
+        ]
 
     operations = [
         _serialize_booking_operation_item(booking)
