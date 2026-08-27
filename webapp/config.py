@@ -35,10 +35,10 @@ class Config:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     PROJECT_ROOT = os.path.dirname(BASE_DIR)
     DEFAULT_DB_PATH = Path(PROJECT_ROOT, "dashboard.db").as_posix()
-    DEFAULT_BOOTSTRAP_SEED_PATH = Path(
+    DEFAULT_SEED_DATA_PATH = Path(
         PROJECT_ROOT,
         "configs",
-        "default_bootstrap_data.json",
+        "default_seed_data.json",
     ).as_posix()
 
     SECRET_KEY = os.environ.get('SECRET_KEY', 'change-this-secret-key')
@@ -54,7 +54,7 @@ class Config:
     APP_VERSION = _read_app_version(PROJECT_ROOT, default='1.0')
 
     # Monitoring scheduler/cache
-    MONITOR_REFRESH_SECONDS = int(os.environ.get('MONITOR_REFRESH_SECONDS', 60))
+    MONITOR_REFRESH_SECONDS = int(os.environ.get('MONITOR_REFRESH_SECONDS', 15 * 60))
     MONITOR_FETCH_THREADS = max(1, int(os.environ.get('MONITOR_FETCH_THREADS', 4)))
     MONITOR_VERSION_PULL_ENABLED = _read_bool(
         os.environ.get('MONITOR_VERSION_PULL_ENABLED', 'true'),
@@ -115,9 +115,9 @@ class Config:
 
     RESET_DB_ON_INIT = _read_bool(os.environ.get('RESET_DB_ON_INIT', 'false'))
     SEED_BOOTSTRAP_ONLY = _read_bool(os.environ.get('SEED_BOOTSTRAP_ONLY', 'true'), default=True)
-    BOOTSTRAP_SEED_PATH = os.environ.get(
-        'BOOTSTRAP_SEED_PATH',
-        DEFAULT_BOOTSTRAP_SEED_PATH,
+    SEED_DATA_PATH = os.environ.get(
+        'SEED_DATA_PATH',
+        DEFAULT_SEED_DATA_PATH,
     )
     MUTUAL_ENV_RESERVATION_ENABLED = _read_bool(
         os.environ.get('MUTUAL_ENV_RESERVATION_ENABLED', 'false')

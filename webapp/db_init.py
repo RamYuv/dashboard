@@ -1,20 +1,19 @@
 """Database initialization and seeding functions."""
 
 import json
+from functools import lru_cache
 from pathlib import Path
 
 from flask import current_app, has_app_context
-from sqlalchemy import inspect, text
 
 from .component_build_catalog import (
     build_package_entries,
     canonical_build_name,
 )
 from .domain.deployment_targets import get_target_definition
-from .password_utils import hash_password, verify_password
+from .password_utils import hash_password
 from .models import (
     ComponentBuild,
-    DeploymentRequestService,
     Environment,
     EnvironmentHostMapping,
     Host,
@@ -29,7 +28,7 @@ from .models import (
     db,
 )
 
-BOOTSTRAP_SEED_MODELS = (
+SEED_GUARD_MODELS = (
     Team,
     User,
     TCSDeploymentMode,
@@ -42,11 +41,8 @@ DEFAULT_ROLES = [
     {"role_name": "admin", "description": "Administrator access"},
 ]
 
-SEED_HOSTS_CONFIG_PATH = (
-    Path(__file__).resolve().parent.parent / "configs" / "default_seed_hosts.json"
-)
-BOOTSTRAP_SEED_CONFIG_FALLBACK_PATH = (
-    Path(__file__).resolve().parent.parent / "configs" / "default_bootstrap_data.json"
+SEED_CONFIG_FALLBACK_PATH = (
+    Path(__file__).resolve().parent.parent / "configs" / "default_seed_data.json"
 )
 ACCESS_ADMIN_TEAM_NAME = "access_admin"
 
@@ -54,18 +50,12 @@ EMPTY_SEED_DATA = {
     "teams": [],
     "environments": [],
     "users": [],
+    "deployment_modes": [],
+    "tcs_services": [],
     "server_types": [],
     "hosts": [],
     "environment_host_mappings": [],
     "pay_ui": [],
-    "component_builds": [],
-}
-
-EMPTY_BOOTSTRAP_DATA = {
-    "teams": [],
-    "users": [],
-    "deployment_modes": [],
-    "tcs_services": [],
     "component_builds": [],
 }
 
@@ -132,12 +122,21 @@ def _normalize_seed_hosts(hosts, mappings):
     return normalized_hosts, normalized_mappings
 
 
-def load_host_seed_data():
-    """Load default seed data from JSON config."""
-    if not SEED_HOSTS_CONFIG_PATH.exists():
+def _seed_config_path():
+    configured_path = None
+    if has_app_context():
+        configured_path = current_app.config.get("SEED_DATA_PATH")
+    resolved_path = configured_path or str(SEED_CONFIG_FALLBACK_PATH)
+    return Path(resolved_path)
+
+
+@lru_cache(maxsize=4)
+def _load_seed_data_from_path(seed_path_value):
+    seed_path = Path(seed_path_value)
+    if not seed_path.exists():
         return dict(EMPTY_SEED_DATA)
 
-    with SEED_HOSTS_CONFIG_PATH.open("r", encoding="utf-8-sig") as seed_file:
+    with seed_path.open("r", encoding="utf-8-sig") as seed_file:
         data = json.load(seed_file)
 
     normalized_hosts, normalized_mappings = _normalize_seed_hosts(
@@ -158,6 +157,8 @@ def load_host_seed_data():
         "teams": data.get("teams") or [],
         "environments": data.get("environments") or [],
         "users": data.get("users") or [],
+        "deployment_modes": data.get("deployment_modes") or [],
+        "tcs_services": data.get("tcs_services") or [],
         "server_types": data.get("server_types") or [],
         "hosts": normalized_hosts,
         "environment_host_mappings": normalized_mappings,
@@ -166,30 +167,14 @@ def load_host_seed_data():
     }
 
 
-def _bootstrap_seed_config_path():
-    configured_path = None
-    if has_app_context():
-        configured_path = current_app.config.get("BOOTSTRAP_SEED_PATH")
-    resolved_path = configured_path or str(BOOTSTRAP_SEED_CONFIG_FALLBACK_PATH)
-    return Path(resolved_path)
+def load_seed_data():
+    """Load the single default seed data source used by startup seeding."""
+    return _load_seed_data_from_path(str(_seed_config_path().resolve()))
 
 
-def load_bootstrap_seed_data():
-    """Load minimal bootstrap seed data for a clean deployment."""
-    seed_path = _bootstrap_seed_config_path()
-    if not seed_path.exists():
-        return dict(EMPTY_BOOTSTRAP_DATA)
-
-    with seed_path.open("r", encoding="utf-8-sig") as seed_file:
-        data = json.load(seed_file)
-
-    return {
-        "teams": data.get("teams") or [],
-        "users": data.get("users") or [],
-        "deployment_modes": data.get("deployment_modes") or [],
-        "tcs_services": data.get("tcs_services") or [],
-        "component_builds": data.get("component_builds") or [],
-    }
+def load_host_seed_data():
+    """Backward-compatible alias for the unified seed data loader."""
+    return load_seed_data()
 
 
 def _seeders():
@@ -201,6 +186,11 @@ def _seeders():
         seed_default_team_memberships,
         seed_default_deployment_modes,
         seed_default_tcs_services,
+        seed_default_environments,
+        seed_default_hosts,
+        seed_default_server_types,
+        seed_default_environment_host_mappings,
+        seed_default_pay_ui,
         seed_default_component_builds,
     )
 
@@ -235,315 +225,9 @@ def _seed_access_admin_memberships():
         _seed_team_membership(admin_user, access_admin_team, admin_user.role)
 
 
-def _get_table_columns(table_name):
-    inspector = inspect(db.engine)
-    try:
-        return {column["name"] for column in inspector.get_columns(table_name)}
-    except Exception:
-        return set()
-
-
-def _add_column_if_missing(table_name, column_sql):
-    column_name = column_sql.split()[0]
-    existing_columns = _get_table_columns(table_name)
-    if column_name in existing_columns:
-        return
-    db.session.execute(text("ALTER TABLE {} ADD COLUMN {}".format(table_name, column_sql)))
-    db.session.commit()
-
-
-def _create_index_if_missing(index_name, table_name, columns, unique=False):
-    existing_indexes = {
-        index["name"]
-        for index in inspect(db.engine).get_indexes(table_name)
-    }
-    if index_name in existing_indexes:
-        return
-    unique_sql = "UNIQUE " if unique else ""
-    db.session.execute(
-        text(
-            "CREATE {}INDEX {} ON {} ({})".format(
-                unique_sql,
-                index_name,
-                table_name,
-                columns,
-            )
-        )
-    )
-    db.session.commit()
-
-
-def _normalize_service_ids(raw_value):
-    if not raw_value:
-        return []
-    parsed = raw_value
-    if isinstance(raw_value, str):
-        try:
-            parsed = json.loads(raw_value)
-        except (TypeError, ValueError):
-            parsed = [part.strip() for part in raw_value.split(",") if part.strip()]
-    if not isinstance(parsed, list):
-        return []
-    normalized = []
-    for value in parsed:
-        normalized_value = (value or "").strip()
-        if normalized_value and normalized_value not in normalized:
-            normalized.append(normalized_value)
-    return normalized
-
-
-def _ensure_tcs_service(service_id):
-    normalized_id = TcsService.normalize_service_id(service_id)
-    normalized_bit_id = TcsService.normalize_bit_id(service_id)
-    if not normalized_id and normalized_bit_id:
-        normalized_id = TcsService.default_service_id_for_bit_id(normalized_bit_id)
-    if not normalized_id:
-        return None
-    service = TcsService.query.get(normalized_id)
-    if service is None:
-        service = TcsService(
-            tcs_service_id=normalized_id,
-            service_name=normalized_id,
-            bit_id=(
-                normalized_bit_id
-                or TcsService.default_bit_id_for_service_id(normalized_id)
-            ),
-            is_active=True,
-        )
-        db.session.add(service)
-    elif not service.service_name:
-        service.service_name = normalized_id
-    if not service.bit_id:
-        service.bit_id = (
-            normalized_bit_id
-            or TcsService.default_bit_id_for_service_id(normalized_id)
-        )
-    return service
-
-
-def _ensure_tcs_deployment_mode(mode_id):
-    normalized_id = (mode_id or "").strip()
-    if not normalized_id:
-        return None
-    deployment_mode = TCSDeploymentMode.query.get(normalized_id)
-    if deployment_mode is None:
-        deployment_mode = TCSDeploymentMode(
-            tcs_deployment_mode_id=normalized_id,
-            mode_name=normalized_id,
-            is_active=True,
-        )
-        db.session.add(deployment_mode)
-    elif not deployment_mode.mode_name:
-        deployment_mode.mode_name = normalized_id
-    return deployment_mode
-
-
-def _upgrade_deployment_request_schema():
-    columns = _get_table_columns("deployment_requests")
-    if not columns:
-        return
-
-    _add_column_if_missing(
-        "deployment_requests",
-        "tcs_deployment_mode_id VARCHAR(16)",
-    )
-
-    select_columns = ["deployment_request_id", "tcs_deployment_mode_id"]
-    if "testing_mode" in columns:
-        select_columns.append("testing_mode")
-    if "service_types" in columns:
-        select_columns.append("service_types")
-    rows = db.session.execute(
-        text(
-            "SELECT {} FROM deployment_requests".format(", ".join(select_columns))
-        )
-    ).fetchall()
-    for row in rows:
-        deployment_mode_id = (
-            (row["tcs_deployment_mode_id"] or "").strip()
-            if "tcs_deployment_mode_id" in row.keys()
-            else ""
-        ) or (
-            (row["testing_mode"] or "").strip()
-            if "testing_mode" in row.keys()
-            else ""
-        )
-        if deployment_mode_id:
-            _ensure_tcs_deployment_mode(deployment_mode_id)
-            db.session.execute(
-                text(
-                    "UPDATE deployment_requests "
-                    "SET tcs_deployment_mode_id = :mode_id "
-                    "WHERE deployment_request_id = :request_id "
-                    "AND (tcs_deployment_mode_id IS NULL OR tcs_deployment_mode_id = '')"
-                ),
-                {
-                    "mode_id": deployment_mode_id,
-                    "request_id": row["deployment_request_id"],
-                },
-            )
-
-        service_values = row["service_types"] if "service_types" in row.keys() else None
-        for service_id in _normalize_service_ids(service_values):
-            _ensure_tcs_service(service_id)
-            exists = DeploymentRequestService.query.filter_by(
-                deployment_request_id=row["deployment_request_id"],
-                tcs_service_id=service_id,
-            ).first()
-            if exists is None:
-                db.session.add(
-                    DeploymentRequestService(
-                        deployment_request_id=row["deployment_request_id"],
-                        tcs_service_id=service_id,
-                    )
-                )
-
-    db.session.commit()
-
-
-def _upgrade_current_deployment_state_schema():
-    columns = _get_table_columns("current_deployment_state")
-    if not columns:
-        return
-
-    _add_column_if_missing(
-        "current_deployment_state",
-        "tcs_service_id VARCHAR(16)",
-    )
-    _add_column_if_missing(
-        "current_deployment_state",
-        "tcs_deployment_mode_id VARCHAR(16)",
-    )
-
-    select_columns = ["current_deployment_state_id", "tcs_service_id", "tcs_deployment_mode_id"]
-    if "testing_mode" in columns:
-        select_columns.append("testing_mode")
-    if "service_types" in columns:
-        select_columns.append("service_types")
-    rows = db.session.execute(
-        text(
-            "SELECT {} FROM current_deployment_state".format(", ".join(select_columns))
-        )
-    ).fetchall()
-    for row in rows:
-        deployment_mode_id = (
-            (row["tcs_deployment_mode_id"] or "").strip()
-            if "tcs_deployment_mode_id" in row.keys()
-            else ""
-        ) or (
-            (row["testing_mode"] or "").strip()
-            if "testing_mode" in row.keys()
-            else ""
-        )
-        if deployment_mode_id:
-            _ensure_tcs_deployment_mode(deployment_mode_id)
-            db.session.execute(
-                text(
-                    "UPDATE current_deployment_state "
-                    "SET tcs_deployment_mode_id = :mode_id "
-                    "WHERE current_deployment_state_id = :state_id "
-                    "AND (tcs_deployment_mode_id IS NULL OR tcs_deployment_mode_id = '')"
-                ),
-                {
-                    "mode_id": deployment_mode_id,
-                    "state_id": row["current_deployment_state_id"],
-                },
-            )
-
-        service_values = row["service_types"] if "service_types" in row.keys() else None
-        service_ids = _normalize_service_ids(service_values)
-        if not service_ids:
-            continue
-        first_service_id = service_ids[0]
-        _ensure_tcs_service(first_service_id)
-        db.session.execute(
-            text(
-                "UPDATE current_deployment_state "
-                "SET tcs_service_id = :service_id "
-                "WHERE current_deployment_state_id = :state_id "
-                "AND (tcs_service_id IS NULL OR tcs_service_id = '')"
-            ),
-            {
-                "service_id": first_service_id,
-                "state_id": row["current_deployment_state_id"],
-            },
-        )
-
-    db.session.commit()
-    _create_index_if_missing(
-        "idx_current_deployment_lookup_v1",
-        "current_deployment_state",
-        "env_scope_type, env_id, env_type, target_key, package_key, tcs_service_id",
-    )
-
-
-def _upgrade_env_booking_system_snapshot_schema():
-    columns = _get_table_columns("env_booking_system_snapshots")
-    if not columns:
-        return
-    _create_index_if_missing(
-        "idx_booking_snapshot_lookup",
-        "env_booking_system_snapshots",
-        "booking_id, environment_host_mapping_id, server_type_id, tcs_service_id",
-    )
-
-
-def _upgrade_user_schema():
-    columns = _get_table_columns("users")
-    if not columns:
-        return
-    _add_column_if_missing(
-        "users",
-        "must_change_password BOOLEAN NOT NULL DEFAULT 0",
-    )
-    _backfill_default_password_flags()
-
-
-def _upgrade_environment_schema():
-    columns = _get_table_columns("environments")
-    if not columns:
-        return
-    _add_column_if_missing(
-        "environments",
-        "monitoring_enabled BOOLEAN NOT NULL DEFAULT 1",
-    )
-
-
-def _backfill_default_password_flags():
-    """Mark users that still appear to use a known plaintext default password."""
-    default_password_table_exists = bool(_get_table_columns("default_passwords"))
-    if not default_password_table_exists:
-        return
-
-    from .models import DefaultPassword
-
-    default_password_values = []
-    for record in DefaultPassword.query.all():
-        value = (record.password_value or "").strip()
-        if not value or "$" in value or ":" in value:
-            continue
-        default_password_values.append(value)
-
-    if not default_password_values:
-        return
-
-    for user in User.query.all():
-        if getattr(user, "must_change_password", False):
-            continue
-        if any(verify_password(user.hzn_hash, default_value) for default_value in default_password_values):
-            user.must_change_password = True
-
-    db.session.commit()
-
-
 def upgrade_existing_schema():
-    """Apply lightweight SQLite-safe schema upgrades for evolving local models."""
+    """Create the current schema for clean deployments."""
     db.create_all()
-    _upgrade_environment_schema()
-    _upgrade_user_schema()
-    _upgrade_deployment_request_schema()
-    _upgrade_current_deployment_state_schema()
-    _upgrade_env_booking_system_snapshot_schema()
 
 
 def seed_initial_data():
@@ -562,7 +246,7 @@ def init_db():
 
 def has_bootstrap_seed_data():
     """Return whether bootstrap-managed operational records already exist."""
-    return any(model.query.first() is not None for model in BOOTSTRAP_SEED_MODELS)
+    return any(model.query.first() is not None for model in SEED_GUARD_MODELS)
 
 
 def should_seed_default_data():
@@ -581,7 +265,7 @@ def get_seed_runtime_summary():
     ) if has_app_context() else True
     has_data = has_bootstrap_seed_data() if has_app_context() else False
     return {
-        "config_path": str(_bootstrap_seed_config_path()),
+        "config_path": str(_seed_config_path()),
         "bootstrap_only": bootstrap_only,
         "has_operational_data": has_data,
         "seed_applied_on_startup": (not bootstrap_only or not has_data),
@@ -596,7 +280,7 @@ def seed_all_default_data():
 
 def seed_default_environments():
     """Seed default environment configurations."""
-    seed_data = load_host_seed_data()
+    seed_data = load_seed_data()
     for environment_data in seed_data["environments"]:
         env_id = environment_data["env_id"]
         env_type = environment_data["env_type"]
@@ -629,7 +313,7 @@ def seed_default_roles():
 
 def seed_default_teams():
     """Seed default teams used by access control and registration."""
-    seed_data = load_bootstrap_seed_data()
+    seed_data = load_seed_data()
     for team_data in seed_data["teams"]:
         if isinstance(team_data, str):
             team_name = team_data
@@ -646,7 +330,7 @@ def seed_default_teams():
 
 def seed_default_users():
     """Seed default user accounts."""
-    seed_data = load_bootstrap_seed_data()
+    seed_data = load_seed_data()
     for user_data in seed_data["users"]:
         _create_if_missing(
             User,
@@ -663,7 +347,7 @@ def seed_default_users():
 
 def seed_default_team_memberships():
     """Ensure seeded users have at least one team membership."""
-    seed_data = load_bootstrap_seed_data()
+    seed_data = load_seed_data()
     for user_data in seed_data["users"]:
         user = _first(User, user_id=user_data["user_id"])
         team = _first(Team, team_name=user_data["team"])
@@ -680,7 +364,7 @@ def seed_default_team_memberships():
 
 def seed_default_deployment_modes():
     """Seed default TCS deployment modes."""
-    seed_data = load_bootstrap_seed_data()
+    seed_data = load_seed_data()
     for mode_data in seed_data["deployment_modes"]:
         mode_id = (
             mode_data.get("tcs_deployment_mode_id")
@@ -708,7 +392,7 @@ def seed_default_deployment_modes():
 
 def seed_default_tcs_services():
     """Seed default TCS services."""
-    seed_data = load_bootstrap_seed_data()
+    seed_data = load_seed_data()
     logical_service_entries = [
         {"tcs_service_id": service_id, "service_name": service_id, "bit_id": bit_id}
         for service_id, bit_id in TcsService.LOGICAL_BIT_ID_MAP.items()
@@ -743,7 +427,7 @@ def seed_default_tcs_services():
 
 def seed_default_hosts():
     """Seed default host configurations."""
-    seed_data = load_host_seed_data()
+    seed_data = load_seed_data()
     for host_data in seed_data["hosts"]:
         _create_if_missing(
             Host,
@@ -760,7 +444,7 @@ def seed_default_hosts():
 
 def seed_default_server_types():
     """Seed default server type configurations."""
-    seed_data = load_host_seed_data()
+    seed_data = load_seed_data()
     for server_data in seed_data["server_types"]:
         _create_if_missing(
             ServerType,
@@ -772,7 +456,7 @@ def seed_default_server_types():
 
 def seed_default_environment_host_mappings():
     """Seed default environment-to-host mappings."""
-    seed_data = load_host_seed_data()
+    seed_data = load_seed_data()
     for mapping_data in seed_data["environment_host_mappings"]:
         env_id = mapping_data.get("env_id")
         env = _first(Environment, env_id=env_id) if env_id else None
@@ -804,7 +488,7 @@ def seed_default_environment_host_mappings():
 
 def seed_default_pay_ui():
     """Seed default Pay UI access links."""
-    seed_data = load_host_seed_data()
+    seed_data = load_seed_data()
     for pay_ui_data in seed_data["pay_ui"]:
         env_id = (pay_ui_data.get("env_id") or "").strip()
         if not env_id:
@@ -822,7 +506,7 @@ def seed_default_pay_ui():
 
 def seed_default_component_builds():
     """Seed default component build catalog entries."""
-    seed_data = load_bootstrap_seed_data()
+    seed_data = load_seed_data()
     for build_data in seed_data["component_builds"]:
         target_key = (build_data.get("target_key") or "").strip().upper()
         version = (build_data.get("version") or "").strip()

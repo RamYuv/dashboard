@@ -6,6 +6,7 @@
     "qa",
     "env",
     "dev",
+    "tool",
     "access_admin"
   ],
   "environments": [
@@ -252,6 +253,13 @@
       "target_key": "TOOLS",
       "version": "TOOLS-3.2.0"
     }
+  ],
+  "deployment_modes": [
+    { "id": "RT", "name": "Realtime" }
+  ],
+  "tcs_services": [
+    { "id": "STL", "name": "Settle", "bit_id": 20 },
+    { "id": "NOW", "name": "NOW", "bit_id": 21 }
   ],
   "hosts": [
     {
