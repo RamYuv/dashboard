@@ -81,7 +81,7 @@
             </details>
 
             <a href="{{ url_for('main.dashboard') }}" class="menu-item menu-item-light">Dashboards</a>
-            <a href="{{ url_for('main.profile') }}" class="menu-item menu-item-light">Contact</a>
+            <a href="#" class="menu-item menu-item-light" data-bs-toggle="modal" data-bs-target="#contactApplicationModal">Contact</a>
         </nav>
     </aside>
 
@@ -240,6 +240,24 @@
                                         <div><strong>Grey:</strong> TCS not found or not available on the host.</div>
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal fade about-modal" id="contactApplicationModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h2 class="modal-title">Contact</h2>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p class="mb-3">For tool support or dashboard questions, contact:</p>
+                            <div class="alert alert-info mb-0">
+                                <strong>Email:</strong>
+                                <a href="mailto:envdashboard@gmail.com">envdashboard@gmail.com</a>
                             </div>
                         </div>
                     </div>

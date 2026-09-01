@@ -132,6 +132,36 @@ def _registration_email_message(user_id, email_id, code):
     ])
 
 
+def _parse_session_datetime(value):
+    """Parse ISO-ish datetime strings stored in the session payload."""
+    if not value:
+        return None
+
+    parser = getattr(datetime, "fromisoformat", None)
+    if parser is not None:
+        try:
+            return parser(value)
+        except ValueError:
+            pass
+
+    normalized_value = str(value).strip()
+    if normalized_value.endswith("Z"):
+        normalized_value = normalized_value[:-1] + "+00:00"
+
+    for format_string in (
+        "%Y-%m-%dT%H:%M:%S.%f%z",
+        "%Y-%m-%dT%H:%M:%S%z",
+        "%Y-%m-%dT%H:%M:%S.%f",
+        "%Y-%m-%dT%H:%M:%S",
+    ):
+        try:
+            return datetime.strptime(normalized_value, format_string)
+        except ValueError:
+            continue
+
+    return None
+
+
 def _clear_otp_session(session_key):
     session.pop(session_key, None)
 
@@ -403,11 +433,7 @@ def verify_register():
     if not pending_registration:
         return jsonify(success=False, error="Verification session expired. Please start again."), 400
 
-    expires_at_raw = pending_registration.get("expires_at")
-    try:
-        expires_at = datetime.fromisoformat(expires_at_raw) if expires_at_raw else None
-    except ValueError:
-        expires_at = None
+    expires_at = _parse_session_datetime(pending_registration.get("expires_at"))
 
     if expires_at is None or expires_at < datetime.utcnow():
         _clear_register_hzn_session()
@@ -567,6 +593,15 @@ def logout():
 def profile():
     user = current_user()
     return render_template("profile.html", user=user)
+
+
+@main_bp.route("/contact")
+@login_required
+def contact():
+    return render_template(
+        "contact.html",
+        support_email="envdashboard@gmail.com",
+    )
 
 
 @main_bp.route("/change-password", methods=["GET", "POST"])

@@ -47,6 +47,7 @@ SEED_CONFIG_FALLBACK_PATH = (
 ACCESS_ADMIN_TEAM_NAME = "access_admin"
 
 EMPTY_SEED_DATA = {
+    "roles": [],
     "teams": [],
     "environments": [],
     "users": [],
@@ -154,6 +155,7 @@ def _load_seed_data_from_path(seed_path_value):
             )
 
     return {
+        "roles": data.get("roles") or [],
         "teams": data.get("teams") or [],
         "environments": data.get("environments") or [],
         "users": data.get("users") or [],
@@ -299,13 +301,23 @@ def seed_default_environments():
 
 def seed_default_roles():
     """Seed default application roles."""
-    for role_data in DEFAULT_ROLES:
+    seed_data = load_seed_data()
+    role_entries = seed_data["roles"] or DEFAULT_ROLES
+    for role_data in role_entries:
+        role_name = (
+            role_data.get("role_name")
+            or role_data.get("id")
+            or role_data.get("name")
+            or ""
+        ).strip().lower()
+        if not role_name:
+            continue
         _create_if_missing(
             Role,
-            role_name=role_data["role_name"],
+            role_name=role_name,
             defaults={
-                "description": role_data["description"],
-                "is_active": True,
+                "description": role_data.get("description"),
+                "is_active": role_data.get("is_active", True),
             },
         )
     db.session.commit()
@@ -384,7 +396,7 @@ def seed_default_deployment_modes():
             defaults={
                 "mode_name": mode_name,
                 "description": mode_data.get("description"),
-                "is_active": True,
+                "is_active": mode_data.get("is_active", True),
             },
         )
     db.session.commit()
@@ -394,7 +406,12 @@ def seed_default_tcs_services():
     """Seed default TCS services."""
     seed_data = load_seed_data()
     logical_service_entries = [
-        {"tcs_service_id": service_id, "service_name": service_id, "bit_id": bit_id}
+        {
+            "tcs_service_id": service_id,
+            "service_name": service_id,
+            "bit_id": bit_id,
+            "is_active": True,
+        }
         for service_id, bit_id in TcsService.LOGICAL_BIT_ID_MAP.items()
     ]
     for service_data in seed_data["tcs_services"]:
@@ -419,7 +436,7 @@ def seed_default_tcs_services():
                 "service_name": service_name,
                 "bit_id": TcsService.normalize_bit_id(service_data.get("bit_id")),
                 "description": service_data.get("description"),
-                "is_active": True,
+                "is_active": service_data.get("is_active", True),
             },
         )
     db.session.commit()

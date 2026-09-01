@@ -1,4 +1,16 @@
 ﻿{
+  "roles": [
+    {
+      "role_name": "user",
+      "description": "Standard user access",
+      "is_active": true
+    },
+    {
+      "role_name": "admin",
+      "description": "Administrator access",
+      "is_active": true
+    }
+  ],
   "teams": [
     "alpha",
     "beta",
