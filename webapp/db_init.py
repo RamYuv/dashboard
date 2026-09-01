@@ -14,9 +14,12 @@ from .domain.deployment_targets import get_target_definition
 from .password_utils import hash_password
 from .models import (
     ComponentBuild,
+    DefaultPassword,
+    EmailDomain,
     Environment,
     EnvironmentHostMapping,
     Host,
+    Orbit,
     PayUi,
     Role,
     ServerType,
@@ -49,6 +52,9 @@ ACCESS_ADMIN_TEAM_NAME = "access_admin"
 EMPTY_SEED_DATA = {
     "roles": [],
     "teams": [],
+    "email_domains": [],
+    "default_passwords": [],
+    "orbits": [],
     "environments": [],
     "users": [],
     "deployment_modes": [],
@@ -157,6 +163,9 @@ def _load_seed_data_from_path(seed_path_value):
     return {
         "roles": data.get("roles") or [],
         "teams": data.get("teams") or [],
+        "email_domains": data.get("email_domains") or [],
+        "default_passwords": data.get("default_passwords") or [],
+        "orbits": data.get("orbits") or [],
         "environments": data.get("environments") or [],
         "users": data.get("users") or [],
         "deployment_modes": data.get("deployment_modes") or [],
@@ -184,6 +193,9 @@ def _seeders():
     return (
         seed_default_roles,
         seed_default_teams,
+        seed_default_email_domains,
+        seed_default_default_passwords,
+        seed_default_orbits,
         seed_default_users,
         seed_default_team_memberships,
         seed_default_deployment_modes,
@@ -337,6 +349,83 @@ def seed_default_teams():
         if not team_name:
             continue
         _create_if_missing(Team, team_name=team_name, defaults={"description": description})
+    db.session.commit()
+
+
+def seed_default_email_domains():
+    """Seed default email domains used during registration."""
+    seed_data = load_seed_data()
+    for domain_data in seed_data["email_domains"]:
+        if isinstance(domain_data, str):
+            domain_id = domain_data
+        else:
+            domain_id = (
+                domain_data.get("email_domain_id")
+                or domain_data.get("id")
+                or domain_data.get("name")
+                or ""
+            )
+        domain_id = (domain_id or "").strip().lower()
+        if not domain_id:
+            continue
+        _create_if_missing(
+            EmailDomain,
+            email_domain_id=domain_id,
+        )
+    db.session.commit()
+
+
+def seed_default_default_passwords():
+    """Seed shared default passwords used by legacy password checks."""
+    seed_data = load_seed_data()
+    for password_data in seed_data["default_passwords"]:
+        password_id = (
+            password_data.get("default_password_id")
+            or password_data.get("id")
+            or ""
+        ).strip()
+        password_value = (
+            password_data.get("password_value")
+            or password_data.get("password")
+            or password_data.get("value")
+            or ""
+        )
+        if not password_id or not password_value:
+            continue
+        _create_if_missing(
+            DefaultPassword,
+            default_password_id=password_id,
+            defaults={
+                "password_value": password_value,
+            },
+        )
+    db.session.commit()
+
+
+def seed_default_orbits():
+    """Seed orbit key records used for encrypted server password access."""
+    seed_data = load_seed_data()
+    for orbit_data in seed_data["orbits"]:
+        orbit_id = (
+            orbit_data.get("orbit_id")
+            or orbit_data.get("id")
+            or ""
+        ).strip()
+        orb_value = (
+            orbit_data.get("orb_value")
+            or orbit_data.get("orb")
+            or orbit_data.get("value")
+            or ""
+        )
+        if not orbit_id or not orb_value:
+            continue
+        _create_if_missing(
+            Orbit,
+            orbit_id=orbit_id,
+            defaults={
+                "orb_value": orb_value,
+            },
+        )
     db.session.commit()
 
 

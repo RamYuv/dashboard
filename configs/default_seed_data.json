@@ -11,6 +11,9 @@
       "is_active": true
     }
   ],
+  "email_domains": [],
+  "default_passwords": [],
+  "orbits": [],
   "teams": [
     "alpha",
     "beta",

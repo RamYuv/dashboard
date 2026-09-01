@@ -18,10 +18,89 @@ from sqlalchemy.orm import joinedload
 
 from webapp import create_app
 from webapp.config import Config
-from webapp.models import Environment, EnvironmentHostMapping, Host, PayUi
+from webapp.models import (
+    Environment,
+    EnvironmentHostMapping,
+    DefaultPassword,
+    EmailDomain,
+    Host,
+    Orbit,
+    PayUi,
+    Role,
+    TCSDeploymentMode,
+    TcsService,
+)
+
+SECTION_EXPORTERS = (
+    "roles",
+    "email_domains",
+    "default_passwords",
+    "orbits",
+    "environments",
+    "hosts",
+    "environment_host_mappings",
+    "pay_ui",
+    "deployment_modes",
+    "tcs_services",
+)
 
 
-SECTION_EXPORTERS = ("environments", "hosts", "environment_host_mappings", "pay_ui")
+def export_roles():
+    """Return seed-ready role rows."""
+    roles = Role.query.order_by(Role.role_name.asc()).all()
+    payload = []
+    for role in roles:
+        payload.append(
+            {
+                "role_name": role.role_name,
+                "description": role.description or "",
+                "is_active": bool(role.is_active),
+            }
+        )
+    return payload
+
+
+def export_email_domains():
+    """Return seed-ready email domain rows."""
+    domains = EmailDomain.query.order_by(EmailDomain.email_domain_id.asc()).all()
+    payload = []
+    for domain in domains:
+        payload.append(
+            {
+                "id": domain.email_domain_id,
+            }
+        )
+    return payload
+
+
+def export_default_passwords():
+    """Return seed-ready default password rows."""
+    records = DefaultPassword.query.order_by(
+        DefaultPassword.default_password_id.asc()
+    ).all()
+    payload = []
+    for record in records:
+        payload.append(
+            {
+                "id": record.default_password_id,
+                "password_value": record.password_value,
+            }
+        )
+    return payload
+
+
+def export_orbits():
+    """Return seed-ready orbit rows."""
+    records = Orbit.query.order_by(Orbit.orbit_id.asc()).all()
+    payload = []
+    for record in records:
+        payload.append(
+            {
+                "id": record.orbit_id,
+                "orb_value": record.orb_value,
+            }
+        )
+    return payload
 
 
 def export_environments():
@@ -113,8 +192,51 @@ def export_pay_ui():
     return payload
 
 
+def export_deployment_modes():
+    """Return seed-ready deployment mode rows."""
+    modes = TCSDeploymentMode.query.order_by(
+        TCSDeploymentMode.tcs_deployment_mode_id.asc()
+    ).all()
+    payload = []
+    for mode in modes:
+        payload.append(
+            {
+                "id": mode.tcs_deployment_mode_id,
+                "name": mode.mode_name,
+                "description": mode.description or "",
+                "is_active": bool(mode.is_active),
+            }
+        )
+    return payload
+
+
+def export_tcs_services():
+    """Return seed-ready TCS service rows."""
+    services = TcsService.query.order_by(TcsService.tcs_service_id.asc()).all()
+    payload = []
+    for service in services:
+        payload.append(
+            {
+                "id": service.tcs_service_id,
+                "name": service.service_name,
+                "bit_id": service.bit_id or "",
+                "description": service.description or "",
+                "is_active": bool(service.is_active),
+            }
+        )
+    return payload
+
+
 def export_section(section_name):
     """Dispatch export by seed section name."""
+    if section_name == "roles":
+        return export_roles()
+    if section_name == "email_domains":
+        return export_email_domains()
+    if section_name == "default_passwords":
+        return export_default_passwords()
+    if section_name == "orbits":
+        return export_orbits()
     if section_name == "environments":
         return export_environments()
     if section_name == "hosts":
@@ -123,6 +245,10 @@ def export_section(section_name):
         return export_environment_host_mappings()
     if section_name == "pay_ui":
         return export_pay_ui()
+    if section_name == "deployment_modes":
+        return export_deployment_modes()
+    if section_name == "tcs_services":
+        return export_tcs_services()
     raise ValueError("Unsupported section: {}".format(section_name))
 
 
