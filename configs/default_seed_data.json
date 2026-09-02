@@ -161,7 +161,7 @@
       "user_id": "admin",
       "email_id": "admin@example.com",
       "name": "Admin User",
-      "password": "adminpass",
+      "hzn_secret": "adminpass",
       "team": "env",
       "role": "admin",
       "team_lead": 0
@@ -170,7 +170,7 @@
       "user_id": "envlead",
       "email_id": "envlead@example.com",
       "name": "ENV Lead",
-      "password": "envpass",
+      "hzn_secret": "envpass",
       "team": "env",
       "role": "user",
       "team_lead": 1
@@ -179,7 +179,7 @@
       "user_id": "qa1",
       "email_id": "qa1@example.com",
       "name": "QA User",
-      "password": "qapass",
+      "hzn_secret": "qapass",
       "team": "qa",
       "role": "user",
       "team_lead": 1
@@ -188,7 +188,7 @@
       "user_id": "qa2",
       "email_id": "qa2@example.com",
       "name": "QA User Two",
-      "password": "qapass2",
+      "hzn_secret": "qapass2",
       "team": "qa",
       "role": "user",
       "team_lead": 0
@@ -197,7 +197,7 @@
       "user_id": "user1",
       "email_id": "user1@example.com",
       "name": "user1",
-      "password": "userpass",
+      "hzn_secret": "userpass",
       "team": "dev",
       "role": "user",
       "team_lead": 0
@@ -206,7 +206,7 @@
       "user_id": "devlead",
       "email_id": "devlead@example.com",
       "name": "DEV Lead",
-      "password": "devpass",
+      "hzn_secret": "devpass",
       "team": "dev",
       "role": "user",
       "team_lead": 1
@@ -215,7 +215,7 @@
       "user_id": "support1",
       "email_id": "support1@example.com",
       "name": "Support User",
-      "password": "supportpass",
+      "hzn_secret": "supportpass",
       "team": "support",
       "role": "user",
       "team_lead": 0

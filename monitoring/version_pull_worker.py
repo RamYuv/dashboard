@@ -35,6 +35,21 @@ class VersionPullWorker:
         self.app = app
         self.version_fetcher = version_fetcher or VersionFetcher()
 
+    def _included_server_types(self):
+        if self.app is None:
+            return []
+
+        raw_value = self.app.config.get(
+            "MONITOR_INCLUDED_SERVER_TYPES",
+            self.app.config.get("MONITOR_INCLUDED_SERVER_ROLES", ""),
+        )
+        included = []
+        for item in str(raw_value).split(","):
+            server_type_key = (item or "").strip()
+            if server_type_key and server_type_key not in included:
+                included.append(server_type_key)
+        return included
+
     def _build_package_lookup(self, target_def):
         packages = target_def.get("packages") or {}
         lookup = {}
@@ -64,6 +79,7 @@ class VersionPullWorker:
         return lookup, packages
 
     def _load_mappings(self):
+        included_server_types = self._included_server_types()
         mappings = (
             EnvironmentHostMapping.query
             .options(
@@ -77,7 +93,10 @@ class VersionPullWorker:
         return [
             mapping
             for mapping in mappings
-            if self._is_monitoring_enabled(mapping)
+            if self._is_monitoring_enabled(mapping) and self._is_included_server_type(
+                mapping,
+                included_server_types,
+            )
         ]
 
     def _is_monitoring_enabled(self, mapping):
@@ -91,6 +110,14 @@ class VersionPullWorker:
 
         environment = Environment.query.filter_by(env_id=env_id).first()
         return bool(environment is not None and getattr(environment, "monitoring_enabled", True))
+
+    def _is_included_server_type(self, mapping, included_server_types):
+        if mapping is None:
+            return False
+        if not included_server_types:
+            return True
+        server_type = mapping.server_type.server_type_key if mapping.server_type else None
+        return bool(server_type and server_type in included_server_types)
 
     def _group_mappings_by_environment(self, mappings):
         grouped = []

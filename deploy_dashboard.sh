@@ -102,31 +102,13 @@ deploy_db() {
     fi
 }
 
-run_migration() {
-    log_info "Running dashboard data migration."
-    python3 "${CURR_DIR}/dashboard_migrate.py"
-    if [[ $? -eq 0 ]]; then
-        log_info "Dashboard data migration completed successfully."
-    else
-        log_info "Dashboard data migration failed."
-        exit 1
-    fi
-}
-
 update_config() {
-    local site_packages_path=""
-
     log_info "Setting up virtual environment. This may take some time."
     python3 -m venv "${DASHBOARD_HOME}/dashboard_venv" --system-site-packages || exit 1
 
     if [[ -d "${DASHBOARD_HOME}/dashboard_dist" ]]; then
-        site_packages_path="$("${DASHBOARD_HOME}/dashboard_venv/bin/python3" -c 'import site; paths = [p for p in site.getsitepackages() if p.endswith("site-packages")]; print(paths[0] if paths else "")')"
-        if [[ -n "${site_packages_path}" && -d "${site_packages_path}" ]]; then
-            log_info "Copying dashboard_dist into virtual environment site-packages."
-            cp -r "${DASHBOARD_HOME}/dashboard_dist/." "${site_packages_path}/"
-        else
-            log_info "Unable to resolve site-packages path. Skipping dashboard_dist copy."
-        fi
+        log_info "Copying dashboard_dist into virtual environment site-packages."
+        cp -r "${DASHBOARD_HOME}/dashboard_dist/." "${DASHBOARD_HOME}/dashboard_venv/lib/python3.6/site-packages/" || exit 1
     else
         log_info "dashboard_dist directory not found. Skipping package copy."
     fi
@@ -165,7 +147,6 @@ main() {
 
     update_config
     deploy_db
-    run_migration
     update_crontab
 
     log_info "DASHBOARD deployment completed."

@@ -67,6 +67,39 @@ EMPTY_SEED_DATA = {
 }
 
 
+def _seed_plaintext_hzn_allowed():
+    """Return whether seed files may include plaintext HZN secrets."""
+    if not has_app_context():
+        return True
+    return bool(current_app.config.get("SEED_ALLOW_HZN_SECRET", True))
+
+
+def _resolve_seed_user_hzn_hash(user_data, index):
+    """Resolve a seeded user's stored HZN hash from explicit seed fields."""
+    seed_hash = str(user_data.get("hzn_hash") or "").strip()
+    seed_secret = user_data.get("hzn_secret")
+    normalized_secret = "" if seed_secret is None else str(seed_secret)
+    user_id = (user_data.get("user_id") or "").strip() or "#{}".format(index)
+
+    if seed_hash and normalized_secret:
+        raise ValueError(
+            "Seed user '{}' cannot include both hzn_hash and hzn_secret.".format(user_id)
+        )
+    if seed_hash:
+        return seed_hash
+    if normalized_secret:
+        if not _seed_plaintext_hzn_allowed():
+            raise ValueError(
+                "Seed user '{}' cannot use hzn_secret when SEED_ALLOW_HZN_SECRET is false.".format(
+                    user_id
+                )
+            )
+        return hash_password(normalized_secret)
+    raise ValueError(
+        "Seed user '{}' must include either hzn_hash or hzn_secret.".format(user_id)
+    )
+
+
 def _first(model, **filters):
     """Return the first matching record for the provided filters."""
     return model.query.filter_by(**filters).first()
@@ -432,14 +465,14 @@ def seed_default_orbits():
 def seed_default_users():
     """Seed default user accounts."""
     seed_data = load_seed_data()
-    for user_data in seed_data["users"]:
+    for index, user_data in enumerate(seed_data["users"], start=1):
         _create_if_missing(
             User,
             user_id=user_data["user_id"],
             defaults={
                 "email_id": user_data["email_id"],
                 "name": user_data["name"],
-                "hzn_hash": hash_password(user_data["password"]),
+                "hzn_hash": _resolve_seed_user_hzn_hash(user_data, index),
                 "role": user_data["role"],
             },
         )
