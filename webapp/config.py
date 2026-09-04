@@ -49,6 +49,12 @@ class Config:
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL', f"sqlite:///{DEFAULT_DB_PATH}")
     # SQLAlchemy event tracking is disabled to reduce memory overhead.
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    # Give SQLite more time to wait for short-lived writers before raising "database is locked".
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        "connect_args": {
+            "timeout": int(os.environ.get("SQLITE_BUSY_TIMEOUT_SECONDS", "10")),
+        }
+    }
     # High-level environment mode used by app-specific defaults such as seed handling.
     APP_ENV = (os.environ.get('APP_ENV', 'development') or 'development').strip().lower()
 

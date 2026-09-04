@@ -9,10 +9,9 @@ from .blueprint import main_bp
 from ..auth_service import (
     current_user,
     login_required,
-    password_change_required,
     should_redirect_to_password_change,
 )
-from ..helpers import normalize_role, normalize_team
+from ..helpers import normalize_role
 from ..models import EmailDomain, PasswordChangeRequest, Team, TeamMember, User, db
 from ..password_utils import (
     hash_password,
@@ -29,13 +28,28 @@ FORGOT_HZN_SESSION_KEY = "forgot_password_otp"
 REGISTER_SESSION_KEY = "register_otp"
 HZN_CHANGE_OTP_TTL_SECONDS = 120
 REGISTER_OTP_TTL_SECONDS = 120
+REGISTRATION_EXCLUDED_TEAM_NAMES = {
+    "access_admin",
+    "l3",
+}
 
 
 def _registration_team_choices():
-    teams = Team.query.order_by(Team.team_name).all()
-    if teams:
-        return teams
-    return [Team(team_name="support")]
+    return [
+        team
+        for team in Team.query.order_by(Team.team_name).all()
+        if (team.team_name or "").strip().lower() not in REGISTRATION_EXCLUDED_TEAM_NAMES
+    ]
+
+
+def _normalize_registration_team(team_name):
+    normalized_team = (team_name or "").strip().lower()
+    if not normalized_team or normalized_team in REGISTRATION_EXCLUDED_TEAM_NAMES:
+        return ""
+    team_record = Team.find_by_name(normalized_team)
+    if team_record is not None:
+        return normalized_team
+    return ""
 
 
 def _registration_domain_choices():
@@ -257,6 +271,7 @@ def _build_registration_email(username, email_domain):
 def _normalize_registration_form():
     username = request.form.get("user_id", "").strip().lower()
     email_domain = request.form.get("email_domain", "").strip().lower()
+    submitted_team = request.form.get("team", "")
     return {
         "first_name": request.form.get("first_name", "").strip(),
         "last_name": request.form.get("last_name", "").strip(),
@@ -265,7 +280,8 @@ def _normalize_registration_form():
         "email_id": _build_registration_email(username, email_domain),
         "password": request.form.get("password", ""),
         "confirm_hzn": request.form.get("confirm_hzn", ""),
-        "team": normalize_team(request.form.get("team", "support")),
+        "submitted_team": (submitted_team or "").strip(),
+        "team": _normalize_registration_team(submitted_team),
         "role": normalize_role("user"),
     }
 
@@ -275,27 +291,16 @@ def _find_existing_registration_user(username, email_id):
 
 
 def _find_or_create_registration_team(team_name):
-    team_record = Team.find_by_name(team_name)
+    normalized_team = _normalize_registration_team(team_name)
+    if not normalized_team:
+        return None
+
+    team_record = Team.find_by_name(normalized_team)
     if team_record is None:
-        team_record = Team(team_name=team_name)
+        team_record = Team(team_name=normalized_team)
         db.session.add(team_record)
         db.session.flush()
     return team_record
-
-
-def _build_registration_user(form_data):
-    return User(
-        username=form_data["username"],
-        email_id=form_data["email_id"],
-        first_name=form_data["first_name"],
-        last_name=form_data["last_name"],
-        name="{} {}".format(
-            form_data["first_name"],
-            form_data["last_name"],
-        ).strip(),
-        hzn_hash=hash_password(form_data["password"]),
-        role=form_data["role"],
-    )
 
 
 def _finalize_successful_login(user, entered_password):
@@ -348,6 +353,15 @@ def register():
             return jsonify(
                 success=False,
                 error="First name, last name, user ID, email domain, and password are required.",
+            ), 400
+
+        if not form_data["submitted_team"]:
+            return jsonify(success=False, error="User group is required."), 400
+
+        if not form_data["team"]:
+            return jsonify(
+                success=False,
+                error="Please select a valid user group.",
             ), 400
 
         if form_data["password"] != form_data["confirm_hzn"]:
@@ -458,6 +472,9 @@ def verify_register():
         ), 400
 
     team_record = _find_or_create_registration_team(pending_registration.get("team"))
+    if team_record is None:
+        _clear_register_hzn_session()
+        return jsonify(success=False, error="Registration session contains an invalid user group. Please start again."), 400
     user = User(
         username=username,
         email_id=email_id,
@@ -570,12 +587,7 @@ def forgot_hzn():
         logger.info("Forgot password verification initiated for user %s", user.user_id)
         return jsonify(success=True)
 
-    request_id = session.get(FORGOT_HZN_SESSION_KEY)
-    pending_request = PasswordChangeRequest.find_by_id(request_id) if request_id else None
     _clear_forgot_hzn_session()
-    if pending_request is not None:
-        _clear_pending_hzn_change_requests(pending_request.user_id)
-        db.session.commit()
     return _render_hzn_page("forgot-password")
 
 
@@ -663,8 +675,6 @@ def change_hzn():
         return jsonify(success=True)
 
     _clear_hzn_change_session()
-    _clear_pending_hzn_change_requests(user.user_id)
-    db.session.commit()
     return _render_hzn_page("change-password", user=user)
 
 

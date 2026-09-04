@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 from flask import Flask
 from flask_migrate import Migrate
+from sqlalchemy import event
 
 try:
     from flask.logging import default_handler
@@ -68,6 +69,25 @@ def _should_initialize_database():
     return os.environ.get("SKIP_APP_INIT_DB", "").strip().lower() != "true"
 
 
+def _configure_sqlite_engine(app):
+    """Apply SQLite pragmas that reduce write contention for the local app database."""
+    database_uri = app.config.get("SQLALCHEMY_DATABASE_URI", "")
+    if not str(database_uri).startswith("sqlite:///"):
+        return
+
+    with app.app_context():
+        engine = db.engine
+
+        @event.listens_for(engine, "connect")
+        def _set_sqlite_pragmas(dbapi_connection, _connection_record):
+            cursor = dbapi_connection.cursor()
+            try:
+                cursor.execute("PRAGMA journal_mode=WAL")
+                cursor.execute("PRAGMA busy_timeout=10000")
+            finally:
+                cursor.close()
+
+
 def _register_blueprints(app):
     from .routes import main_bp
     from booking.routes.booking import booking_bp
@@ -95,6 +115,7 @@ def create_app(config_class=Config):
 
     _recover_sqlite_database_uri(app)
     db.init_app(app)
+    _configure_sqlite_engine(app)
     migrate.init_app(app, db)
 
     # Initialize shared monitor state
