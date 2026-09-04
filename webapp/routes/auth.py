@@ -1,9 +1,10 @@
 import logging
 import random
+import time
 from datetime import datetime, timedelta
 
 from flask import flash, jsonify, redirect, render_template, request, session, url_for
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, OperationalError
 
 from .blueprint import main_bp
 from ..auth_service import (
@@ -28,6 +29,8 @@ FORGOT_HZN_SESSION_KEY = "forgot_password_otp"
 REGISTER_SESSION_KEY = "register_otp"
 HZN_CHANGE_OTP_TTL_SECONDS = 120
 REGISTER_OTP_TTL_SECONDS = 120
+SQLITE_LOCK_RETRY_ATTEMPTS = 3
+SQLITE_LOCK_RETRY_DELAY_SECONDS = 0.25
 REGISTRATION_EXCLUDED_TEAM_NAMES = {
     "access_admin",
     "l3",
@@ -192,6 +195,40 @@ def _clear_register_hzn_session():
     _clear_otp_session(REGISTER_SESSION_KEY)
 
 
+def _is_sqlite_lock_error(error):
+    message = str(getattr(error, "orig", error) or "").strip().lower()
+    return "database is locked" in message or "database table is locked" in message
+
+
+def _run_with_sqlite_lock_retry(operation, log_context):
+    last_error = None
+    for attempt in range(1, SQLITE_LOCK_RETRY_ATTEMPTS + 1):
+        try:
+            return operation()
+        except OperationalError as exc:
+            db.session.rollback()
+            if not _is_sqlite_lock_error(exc) or attempt == SQLITE_LOCK_RETRY_ATTEMPTS:
+                logger.exception("%s failed after SQLite retry handling.", log_context)
+                raise
+            last_error = exc
+            logger.warning(
+                "%s hit a temporary SQLite lock on attempt %s/%s. Retrying shortly.",
+                log_context,
+                attempt,
+                SQLITE_LOCK_RETRY_ATTEMPTS,
+            )
+            time.sleep(SQLITE_LOCK_RETRY_DELAY_SECONDS)
+    if last_error is not None:
+        raise last_error
+
+
+def _otp_lock_error_response():
+    return jsonify(
+        success=False,
+        error="Another request is still in progress. Please wait a few seconds and try again.",
+    ), 503
+
+
 def _clear_pending_hzn_change_requests(user_id):
     if not user_id:
         return
@@ -215,24 +252,43 @@ def _store_register_hzn_session(payload):
 
 
 def _create_hzn_change_request(user, new_hzn_hash, code):
-    _clear_pending_hzn_change_requests(user.user_id)
-    pending_request = PasswordChangeRequest(
-        user_id=user.user_id,
-        new_hzn_hash=new_hzn_hash,
-        verification_code=str(code),
-        expires_at=datetime.utcnow() + timedelta(seconds=HZN_CHANGE_OTP_TTL_SECONDS),
-        attempt_count=0,
+    user_id = user.user_id
+
+    def _operation():
+        _clear_pending_hzn_change_requests(user_id)
+        pending_request = PasswordChangeRequest(
+            user_id=user_id,
+            new_hzn_hash=new_hzn_hash,
+            verification_code=str(code),
+            expires_at=datetime.utcnow() + timedelta(seconds=HZN_CHANGE_OTP_TTL_SECONDS),
+            attempt_count=0,
+        )
+        db.session.add(pending_request)
+        db.session.commit()
+        return pending_request
+
+    return _run_with_sqlite_lock_retry(
+        _operation,
+        "Creating password-change OTP for user '{}'".format(user_id),
     )
-    db.session.add(pending_request)
-    db.session.commit()
-    return pending_request
 
 
 def _delete_pending_hzn_change_request(pending_request):
     if pending_request is None:
         return
-    db.session.delete(pending_request)
-    db.session.commit()
+    pending_request_id = pending_request.id
+
+    def _operation():
+        current_request = PasswordChangeRequest.find_by_id(pending_request_id)
+        if current_request is None:
+            return
+        db.session.delete(current_request)
+        db.session.commit()
+
+    _run_with_sqlite_lock_retry(
+        _operation,
+        "Deleting password-change OTP '{}'".format(pending_request_id),
+    )
 
 
 def _load_pending_hzn_change_request():
@@ -578,11 +634,14 @@ def forgot_hzn():
                 error="Unable to send the verification code right now. Please try again later.",
             ), 500
 
-        pending_request = _create_hzn_change_request(
-            user,
-            hash_password(new_hzn),
-            verification_code,
-        )
+        try:
+            pending_request = _create_hzn_change_request(
+                user,
+                hash_password(new_hzn),
+                verification_code,
+            )
+        except OperationalError:
+            return _otp_lock_error_response()
         _store_forgot_hzn_session(pending_request.id)
         logger.info("Forgot password verification initiated for user %s", user.user_id)
         return jsonify(success=True)
@@ -665,11 +724,14 @@ def change_hzn():
                 error="Unable to send the verification code right now. Please try again later.",
             ), 500
 
-        pending_request = _create_hzn_change_request(
-            user,
-            hash_password(new_hzn),
-            verification_code,
-        )
+        try:
+            pending_request = _create_hzn_change_request(
+                user,
+                hash_password(new_hzn),
+                verification_code,
+            )
+        except OperationalError:
+            return _otp_lock_error_response()
         _store_hzn_change_session(pending_request.id)
         logger.info("Password change verification initiated for user %s", user.user_id)
         return jsonify(success=True)
