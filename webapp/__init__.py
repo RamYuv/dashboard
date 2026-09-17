@@ -113,10 +113,16 @@ def create_app(config_class=Config):
         app.logger.removeHandler(default_handler)
     app.logger.propagate = True
 
-    _recover_sqlite_database_uri(app)
+    initialize_database = _should_initialize_database()
+    if initialize_database:
+        _recover_sqlite_database_uri(app)
     db.init_app(app)
     _configure_sqlite_engine(app)
-    migrate.init_app(app, db)
+    migrate.init_app(app, db, compare_type=True, render_as_batch=True)
+
+    # Migration commands must work even when the old schema cannot be queried.
+    if not initialize_database:
+        return app
 
     # Initialize shared monitor state
     app.monitor_state = MonitorState()
