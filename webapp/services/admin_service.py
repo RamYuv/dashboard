@@ -12,7 +12,7 @@ from ..component_build_catalog import (
 from ..domain.deployment_targets import get_deployment_target_options, get_target_definition
 from ..helpers import DEFAULT_ROLE_NAMES, get_valid_roles, normalize_role
 from ..db_init import get_seed_runtime_summary
-from ..orbit_crypto import encrypt_server_password
+from ..orbit_crypto import (encrypt_server_password, get_primary_orbit_key, is_valid_orbit_key, OrbitCryptoError)
 from ..password_utils import hash_password
 from ..models import (
     ComponentBuild,
@@ -426,9 +426,15 @@ def delete_server_type(form):
 def create_environment_host_mapping(form):
     env_id = (form.get("env_id") or "").strip().upper()
     deployment_user = (form.get("deployment_user") or "").strip() or None
-    deploy_user_hzn = (form.get("deploy_user_hzn") or "").strip() or None
+    deploy_user_hzn = form.get("deploy_user_hzn") or None
     if deploy_user_hzn:
-        deploy_user_hzn = encrypt_server_password(deploy_user_hzn)
+        orbit_key = get_primary_orbit_key()
+        if not is_valid_orbit_key(orbit_key):
+            return "Configure a valid Orbit key before saving a deployment password."
+        try:
+            deploy_user_hzn = encrypt_server_password(deploy_user_hzn, orbit_key)
+        except OrbitCryptoError:
+            return "Deployment password could not be encrypted with the configured Orbit key."
 
     try:
         server_type_id = int(form.get("server_type_id") or "")
@@ -456,10 +462,7 @@ def create_environment_host_mapping(form):
         server_type_id=server_type_id,
     ).first()
     if existing is not None:
-        existing.host_id = host_id
-        existing.deployment_user = deployment_user
-        existing.deploy_user_hzn = deploy_user_hzn
-        return None
+        return "A mapping already exists for that environment and server type. Edit its details instead."
 
     db.session.add(
         EnvironmentHostMapping(
@@ -487,9 +490,6 @@ def update_environment_host_mapping(form):
 
     env_id = (form.get("env_id") or "").strip().upper()
     deployment_user = (form.get("deployment_user") or "").strip() or None
-    deploy_user_hzn = (form.get("deploy_user_hzn") or "").strip() or None
-    if deploy_user_hzn:
-        deploy_user_hzn = encrypt_server_password(deploy_user_hzn)
 
     try:
         server_type_id = int(form.get("server_type_id") or "")
@@ -518,7 +518,6 @@ def update_environment_host_mapping(form):
     mapping.server_type_id = server_type_id
     mapping.host_id = host_id
     mapping.deployment_user = deployment_user
-    mapping.deploy_user_hzn = deploy_user_hzn
     return None
 
 

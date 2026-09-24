@@ -302,6 +302,11 @@
                     values = {};
                 }
                 applyFormValues(form, values);
+                const mappingPassword = form.querySelector('[name="deploy_user_hzn"]');
+                if (mappingPassword) {
+                    mappingPassword.value = "";
+                    mappingPassword.disabled = trigger.getAttribute("data-admin-action") !== "create";
+                }
 
                 const actionField = form.querySelector('[name="action"]');
                 if (actionField) {
@@ -329,6 +334,11 @@
                 if (targetField && form.contains(targetField)) {
                     syncVersionAdminForm();
                     applyFormValues(form, values);
+                const mappingPassword = form.querySelector('[name="deploy_user_hzn"]');
+                if (mappingPassword) {
+                    mappingPassword.value = "";
+                    mappingPassword.disabled = trigger.getAttribute("data-admin-action") !== "create";
+                }
                 }
             });
         });

@@ -1,1 +1,85 @@
-Generic single-database configuration.
+Database schema migrations
+==========================
+
+Linux deployment
+----------------
+Ship this entire folder, including versions and script.py.mako, with every
+release. deploy_dashboard.sh calls dashboard_db.py, which backs up SQLite,
+applies migrations, and then seeds data. Failure prevents application startup.
+The backup uses SQLite's backup API so committed WAL data is included.
+
+An empty database receives the initial schema and all subsequent revisions.
+An unversioned existing database is compared against a temporary database
+created from the initial revision. Only a matching schema is stamped at the
+initial revision; subsequent revisions are then applied normally. Mismatches
+and unknown old revision IDs stop deployment without automatically stamping.
+Missing migration files also stop deployment; migrations are not generated
+on the production server.
+
+First-time initial schema generation (only if no history exists)
+---------------------------------------------------------------
+On a development checkout, use models matching the existing production
+schema and a NEW EMPTY scratch database. Do not point at production:
+
+    export FLASK_APP=manage.py
+    export DATABASE_URL=sqlite:////absolute/path/to/new_baseline_scratch.db
+    python -m flask db init       # only when migrations/ does not exist
+    python -m flask db migrate -m "initial schema"
+    python -m flask db upgrade
+
+Then update the models to the new release and generate the delta against
+that scratch database:
+
+    python -m flask db migrate -m "add PAY_VM column"
+    # Review the file, including defaults/backfills for existing rows.
+    python -m flask db upgrade
+    unset DATABASE_URL
+
+Commit and ship both revisions. Our initial schema file already exists;
+do not generate a second initial revision. If the production schema is older
+than this initial schema, prepare a reviewed reconciliation before deploying.
+
+This folder starts with one complete initial schema: 0001_initial.
+It represents the current models and creates tables, constraints and indexes.
+It does not insert application seed data.
+
+New EMPTY database (PowerShell, from project root)
+------------------------------------------------
+Set DATABASE_URL to the intended empty database, then run:
+
+    $env:FLASK_APP = "manage.py"
+    python -m flask db upgrade
+
+Use manage.py for migration commands: it skips startup create_all, seeding
+and runtime initialization. Do not run db init again.
+
+Existing database
+-----------------
+Do not run the initial upgrade against existing application tables.
+Back up the database, compare its schema with the models, and reconcile any
+missing tables, columns or constraints before marking the initial revision
+as applied. Stamping records a revision; it does not update the schema.
+
+The local dashboard.db still records the retired revision d9a4b7c8e1f2.
+Its data and revision record were deliberately not changed during cleanup.
+It needs schema reconciliation and replacement of the retired revision
+record before it can use this new history. Do not merely stamp it to hide
+missing columns. A database already matching the complete initial schema
+can be adopted by stamping 0001_initial (purging a retired revision record
+if necessary), after backup and schema verification.
+
+Future model changes
+--------------------
+Against a database already at the current migration head:
+
+    $env:FLASK_APP = "manage.py"
+    python -m flask db migrate -m "describe schema change"
+
+Review the generated revision, then:
+
+    python -m flask db upgrade
+
+Commit migration files with the models. Never edit applied revisions.
+Review renames manually; autogeneration can treat them as drop/add changes.
+New required columns need a backfill or server default for existing rows.
+Downgrading the initial revision to base deletes all application tables.
