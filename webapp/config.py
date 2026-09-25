@@ -114,6 +114,8 @@ class Config:
 
     # Comma-separated email recipients for ENV-team deployment notifications.
     ENV_TEAM_EMAILS = os.environ.get('ENV_TEAM_EMAILS', '')
+    # Comma-separated environment support recipients for new registration OTPs.
+    REGISTRATION_OTP_EMAILS = os.environ.get('REGISTRATION_OTP_EMAILS', '')
     # Enables or disables outbound email delivery through the configured sendmail binary.
     SENDMAIL_ENABLED = _read_bool(os.environ.get('SENDMAIL_ENABLED', 'true'), default=True)
     # Absolute path to the sendmail-compatible executable used for email sending.

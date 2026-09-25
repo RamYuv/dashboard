@@ -1,9 +1,12 @@
+import hashlib
+import hmac
+import secrets
 import logging
 import random
 import time
 from datetime import datetime, timedelta
 
-from flask import flash, jsonify, redirect, render_template, request, session, url_for
+from flask import current_app, flash, jsonify, redirect, render_template, request, session, url_for
 from sqlalchemy.exc import IntegrityError, OperationalError
 
 from .blueprint import main_bp
@@ -28,7 +31,7 @@ HZN_CHANGE_SESSION_KEY = "password_change_otp"
 FORGOT_HZN_SESSION_KEY = "forgot_password_otp"
 REGISTER_SESSION_KEY = "register_otp"
 HZN_CHANGE_OTP_TTL_SECONDS = 120
-REGISTER_OTP_TTL_SECONDS = 120
+REGISTER_OTP_TTL_SECONDS = 180
 SQLITE_LOCK_RETRY_ATTEMPTS = 3
 SQLITE_LOCK_RETRY_DELAY_SECONDS = 0.25
 REGISTRATION_EXCLUDED_TEAM_NAMES = {
@@ -136,6 +139,13 @@ def _forgot_hzn_email_message(user, code):
     ])
 
 
+def _registration_code_digest(user_id, code):
+    key = current_app.config["SECRET_KEY"]
+    if isinstance(key, str):
+        key = key.encode("utf-8")
+    return hmac.new(key, ("registration:" + user_id + ":" + str(code)).encode("utf-8"), hashlib.sha256).hexdigest()
+
+
 def _registration_email_message(user_id, email_id, code):
     return "\n".join([
         "A new Envista account registration was requested.",
@@ -144,8 +154,8 @@ def _registration_email_message(user_id, email_id, code):
         "Email: {}".format(email_id),
         "Verification code: {}".format(code),
         "",
-        "This code will expire in 2 minutes.",
-        "If you did not request this registration, please ignore this email.",
+        "This code will expire in 3 minutes.",
+        "Share this code with the applicant only after approving their registration.",
     ])
 
 
@@ -442,11 +452,16 @@ def register():
                 error="That {} is already registered.".format(duplicate_field),
             ), 400
 
-        verification_code = random.randint(100000, 999999)
+        recipients = [address.strip() for address in
+                      (current_app.config.get("REGISTRATION_OTP_EMAILS") or "").split(",")
+                      if address.strip()]
+        if not recipients:
+            return jsonify(success=False, error="Registration approval email is not configured. Contact application support."), 503
+        verification_code = secrets.randbelow(900000) + 100000
         try:
             SendmailEmailService.send_message(
                 subject="[Envista] Registration verification",
-                recipients=[form_data["email_id"]],
+                recipients=recipients,
                 body=_registration_email_message(
                     form_data["username"],
                     form_data["email_id"],
@@ -475,7 +490,7 @@ def register():
                 "password_hash": hash_password(form_data["password"]),
                 "team": form_data["team"],
                 "role": form_data["role"],
-                "verification_code": str(verification_code),
+                "verification_digest": _registration_code_digest(form_data["username"], verification_code),
                 "expires_at": (
                     datetime.utcnow() + timedelta(seconds=REGISTER_OTP_TTL_SECONDS)
                 ).isoformat(),
@@ -509,7 +524,7 @@ def verify_register():
         _clear_register_hzn_session()
         return jsonify(success=False, error="Verification code expired. Please start again."), 400
 
-    if submitted_code != str(pending_registration.get("verification_code", "")).strip():
+    if not hmac.compare_digest(_registration_code_digest(pending_registration.get("username", ""), submitted_code), pending_registration.get("verification_digest", "")):
         return jsonify(success=False, error="Invalid verification code."), 400
 
     username = pending_registration.get("username", "")

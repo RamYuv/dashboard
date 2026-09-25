@@ -179,12 +179,12 @@
             setAlertState(
                 verifyRegisterMessage,
                 "warning",
-                "Verification timed out after 2 minutes. Please start registration again."
+                "Verification timed out after 3 minutes. Please start registration again."
             );
             if (verifyRegisterButton) {
                 verifyRegisterButton.disabled = true;
             }
-        }, 120000);
+        }, 180000);
     }
 
     function redirectAfterSuccess() {
@@ -269,7 +269,7 @@
                 setAlertState(
                     registerMessage,
                     "success",
-                    "Verification code sent to " + (result.data.email_id || buildEmailPreview()) + "."
+                    "Verification code sent to application support. Contact the environment team lead to obtain it."
                 );
                 if (otpModal) {
                     otpModal.show();

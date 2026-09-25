@@ -423,18 +423,26 @@ def delete_server_type(form):
     return None
 
 
+def _encrypt_mapping_password(password, required=False):
+    if not password:
+        return None, "Deployment password is required." if required else None
+    if len(password) < 7:
+        return None, "Deployment password must be at least 7 characters."
+    orbit_key = get_primary_orbit_key()
+    if not is_valid_orbit_key(orbit_key):
+        return None, "Configure a valid Orbit key before saving a deployment password."
+    try:
+        return encrypt_server_password(password, orbit_key), None
+    except OrbitCryptoError:
+        return None, "Deployment password could not be encrypted with the configured Orbit key."
+
+
 def create_environment_host_mapping(form):
     env_id = (form.get("env_id") or "").strip().upper()
     deployment_user = (form.get("deployment_user") or "").strip() or None
-    deploy_user_hzn = form.get("deploy_user_hzn") or None
-    if deploy_user_hzn:
-        orbit_key = get_primary_orbit_key()
-        if not is_valid_orbit_key(orbit_key):
-            return "Configure a valid Orbit key before saving a deployment password."
-        try:
-            deploy_user_hzn = encrypt_server_password(deploy_user_hzn, orbit_key)
-        except OrbitCryptoError:
-            return "Deployment password could not be encrypted with the configured Orbit key."
+    deploy_user_hzn, error = _encrypt_mapping_password(form.get("deploy_user_hzn"), required=True)
+    if error:
+        return error
 
     try:
         server_type_id = int(form.get("server_type_id") or "")
@@ -513,11 +521,17 @@ def update_environment_host_mapping(form):
     if duplicate is not None:
         return "A mapping already exists for that environment and server type."
 
+    deploy_user_hzn, error = _encrypt_mapping_password(form.get("deploy_user_hzn"))
+    if error:
+        return error
+
     mapping.env_id = env_id
     mapping.env_type = environment.env_type
     mapping.server_type_id = server_type_id
     mapping.host_id = host_id
     mapping.deployment_user = deployment_user
+    if deploy_user_hzn is not None:
+        mapping.deploy_user_hzn = deploy_user_hzn
     return None
 
 

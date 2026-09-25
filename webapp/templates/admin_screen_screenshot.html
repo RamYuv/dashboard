@@ -304,8 +304,11 @@
                 applyFormValues(form, values);
                 const mappingPassword = form.querySelector('[name="deploy_user_hzn"]');
                 if (mappingPassword) {
+                    const creating = trigger.getAttribute("data-admin-action") === "create";
                     mappingPassword.value = "";
-                    mappingPassword.disabled = trigger.getAttribute("data-admin-action") !== "create";
+                    mappingPassword.disabled = false;
+                    mappingPassword.required = creating;
+                    mappingPassword.placeholder = creating ? "At least 7 characters" : "********";
                 }
 
                 const actionField = form.querySelector('[name="action"]');
@@ -334,11 +337,6 @@
                 if (targetField && form.contains(targetField)) {
                     syncVersionAdminForm();
                     applyFormValues(form, values);
-                const mappingPassword = form.querySelector('[name="deploy_user_hzn"]');
-                if (mappingPassword) {
-                    mappingPassword.value = "";
-                    mappingPassword.disabled = trigger.getAttribute("data-admin-action") !== "create";
-                }
                 }
             });
         });
