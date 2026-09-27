@@ -352,6 +352,76 @@ def _normalize_registration_form():
     }
 
 
+def _registration_otp_recipients():
+    """Current recipient policy: configured addresses, then active ENV admins."""
+    configured_recipients = [
+        address.strip()
+        for address in (current_app.config.get("REGISTRATION_OTP_EMAILS") or "").split(",")
+        if address.strip()
+    ]
+    if configured_recipients:
+        return configured_recipients
+
+    users = (
+        User.by_team_and_role("env", "admin")
+        .filter(User.is_active.is_(True))
+        .all()
+    )
+    return sorted({
+        user.email_id.strip().lower()
+        for user in users
+        if user.email_id and user.email_id.strip()
+    })
+
+
+def _start_registration_verification(form_data, recipients):
+    """Send the OTP and retain registration data only after delivery succeeds."""
+    verification_code = secrets.randbelow(900000) + 100000
+    SendmailEmailService.send_message(
+        subject="[Envista] Registration verification",
+        recipients=recipients,
+        body=_registration_email_message(
+            form_data["username"],
+            form_data["email_id"],
+            verification_code,
+        ),
+        reply_to=form_data["email_id"],
+    )
+
+    _store_register_hzn_session(
+        {
+            "first_name": form_data["first_name"],
+            "last_name": form_data["last_name"],
+            "username": form_data["username"],
+            "email_domain": form_data["email_domain"],
+            "email_id": form_data["email_id"],
+            "password_hash": hash_password(form_data["password"]),
+            "team": form_data["team"],
+            "role": form_data["role"],
+            "verification_digest": _registration_code_digest(form_data["username"], verification_code),
+            "expires_at": (
+                datetime.utcnow() + timedelta(seconds=REGISTER_OTP_TTL_SECONDS)
+            ).isoformat(),
+        }
+    )
+
+
+def _registration_verification_error(pending_registration, submitted_code):
+    """Validate the current OTP challenge independently of account creation."""
+    if not pending_registration:
+        return "Verification session expired. Please start again."
+    expires_at = _parse_session_datetime(pending_registration.get("expires_at"))
+    if expires_at is None or expires_at < datetime.utcnow():
+        _clear_register_hzn_session()
+        return "Verification code expired. Please start again."
+    digest = _registration_code_digest(
+        pending_registration.get("username", ""), submitted_code
+    )
+    if not hmac.compare_digest(digest, pending_registration.get("verification_digest", "")):
+        return "Invalid verification code."
+    return None
+
+
 def _find_existing_registration_user(username, email_id):
     return User.find_by_user_id(username) or User.find_by_email(email_id)
 
@@ -367,6 +437,35 @@ def _find_or_create_registration_team(team_name):
         db.session.add(team_record)
         db.session.flush()
     return team_record
+
+
+def _create_verified_registration_user(pending_registration, team_record):
+    """Stage an active account and membership; the caller owns the transaction.
+
+    This is the account-provisioning boundary for a future approval workflow.
+    """
+    user = User(
+        username=pending_registration.get("username", ""),
+        email_id=pending_registration.get("email_id", ""),
+        first_name=pending_registration.get("first_name", ""),
+        last_name=pending_registration.get("last_name", ""),
+        name="{} {}".format(
+            pending_registration.get("first_name", ""),
+            pending_registration.get("last_name", ""),
+        ).strip(),
+        hzn_hash=pending_registration.get("password_hash", ""),
+        role=pending_registration.get("role", "user"),
+    )
+    db.session.add(user)
+    db.session.flush()
+    db.session.add(
+        TeamMember(
+            user_id=user.user_id,
+            team_id=team_record.team_id,
+            role=pending_registration.get("role", "user"),
+        )
+    )
+    return user
 
 
 def _finalize_successful_login(user, entered_password):
@@ -452,23 +551,11 @@ def register():
                 error="That {} is already registered.".format(duplicate_field),
             ), 400
 
-        recipients = [address.strip() for address in
-                      (current_app.config.get("REGISTRATION_OTP_EMAILS") or "").split(",")
-                      if address.strip()]
+        recipients = _registration_otp_recipients()
         if not recipients:
-            return jsonify(success=False, error="Registration approval email is not configured. Contact application support."), 503
-        verification_code = secrets.randbelow(900000) + 100000
+            return jsonify(success=False, error="No active ENV team administrator has an email address. Contact application support."), 503
         try:
-            SendmailEmailService.send_message(
-                subject="[Envista] Registration verification",
-                recipients=recipients,
-                body=_registration_email_message(
-                    form_data["username"],
-                    form_data["email_id"],
-                    verification_code,
-                ),
-                reply_to=form_data["email_id"],
-            )
+            _start_registration_verification(form_data, recipients)
         except EmailDeliveryError as exc:
             logger.exception(
                 "Registration verification email failed for user %s: %s",
@@ -479,23 +566,6 @@ def register():
                 success=False,
                 error="Unable to send the verification code right now. Please try again later.",
             ), 500
-
-        _store_register_hzn_session(
-            {
-                "first_name": form_data["first_name"],
-                "last_name": form_data["last_name"],
-                "username": form_data["username"],
-                "email_domain": form_data["email_domain"],
-                "email_id": form_data["email_id"],
-                "password_hash": hash_password(form_data["password"]),
-                "team": form_data["team"],
-                "role": form_data["role"],
-                "verification_digest": _registration_code_digest(form_data["username"], verification_code),
-                "expires_at": (
-                    datetime.utcnow() + timedelta(seconds=REGISTER_OTP_TTL_SECONDS)
-                ).isoformat(),
-            }
-        )
 
         logger.info(
             "Registration verification initiated for user %s with role=%s team=%s",
@@ -515,17 +585,9 @@ def verify_register():
     submitted_code = str(data.get("code", "")).strip()
     pending_registration = _load_pending_register_request()
 
-    if not pending_registration:
-        return jsonify(success=False, error="Verification session expired. Please start again."), 400
-
-    expires_at = _parse_session_datetime(pending_registration.get("expires_at"))
-
-    if expires_at is None or expires_at < datetime.utcnow():
-        _clear_register_hzn_session()
-        return jsonify(success=False, error="Verification code expired. Please start again."), 400
-
-    if not hmac.compare_digest(_registration_code_digest(pending_registration.get("username", ""), submitted_code), pending_registration.get("verification_digest", "")):
-        return jsonify(success=False, error="Invalid verification code."), 400
+    verification_error = _registration_verification_error(pending_registration, submitted_code)
+    if verification_error:
+        return jsonify(success=False, error=verification_error), 400
 
     username = pending_registration.get("username", "")
     email_id = pending_registration.get("email_id", "")
@@ -546,28 +608,8 @@ def verify_register():
     if team_record is None:
         _clear_register_hzn_session()
         return jsonify(success=False, error="Registration session contains an invalid user group. Please start again."), 400
-    user = User(
-        username=username,
-        email_id=email_id,
-        first_name=pending_registration.get("first_name", ""),
-        last_name=pending_registration.get("last_name", ""),
-        name="{} {}".format(
-            pending_registration.get("first_name", ""),
-            pending_registration.get("last_name", ""),
-        ).strip(),
-        hzn_hash=pending_registration.get("password_hash", ""),
-        role=pending_registration.get("role", "user"),
-    )
-    db.session.add(user)
-    db.session.flush()
-    db.session.add(
-        TeamMember(
-            user_id=user.user_id,
-            team_id=team_record.team_id,
-            role=pending_registration.get("role", "user"),
-        )
-    )
     try:
+        _create_verified_registration_user(pending_registration, team_record)
         db.session.commit()
     except IntegrityError:
         db.session.rollback()
