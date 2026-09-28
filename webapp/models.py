@@ -153,6 +153,23 @@ class User(db.Model):
         return cls.query.filter_by(role=normalized_role_name).order_by(cls.user_id)
 
     @classmethod
+    def by_team_and_role(cls, team_name, role_name):
+        """Query team members by user role, including inactive accounts."""
+        normalized_team = (team_name or "").strip().lower()
+        normalized_role = (role_name or "").strip().lower()
+        if not normalized_team or not normalized_role:
+            return cls.query.filter(db.text("1 = 0"))
+        return (
+            cls.query.join(TeamMember, TeamMember.user_id == cls.user_id)
+            .join(Team, Team.team_id == TeamMember.team_id)
+            .filter(
+                db.func.lower(db.func.trim(Team.team_name)) == normalized_team,
+                db.func.lower(db.func.trim(cls.role)) == normalized_role,
+            )
+            .order_by(cls.user_id)
+        )
+
+    @classmethod
     def requiring_password_change(cls):
         return cls.query.filter_by(must_change_password=True).order_by(cls.user_id)
 
