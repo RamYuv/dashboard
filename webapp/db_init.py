@@ -484,7 +484,17 @@ def seed_default_team_memberships():
     seed_data = load_seed_data()
     for user_data in seed_data["users"]:
         user = _first(User, user_id=user_data["user_id"])
-        team = _first(Team, team_name=user_data["team"])
+        team_name = (user_data.get("team") or "").strip().lower()
+        team = Team.query.filter(
+            db.func.lower(db.func.trim(Team.team_name)) == team_name
+        ).first() if team_name else None
+        if user is None or team is None:
+            current_app.logger.warning(
+                "Skipping seeded membership for user %r and team %r: %s not found.",
+                user_data["user_id"], user_data.get("team"),
+                "user" if user is None else "team",
+            )
+            continue
         _seed_team_membership(
             user,
             team,
