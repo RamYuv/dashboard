@@ -1,13 +1,11 @@
 """Deployment-time database initializer for the dashboard application."""
 
-from __future__ import annotations
-
 import json
 import os
 import sys
 import tempfile
 import sqlite3
-from datetime import datetime
+import subprocess
 from pathlib import Path
 
 from alembic.autogenerate import compare_metadata
@@ -38,6 +36,17 @@ def copy_sqlite_database(source, destination):
         raise RuntimeError("Refusing to overwrite existing database: " + str(destination))
     connection = sqlite3.connect(source.as_uri() + "?mode=ro", uri=True)
     try:
+        if not hasattr(connection, "backup"):
+            # Python 3.6 lacks Connection.backup; use SQLite's WAL-aware CLI.
+            destination_arg = destination.as_posix().replace('"', '\\"')
+            try:
+                subprocess.check_call([
+                    "sqlite3", "-batch", "-bail", str(source),
+                    '.backup "{}"'.format(destination_arg),
+                ])
+            except OSError as exc:
+                raise RuntimeError("Database copy requires the sqlite3 command on PATH.") from exc
+            return
         target = sqlite3.connect(str(destination))
         try:
             connection.backup(target)
@@ -100,18 +109,28 @@ def apply_schema_migrations(app, directory=None):
 
 
 def main():
+    # deploy_dashboard.sh has already copied the previous release database.
+    # Skip normal startup initialization so migrations run before model queries.
+    previous_skip_init = os.environ.get("SKIP_APP_INIT_DB")
     os.environ["SKIP_APP_INIT_DB"] = "true"
-    app = create_app()
+    try:
+        app = create_app()
+    finally:
+        if previous_skip_init is None:
+            os.environ.pop("SKIP_APP_INIT_DB", None)
+        else:
+            os.environ["SKIP_APP_INIT_DB"] = previous_skip_init
     with app.app_context():
-        url = db.engine.url
-        if url.get_backend_name() == "sqlite" and url.database and Path(url.database).is_file():
-            backup = url.database + ".before_migrate_" + datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-            copy_sqlite_database(url.database, backup)
-            print("Database backup: " + backup)
-    apply_schema_migrations(app)
-    with app.app_context():
-        seed_initial_data()
-        summary = get_seed_runtime_summary()
+        try:
+            apply_schema_migrations(app)
+            summary = get_seed_runtime_summary()
+            seed_initial_data()
+        except Exception:
+            db.session.rollback()
+            raise
+        finally:
+            db.session.remove()
+            db.engine.dispose()
 
     print(json.dumps(summary, indent=2, sort_keys=True))
     return 0

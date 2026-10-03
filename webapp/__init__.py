@@ -1,7 +1,5 @@
-import sqlite3
 import time
 import os
-from pathlib import Path
 from flask import Flask
 from flask_migrate import Migrate
 from sqlalchemy import event
@@ -26,45 +24,6 @@ from .db_init import init_db
 migrate = Migrate()
 
 
-def _project_sqlite_recovery_path(app):
-    """Return a recovery SQLite file path inside the project directory."""
-    project_root = app.config.get("PROJECT_ROOT")
-    if project_root:
-        return Path(project_root) / "envbooking_app_recovered.db"
-    return Path("envbooking_app_recovered.db").resolve()
-
-
-def _recover_sqlite_database_uri(app):
-    """Switch to a fresh SQLite file when the configured DB is unreadable."""
-    database_uri = app.config.get("SQLALCHEMY_DATABASE_URI", "")
-    prefix = "sqlite:///"
-    if not database_uri.startswith(prefix):
-        return
-
-    db_path = Path(database_uri[len(prefix):])
-    if not db_path.exists():
-        return
-
-    try:
-        connection = sqlite3.connect(str(db_path))
-        connection.execute("PRAGMA schema_version")
-        connection.execute("PRAGMA integrity_check")
-        connection.execute("BEGIN IMMEDIATE")
-        connection.rollback()
-        connection.close()
-    except sqlite3.Error as exc:
-        recovery_path = _project_sqlite_recovery_path(app)
-        app.logger.warning(
-            "Configured SQLite database %s is unreadable (%s). Falling back to %s.",
-            db_path,
-            exc,
-            recovery_path,
-        )
-        app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///{}".format(
-            recovery_path.as_posix()
-        )
-
-
 def _should_initialize_database():
     return os.environ.get("SKIP_APP_INIT_DB", "").strip().lower() != "true"
 
@@ -84,7 +43,11 @@ def _configure_sqlite_engine(app):
             try:
                 cursor.execute("PRAGMA journal_mode=WAL")
                 cursor.execute("PRAGMA busy_timeout=10000")
-            finally:
+            except Exception:
+                cursor.close()
+                dbapi_connection.close()
+                raise
+            else:
                 cursor.close()
 
 
@@ -114,8 +77,6 @@ def create_app(config_class=Config):
     app.logger.propagate = True
 
     initialize_database = _should_initialize_database()
-    if initialize_database:
-        _recover_sqlite_database_uri(app)
     db.init_app(app)
     _configure_sqlite_engine(app)
     migrate.init_app(app, db, compare_type=True, render_as_batch=True)

@@ -306,7 +306,7 @@ class VersionPullWorker:
         )
 
     def refresh(self):
-        """Run one version pull pass and persist discovered versions."""
+        """Persist each host independently before fetching the next host."""
         created = 0
         updated = 0
         skipped = 0
@@ -316,15 +316,22 @@ class VersionPullWorker:
 
         for environment_group in environment_groups:
             for mapping in environment_group["mappings"]:
-                summary = self._process_mapping(mapping)
+                mapping_id = mapping.environment_host_mapping_id
+                env_id = mapping.env_id
+                try:
+                    summary = self._process_mapping(mapping)
+                    # Finish this write transaction before the next remote call.
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
+                    logger.exception(
+                        "Version pull failed for env_id=%s mapping_id=%s; continuing with the next host.",
+                        env_id, mapping_id,
+                    )
+                    skipped += 1
+                    continue
                 created += summary["created"]
                 updated += summary["updated"]
                 skipped += summary["skipped"]
-
-        try:
-            db.session.commit()
-        except Exception:
-            logger.exception("Failed to commit version pull updates.")
-            db.session.rollback()
 
         return {"created": created, "updated": updated, "skipped": skipped}
